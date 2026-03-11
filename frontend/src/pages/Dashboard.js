@@ -71,7 +71,7 @@ export default function Dashboard() {
       <div>
         <h2 className="text-xl font-bold text-white mb-4">Latest AI Signals</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {signals.map((signal, i) => <TradingSignalCard key={i} signal={signal} />)}
+          {signals.map((signal, i) => <TradingSignalCard key={signal.id ?? `${signal.asset}-${i}`} signal={signal} />)}
         </div>
       </div>
     </div>

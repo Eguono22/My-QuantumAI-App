@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { tradingService } from '../services/tradingService';
 import { marketService } from '../services/marketService';
 import PortfolioChart from '../components/PortfolioChart';
@@ -16,7 +16,7 @@ export default function Portfolio({ user }) {
   const [tradeForm, setTradeForm] = useState({ asset: 'BTC', action: 'buy', quantity: '' });
   const [alert, setAlert] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [port, perf, hist] = await Promise.all([
         tradingService.getPortfolio(),
@@ -31,9 +31,9 @@ export default function Portfolio({ user }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAsset]);
 
-  useEffect(() => { fetchData(); }, [selectedAsset]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleTrade = async (e) => {
     e.preventDefault();

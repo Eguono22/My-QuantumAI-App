@@ -3,6 +3,10 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from quantum_ai.algorithms import QuantumInspiredOptimizer, MarketStateEncoder, QuantumCircuitSimulator
 
+# Boost factor applied to raw vote-proportion confidence to better reflect
+# quantum algorithm certainty; capped at 0.95 to avoid overconfident signals.
+CONFIDENCE_BOOST_FACTOR = 1.2
+
 class SignalGenerator:
     def __init__(self):
         self.optimizer = QuantumInspiredOptimizer()
@@ -129,7 +133,7 @@ class SignalGenerator:
         return {
             "asset": asset,
             "signal_type": final_signal,
-            "confidence": float(min(confidence * 1.2, 0.95)),
+            "confidence": float(min(confidence * CONFIDENCE_BOOST_FACTOR, 0.95)),
             "price": current_price,
             "rsi": rsi,
             "macd": macd_data,
