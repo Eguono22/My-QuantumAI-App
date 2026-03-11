@@ -48,6 +48,11 @@ jobs:
       - name: Install dependencies
         run: cd frontend && npm install
       
+      - name: Run tests
+        run: cd frontend && npm test -- --watchAll=false
+        env:
+          CI: true
+
       - name: Build
         run: cd frontend && npm run build
         env:
@@ -57,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [backend-tests]
+    needs: [backend-tests, frontend-build]
     steps:
       - uses: actions/checkout@v4
       
