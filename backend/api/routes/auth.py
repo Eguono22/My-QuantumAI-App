@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from models.database import User, get_db
@@ -23,7 +23,7 @@ class LoginRequest(BaseModel):
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -48,7 +48,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == request.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_pw = pwd_context.hash(request.password)
-    user = User(username=request.username, email=request.email, hashed_password=hashed_pw, created_at=datetime.utcnow())
+    user = User(username=request.username, email=request.email, hashed_password=hashed_pw, created_at=datetime.now(timezone.utc))
     db.add(user)
     db.commit()
     db.refresh(user)

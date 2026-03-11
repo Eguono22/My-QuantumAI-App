@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from quantum_ai.algorithms import QuantumInspiredOptimizer, MarketStateEncoder, QuantumCircuitSimulator
 
 # Boost factor applied to raw vote-proportion confidence to better reflect
@@ -139,5 +139,5 @@ class SignalGenerator:
             "macd": macd_data,
             "bollinger_bands": bb_data,
             "quantum_walk": walk_result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }

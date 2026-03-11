@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models.database import Portfolio, Trade, TradingSignal
 from services.market_service import market_service, MOCK_ASSETS
@@ -46,7 +46,7 @@ class TradingService:
             action=action.lower(),
             quantity=quantity,
             price=price,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(trade)
         
@@ -117,7 +117,7 @@ class TradingService:
                 signal_type=signal["signal_type"],
                 confidence=signal["confidence"],
                 price=signal["price"],
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(db_signal)
             signals.append(signal)

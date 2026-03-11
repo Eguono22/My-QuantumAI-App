@@ -1,5 +1,5 @@
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 
 MOCK_ASSETS = {
@@ -19,7 +19,7 @@ _price_cache = {}
 
 def get_current_price(symbol: str, base_price: float, volatility: float) -> float:
     """Get current mock price with small random variation."""
-    key = f"{symbol}_{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+    key = f"{symbol}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}"
     if key not in _price_cache:
         rng = np.random.default_rng(hash(key) % (2**32))
         change = rng.normal(0, volatility)
@@ -40,7 +40,7 @@ def generate_price_history(symbol: str, base_price: float, volatility: float, da
     prices = base_price * np.exp(np.cumsum(returns))
     
     history = []
-    end_time = datetime.utcnow()
+    end_time = datetime.now(timezone.utc)
     for i, price in enumerate(prices):
         timestamp = end_time - timedelta(hours=n_points - i)
         volume = rng.uniform(500000, 5000000)
@@ -66,7 +66,7 @@ class MarketService:
             current = get_current_price(symbol, info["base_price"], info["volatility"])
             change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
             
-            rng = np.random.default_rng(hash(symbol + datetime.utcnow().strftime('%Y%m%d%H')) % (2**32))
+            rng = np.random.default_rng(hash(symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')) % (2**32))
             volume_24h = float(rng.uniform(1e7, 1e10))
             market_cap = current * float(rng.uniform(1e8, 1e12))
             
@@ -91,7 +91,7 @@ class MarketService:
         info = MOCK_ASSETS[symbol]
         current = get_current_price(symbol, info["base_price"], info["volatility"])
         change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
-        rng = np.random.default_rng(hash(symbol + datetime.utcnow().strftime('%Y%m%d%H')) % (2**32))
+        rng = np.random.default_rng(hash(symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')) % (2**32))
         return {
             "symbol": symbol,
             "name": info["name"],

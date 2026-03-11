@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
@@ -58,7 +59,7 @@ class TestTradingService:
         Session = sessionmaker(bind=engine)
         db = Session()
         
-        user = User(username="testuser", email="test@test.com", hashed_password="hashed", created_at=datetime.datetime.utcnow())
+        user = User(username="testuser", email="test@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
         db.add(user)
         db.commit()
         
@@ -80,7 +81,7 @@ class TestTradingService:
         Session = sessionmaker(bind=engine)
         db = Session()
         
-        user = User(username="testuser2", email="test2@test.com", hashed_password="hashed", created_at=datetime.datetime.utcnow())
+        user = User(username="testuser2", email="test2@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
         db.add(user)
         db.commit()
         
