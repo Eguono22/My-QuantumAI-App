@@ -29,12 +29,12 @@ export default function Register({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md bg-deep-900/85 p-8 rounded-3xl shadow-2xl shadow-cyan-900/30 border border-cyan-200/10 backdrop-blur-xl animate-fadeRise">
         <div className="text-center mb-8">
-          <span className="text-4xl">⚛️</span>
-          <h1 className="text-2xl font-bold text-white mt-2">Create Account</h1>
-          <p className="text-gray-400 mt-1">Start trading with quantum AI</p>
+          <span className="text-4xl">⚛</span>
+          <h1 className="text-3xl font-display font-bold text-white mt-2">Create Account</h1>
+          <p className="text-slate-300/80 mt-1">Start trading with quantum AI</p>
         </div>
         {error && <Alert type="error" message={error} onClose={() => setError('')} />}
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -45,12 +45,12 @@ export default function Register({ onLogin }) {
             { key: 'confirm', label: 'Confirm Password', type: 'password' },
           ].map(field => (
             <div key={field.key}>
-              <label className="block text-sm text-gray-400 mb-1">{field.label}</label>
+              <label className="block text-sm text-slate-300 mb-1">{field.label}</label>
               <input
                 type={field.type}
                 value={form[field.key]}
                 onChange={e => setForm({...form, [field.key]: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-deep-950 border border-cyan-200/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-300"
                 required
               />
             </div>
@@ -58,14 +58,14 @@ export default function Register({ onLogin }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition"
+            className="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-deep-950 font-semibold py-3 rounded-xl transition shadow-lg shadow-amber-500/25"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
-        <p className="text-center text-gray-400 mt-4 text-sm">
+        <p className="text-center text-slate-300/80 mt-4 text-sm">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-400 hover:text-blue-300">Sign In</Link>
+          <Link to="/login" className="text-cyan-300 hover:text-cyan-200">Sign In</Link>
         </p>
       </div>
     </div>

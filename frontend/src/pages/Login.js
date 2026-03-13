@@ -25,46 +25,46 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md bg-deep-900/85 p-8 rounded-3xl shadow-2xl shadow-cyan-900/30 border border-cyan-200/10 backdrop-blur-xl animate-fadeRise">
         <div className="text-center mb-8">
-          <span className="text-4xl">⚛️</span>
-          <h1 className="text-2xl font-bold text-white mt-2">QuantumAI Trading</h1>
-          <p className="text-gray-400 mt-1">Sign in to your account</p>
+          <span className="text-4xl">⚛</span>
+          <h1 className="text-3xl font-display font-bold text-white mt-2">QuantumAI Trading</h1>
+          <p className="text-slate-300/80 mt-1">Sign in to your account</p>
         </div>
         {error && <Alert type="error" message={error} onClose={() => setError('')} />}
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Username</label>
+            <label className="block text-sm text-slate-300 mb-1">Username</label>
             <input
               type="text"
               value={form.username}
               onChange={e => setForm({...form, username: e.target.value})}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-deep-950 border border-cyan-200/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-300"
               required
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
+            <label className="block text-sm text-slate-300 mb-1">Password</label>
             <input
               type="password"
               value={form.password}
               onChange={e => setForm({...form, password: e.target.value})}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-deep-950 border border-cyan-200/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-300"
               required
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition"
+            className="w-full bg-cyan-400 hover:bg-cyan-300 disabled:opacity-50 text-deep-950 font-semibold py-3 rounded-xl transition shadow-lg shadow-cyan-400/30"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-        <p className="text-center text-gray-400 mt-4 text-sm">
+        <p className="text-center text-slate-300/80 mt-4 text-sm">
           Don't have an account?{' '}
-          <Link to="/register" className="text-blue-400 hover:text-blue-300">Register</Link>
+          <Link to="/register" className="text-amber-300 hover:text-amber-200">Register</Link>
         </p>
       </div>
     </div>

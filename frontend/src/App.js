@@ -28,13 +28,15 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen text-slate-100 font-sans relative overflow-x-hidden">
+        <div className="pointer-events-none fixed -top-28 right-8 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl animate-floatSlow" />
+        <div className="pointer-events-none fixed top-1/2 -left-20 h-64 w-64 rounded-full bg-amber-300/10 blur-3xl animate-floatSlow" />
         {user && (
           <>
             <Navbar user={user} onLogout={handleLogout} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
             <div className="flex pt-16">
               <Sidebar isOpen={sidebarOpen} />
-              <main className={`flex-1 p-6 transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+              <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/signals" element={<TradingSignals />} />

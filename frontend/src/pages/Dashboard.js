@@ -41,20 +41,20 @@ export default function Dashboard() {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeRise">
       <div>
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <p className="text-gray-400 mt-1">Real-time quantum AI trading overview</p>
+        <h1 className="text-3xl md:text-4xl font-display font-bold text-white">Dashboard</h1>
+        <p className="text-slate-300/80 mt-1">Real-time quantum AI trading overview</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div key={stat.label} className="bg-deep-900/80 rounded-2xl p-4 border border-cyan-200/10 backdrop-blur-sm">
             <div className="flex items-center space-x-2">
               <span className="text-2xl">{stat.icon}</span>
               <div>
                 <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                <p className="text-gray-400 text-xs">{stat.label}</p>
+                <p className="text-slate-400 text-xs tracking-wide">{stat.label}</p>
               </div>
             </div>
           </div>
@@ -62,14 +62,14 @@ export default function Dashboard() {
       </div>
 
       <div>
-        <h2 className="text-xl font-bold text-white mb-4">Market Overview</h2>
+        <h2 className="text-xl font-display font-bold text-white mb-4">Market Overview</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {marketData.map(item => <MarketCard key={item.symbol} data={item} />)}
         </div>
       </div>
 
       <div>
-        <h2 className="text-xl font-bold text-white mb-4">Latest AI Signals</h2>
+        <h2 className="text-xl font-display font-bold text-white mb-4">Latest AI Signals</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {signals.map((signal, i) => <TradingSignalCard key={signal.id ?? `${signal.asset}-${i}`} signal={signal} />)}
         </div>
