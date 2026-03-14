@@ -45,15 +45,15 @@ export default function TradingSignals() {
     <div className="space-y-6 animate-fadeRise">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-white">AI Trading Signals</h1>
-          <p className="text-slate-300/80 mt-1">Quantum-powered trading recommendations</p>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-zinc-900 uppercase tracking-wide">AI Trading Signals</h1>
+          <p className="text-zinc-600 mt-1">Machine-generated opportunities across tracked markets</p>
         </div>
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-deep-950 px-4 py-2 rounded-xl transition flex items-center justify-center space-x-2 font-semibold shadow-lg shadow-cyan-500/20"
+          className="market-btn-primary disabled:opacity-50 px-4 py-2 rounded-md transition flex items-center justify-center space-x-2 font-semibold"
         >
-          <span>{generating ? '⟳' : '⚛️'}</span>
+          <span>{generating ? '⟳' : '↺'}</span>
           <span>{generating ? 'Generating...' : 'Generate New Signals'}</span>
         </button>
       </div>
@@ -65,8 +65,8 @@ export default function TradingSignals() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === f ? 'bg-amber-400 text-deep-950' : 'bg-deep-900/80 text-slate-300 border border-cyan-200/10 hover:bg-deep-800'
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+              filter === f ? 'bg-market-yellow text-black border border-amber-600' : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
             }`}
           >
             {f} ({f === 'ALL' ? signals.length : signals.filter(s => s.signal_type === f).length})
@@ -79,7 +79,7 @@ export default function TradingSignals() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-12 text-slate-400">No signals found for filter: {filter}</div>
+        <div className="text-center py-12 text-zinc-500">No signals found for filter: {filter}</div>
       )}
     </div>
   );

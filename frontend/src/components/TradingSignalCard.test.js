@@ -49,25 +49,25 @@ describe('TradingSignalCard', () => {
 
   it('uses green styles for BUY signal', () => {
     const { container } = render(<TradingSignalCard signal={buySignal} />);
-    const bar = container.querySelector('.bg-green-500');
+    const bar = container.querySelector('.bg-emerald-600');
     expect(bar).toBeInTheDocument();
   });
 
   it('uses red styles for SELL signal', () => {
     const { container } = render(<TradingSignalCard signal={sellSignal} />);
-    const bar = container.querySelector('.bg-red-500');
+    const bar = container.querySelector('.bg-red-600');
     expect(bar).toBeInTheDocument();
   });
 
   it('uses yellow styles for HOLD signal', () => {
     const { container } = render(<TradingSignalCard signal={holdSignal} />);
-    const bar = container.querySelector('.bg-yellow-500');
+    const bar = container.querySelector('.bg-amber-600');
     expect(bar).toBeInTheDocument();
   });
 
   it('sets confidence bar width based on confidence value', () => {
     const { container } = render(<TradingSignalCard signal={buySignal} />);
-    const bar = container.querySelector('.bg-green-500');
+    const bar = container.querySelector('.bg-emerald-600');
     expect(bar.style.width).toBe('82%');
   });
 

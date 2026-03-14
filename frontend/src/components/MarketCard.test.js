@@ -38,14 +38,14 @@ describe('MarketCard', () => {
 
   it('renders positive change badge with green background', () => {
     const { container } = render(<MarketCard data={positiveAsset} />);
-    const badge = container.querySelector('.bg-green-900');
+    const badge = container.querySelector('.bg-emerald-100');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('+2.35%');
   });
 
   it('renders negative change badge with red background', () => {
     const { container } = render(<MarketCard data={negativeAsset} />);
-    const badge = container.querySelector('.bg-red-900');
+    const badge = container.querySelector('.bg-red-100');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('-1.42%');
   });

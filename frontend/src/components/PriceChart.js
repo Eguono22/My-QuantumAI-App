@@ -5,7 +5,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 export default function PriceChart({ history, symbol }) {
   if (!history || history.length === 0) {
-    return <div className="flex items-center justify-center h-48 text-gray-500">No price data</div>;
+    return <div className="flex items-center justify-center h-48 text-zinc-500">No price data</div>;
   }
   const step = Math.max(1, Math.floor(history.length / 50));
   const sampled = history.filter((_, i) => i % step === 0);
@@ -14,12 +14,12 @@ export default function PriceChart({ history, symbol }) {
     datasets: [{
       label: symbol,
       data: sampled.map(h => h.close),
-      borderColor: '#22d3ee',
-      backgroundColor: 'rgba(34, 211, 238, 0.14)',
+      borderColor: '#151515',
+      backgroundColor: 'rgba(255, 191, 0, 0.2)',
       fill: true,
-      tension: 0.4,
+      tension: 0.28,
       pointRadius: 0,
-      borderWidth: 2.5,
+      borderWidth: 2.2,
     }],
   };
   const options = {
@@ -29,14 +29,14 @@ export default function PriceChart({ history, symbol }) {
       tooltip: {
         mode: 'index',
         intersect: false,
-        backgroundColor: '#0b1325',
-        borderColor: 'rgba(34, 211, 238, 0.4)',
+        backgroundColor: '#151515',
+        borderColor: 'rgba(255, 191, 0, 0.6)',
         borderWidth: 1
       }
     },
     scales: {
-      x: { ticks: { color: '#94a3b8', maxTicksLimit: 8 }, grid: { color: 'rgba(148, 163, 184, 0.15)' } },
-      y: { ticks: { color: '#94a3b8', callback: (v) => `$${v.toFixed(0)}` }, grid: { color: 'rgba(148, 163, 184, 0.15)' } }
+      x: { ticks: { color: '#6a6a6a', maxTicksLimit: 8 }, grid: { color: 'rgba(0, 0, 0, 0.08)' } },
+      y: { ticks: { color: '#6a6a6a', callback: (v) => `$${v.toFixed(0)}` }, grid: { color: 'rgba(0, 0, 0, 0.08)' } }
     }
   };
   return <Line data={data} options={options} />;

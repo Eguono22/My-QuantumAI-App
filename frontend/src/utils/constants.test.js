@@ -2,29 +2,29 @@ import { SIGNAL_COLORS, SIGNAL_BG_COLORS, API_BASE_URL, WS_BASE_URL } from './co
 
 describe('SIGNAL_COLORS', () => {
   it('defines BUY color', () => {
-    expect(SIGNAL_COLORS.BUY).toBe('text-green-400');
+    expect(SIGNAL_COLORS.BUY).toBe('text-emerald-700');
   });
 
   it('defines SELL color', () => {
-    expect(SIGNAL_COLORS.SELL).toBe('text-red-400');
+    expect(SIGNAL_COLORS.SELL).toBe('text-red-700');
   });
 
   it('defines HOLD color', () => {
-    expect(SIGNAL_COLORS.HOLD).toBe('text-yellow-400');
+    expect(SIGNAL_COLORS.HOLD).toBe('text-amber-700');
   });
 });
 
 describe('SIGNAL_BG_COLORS', () => {
   it('defines BUY background', () => {
-    expect(SIGNAL_BG_COLORS.BUY).toBe('bg-green-900 border-green-500');
+    expect(SIGNAL_BG_COLORS.BUY).toBe('bg-emerald-50 border-emerald-300');
   });
 
   it('defines SELL background', () => {
-    expect(SIGNAL_BG_COLORS.SELL).toBe('bg-red-900 border-red-500');
+    expect(SIGNAL_BG_COLORS.SELL).toBe('bg-red-50 border-red-300');
   });
 
   it('defines HOLD background', () => {
-    expect(SIGNAL_BG_COLORS.HOLD).toBe('bg-yellow-900 border-yellow-500');
+    expect(SIGNAL_BG_COLORS.HOLD).toBe('bg-amber-50 border-amber-300');
   });
 });
 
