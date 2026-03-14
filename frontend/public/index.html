@@ -3,64 +3,119 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0a111f" />
+    <meta name="theme-color" content="#121212" />
     <meta name="description" content="Quantum AI Trading Platform" />
     <title>QuantumAI Trading</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Sora', 'sans-serif'],
-              display: ['Space Grotesk', 'sans-serif']
+              sans: ['Barlow', 'sans-serif'],
+              display: ['Barlow Condensed', 'sans-serif']
             },
             colors: {
-              deep: {
-                950: '#070b16',
-                900: '#0d1426',
-                800: '#1a2440',
+              market: {
+                black: '#151515',
+                dark: '#262626',
+                yellow: '#ffbf00',
+                paper: '#f5f5f5',
+                line: '#dedede',
+                text: '#1f1f1f'
               },
-              accent: {
-                300: '#22d3ee',
-                500: '#06b6d4',
-                700: '#0e7490',
-              },
-              ember: {
-                300: '#fcd34d',
-                500: '#f59e0b',
-                700: '#b45309',
-              }
             },
             boxShadow: {
-              glow: '0 0 40px rgba(34, 211, 238, 0.2)',
+              panel: '0 2px 8px rgba(0, 0, 0, 0.08)',
             },
             keyframes: {
-              floatSlow: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-12px)' }
-              },
               fadeRise: {
                 '0%': { opacity: '0', transform: 'translateY(12px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' }
+              },
+              ticker: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(-50%)' }
               }
             },
             animation: {
-              floatSlow: 'floatSlow 8s ease-in-out infinite',
-              fadeRise: 'fadeRise 600ms ease-out forwards'
+              fadeRise: 'fadeRise 600ms ease-out forwards',
+              ticker: 'ticker 36s linear infinite'
             }
           }
         }
       }
     </script>
     <style>
+      :root {
+        --market-black: #151515;
+        --market-dark: #262626;
+        --market-yellow: #ffbf00;
+        --market-paper: #f5f5f5;
+        --market-line: #dedede;
+        --market-text: #1f1f1f;
+        --market-muted: #6a6a6a;
+      }
+
       body {
-        background: radial-gradient(circle at 15% 10%, rgba(34, 211, 238, 0.14), transparent 32%),
-                    radial-gradient(circle at 80% 0%, rgba(245, 158, 11, 0.14), transparent 28%),
-                    linear-gradient(170deg, #070b16 0%, #0a111f 55%, #10182b 100%);
+        margin: 0;
+        color: var(--market-text);
+        background:
+          radial-gradient(circle at 3% 4%, rgba(0, 0, 0, 0.03), transparent 16%),
+          linear-gradient(180deg, #f7f7f7 0%, #efefef 100%);
+      }
+
+      #root {
+        min-height: 100vh;
+      }
+
+      .market-panel {
+        background: #fff;
+        border: 1px solid var(--market-line);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+
+      .market-panel-soft {
+        background: #fafafa;
+        border: 1px solid var(--market-line);
+      }
+
+      .market-input,
+      .market-select {
+        width: 100%;
+        border: 1px solid #cfcfcf;
+        background: #fff;
+        color: var(--market-text);
+      }
+
+      .market-input:focus,
+      .market-select:focus {
+        outline: none;
+        border-color: var(--market-yellow);
+        box-shadow: 0 0 0 2px rgba(255, 191, 0, 0.25);
+      }
+
+      .market-btn-primary {
+        background: var(--market-yellow);
+        color: #191919;
+        border: 1px solid #d69f00;
+      }
+
+      .market-btn-primary:hover {
+        background: #f2b600;
+      }
+
+      .market-btn-dark {
+        background: var(--market-black);
+        color: #fff;
+        border: 1px solid #000;
+      }
+
+      .market-btn-dark:hover {
+        background: #000;
       }
     </style>
   </head>

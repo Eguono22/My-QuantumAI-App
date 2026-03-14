@@ -13,7 +13,7 @@ const renderNavbar = (props) =>
 describe('Navbar', () => {
   it('renders the brand name', () => {
     renderNavbar({ user: null, onLogout: jest.fn(), onToggleSidebar: jest.fn() });
-    expect(screen.getByText('QuantumAI Trading')).toBeInTheDocument();
+    expect(screen.getByText('QuantumAI Markets')).toBeInTheDocument();
   });
 
   it('renders the live indicator', () => {

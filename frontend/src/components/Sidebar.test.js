@@ -20,10 +20,10 @@ describe('Sidebar', () => {
 
   it('renders the quantum status panel', () => {
     renderSidebar({ isOpen: true });
-    expect(screen.getByText('QUANTUM STATUS')).toBeInTheDocument();
-    expect(screen.getByText('Qubits Active')).toBeInTheDocument();
-    expect(screen.getByText('Coherence')).toBeInTheDocument();
-    expect(screen.getByText('Gate Fidelity')).toBeInTheDocument();
+    expect(screen.getByText('MARKET STATUS')).toBeInTheDocument();
+    expect(screen.getByText('Assets Tracked')).toBeInTheDocument();
+    expect(screen.getByText('Sentiment Index')).toBeInTheDocument();
+    expect(screen.getByText('Volatility (VIX)')).toBeInTheDocument();
   });
 
   it('applies w-64 class when open', () => {
@@ -43,7 +43,7 @@ describe('Sidebar', () => {
       </MemoryRouter>
     );
     const activeLink = screen.getByText('AI Signals').closest('a');
-    expect(activeLink).toHaveClass('bg-blue-600');
+    expect(activeLink).toHaveClass('bg-market-yellow');
   });
 
   it('does not highlight inactive routes', () => {
@@ -53,6 +53,6 @@ describe('Sidebar', () => {
       </MemoryRouter>
     );
     const dashboardLink = screen.getByText('Dashboard').closest('a');
-    expect(dashboardLink).not.toHaveClass('bg-blue-600');
+    expect(dashboardLink).not.toHaveClass('bg-market-yellow');
   });
 });

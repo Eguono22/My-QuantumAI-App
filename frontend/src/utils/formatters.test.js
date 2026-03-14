@@ -113,14 +113,14 @@ describe('formatDate', () => {
 
 describe('getChangeColor', () => {
   it('returns green for positive values', () => {
-    expect(getChangeColor(5)).toBe('text-green-400');
+    expect(getChangeColor(5)).toBe('text-emerald-700');
   });
 
   it('returns red for negative values', () => {
-    expect(getChangeColor(-3)).toBe('text-red-400');
+    expect(getChangeColor(-3)).toBe('text-red-700');
   });
 
   it('returns gray for zero', () => {
-    expect(getChangeColor(0)).toBe('text-gray-400');
+    expect(getChangeColor(0)).toBe('text-zinc-500');
   });
 });

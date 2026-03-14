@@ -28,9 +28,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen text-slate-100 font-sans relative overflow-x-hidden">
-        <div className="pointer-events-none fixed -top-28 right-8 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl animate-floatSlow" />
-        <div className="pointer-events-none fixed top-1/2 -left-20 h-64 w-64 rounded-full bg-amber-300/10 blur-3xl animate-floatSlow" />
+      <div className="min-h-screen text-market-text font-sans">
         {user && (
           <>
             <Navbar user={user} onLogout={handleLogout} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />

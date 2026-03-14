@@ -41,7 +41,7 @@ export const formatDate = (dateString) => {
 };
 
 export const getChangeColor = (value) => {
-  if (value > 0) return 'text-green-400';
-  if (value < 0) return 'text-red-400';
-  return 'text-gray-400';
+  if (value > 0) return 'text-emerald-700';
+  if (value < 0) return 'text-red-700';
+  return 'text-zinc-500';
 };
