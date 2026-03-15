@@ -18,7 +18,7 @@ export default function Login({ onLogin }) {
       localStorage.setItem('username', data.username);
       onLogin({ username: data.username, token: data.access_token });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed');
+      setError(err.response?.data?.detail || 'Login failed. API unavailable or misconfigured.');
     } finally {
       setLoading(false);
     }

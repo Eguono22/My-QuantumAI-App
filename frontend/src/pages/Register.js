@@ -22,7 +22,7 @@ export default function Register({ onLogin }) {
       localStorage.setItem('username', data.username);
       onLogin({ username: data.username, token: data.access_token });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed');
+      setError(err.response?.data?.detail || 'Registration failed. API unavailable or misconfigured.');
     } finally {
       setLoading(false);
     }

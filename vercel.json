@@ -4,10 +4,21 @@
   "installCommand": "cd frontend && npm install",
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/build",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "https://quantumalpha.ai/api/$1"
+    },
+    {
+      "src": "/ws",
+      "dest": "https://quantumalpha.ai/ws"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
