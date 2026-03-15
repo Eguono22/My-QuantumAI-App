@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from models.database import User, get_db
 from config.settings import settings
+from api.routes.response_models import TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -41,7 +42,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     return user
 
-@router.post("/register")
+@router.post("/register", response_model=TokenResponse)
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == request.username).first():
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -55,7 +56,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "username": user.username}
 
-@router.post("/login")
+@router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == request.username).first()
     if not user or not pwd_context.verify(request.password, user.hashed_password):
@@ -63,6 +64,6 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "username": user.username}
 
-@router.get("/me")
+@router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "email": current_user.email}

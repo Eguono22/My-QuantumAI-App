@@ -2,7 +2,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 from typing import List
 import asyncio
 import json
+import logging
 from services.market_service import market_service
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
@@ -21,7 +24,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to send to WebSocket client %s: %s", connection.client, exc)
                 disconnected.append(connection)
         for conn in disconnected:
             self.disconnect(conn)
@@ -40,5 +44,6 @@ async def websocket_endpoint(websocket: WebSocket):
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-    except Exception:
+    except Exception as exc:
+        logger.error("Unexpected WebSocket error for client %s: %s", websocket.client, exc, exc_info=True)
         manager.disconnect(websocket)
