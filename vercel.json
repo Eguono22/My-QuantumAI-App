@@ -9,15 +9,7 @@
       "handle": "filesystem"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "https://quantumalpha.ai/api/$1"
-    },
-    {
-      "src": "/ws",
-      "dest": "https://quantumalpha.ai/ws"
-    },
-    {
-      "src": "/.*",
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
