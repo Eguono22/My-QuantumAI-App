@@ -1,3 +1,4 @@
+import hashlib
 import numpy as np
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
@@ -21,7 +22,8 @@ def get_current_price(symbol: str, base_price: float, volatility: float) -> floa
     """Get current mock price with small random variation."""
     key = f"{symbol}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}"
     if key not in _price_cache:
-        rng = np.random.default_rng(hash(key) % (2**32))
+        seed = int(hashlib.sha256(key.encode()).hexdigest(), 16) % (2**32)
+        rng = np.random.default_rng(seed)
         change = rng.normal(0, volatility)
         _price_cache[key] = base_price * (1 + change)
         if len(_price_cache) > 1000:
@@ -31,7 +33,7 @@ def get_current_price(symbol: str, base_price: float, volatility: float) -> floa
 
 def generate_price_history(symbol: str, base_price: float, volatility: float, days: int = 30) -> List[Dict]:
     """Generate realistic price history using geometric Brownian motion."""
-    rng = np.random.default_rng(hash(symbol) % (2**32))
+    rng = np.random.default_rng(int(hashlib.sha256(symbol.encode()).hexdigest(), 16) % (2**32))
     n_points = days * 24  # hourly data
     
     dt = 1 / (252 * 24)
@@ -66,7 +68,7 @@ class MarketService:
             current = get_current_price(symbol, info["base_price"], info["volatility"])
             change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
             
-            rng = np.random.default_rng(hash(symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')) % (2**32))
+            rng = np.random.default_rng(int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32))
             volume_24h = float(rng.uniform(1e7, 1e10))
             market_cap = current * float(rng.uniform(1e8, 1e12))
             
@@ -91,7 +93,7 @@ class MarketService:
         info = MOCK_ASSETS[symbol]
         current = get_current_price(symbol, info["base_price"], info["volatility"])
         change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
-        rng = np.random.default_rng(hash(symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')) % (2**32))
+        rng = np.random.default_rng(int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32))
         return {
             "symbol": symbol,
             "name": info["name"],
