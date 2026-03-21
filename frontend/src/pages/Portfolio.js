@@ -11,6 +11,7 @@ export default function Portfolio({ user }) {
   const [portfolio, setPortfolio] = useState([]);
   const [performance, setPerformance] = useState(null);
   const [priceHistory, setPriceHistory] = useState([]);
+  const [assetOptions, setAssetOptions] = useState(['BTC']);
   const [selectedAsset, setSelectedAsset] = useState('BTC');
   const [loading, setLoading] = useState(true);
   const [tradeForm, setTradeForm] = useState({ asset: 'BTC', action: 'buy', quantity: '' });
@@ -18,14 +19,25 @@ export default function Portfolio({ user }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [port, perf, hist] = await Promise.all([
+      const [port, perf, hist, overview] = await Promise.all([
         tradingService.getPortfolio(),
         tradingService.getPerformance(),
-        marketService.getHistory(selectedAsset, 30)
+        marketService.getHistory(selectedAsset, 30),
+        marketService.getOverview(),
       ]);
       setPortfolio(port);
       setPerformance(perf);
       setPriceHistory(hist);
+      const symbols = overview.map((item) => item.symbol);
+      setAssetOptions(symbols);
+      if (!symbols.includes(selectedAsset) && symbols.length > 0) {
+        setSelectedAsset(symbols[0]);
+      }
+      if (symbols.length > 0) {
+        setTradeForm(prev => (
+          symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }
+        ));
+      }
     } catch (err) {
       setAlert({ type: 'error', message: 'Failed to load portfolio data' });
     } finally {
@@ -94,7 +106,7 @@ export default function Portfolio({ user }) {
                 onChange={e => setTradeForm({...tradeForm, asset: e.target.value})}
                 className="market-select rounded-md px-3 py-2"
               >
-                {['BTC','ETH','AAPL','GOOGL','MSFT','TSLA','AMZN','NVDA','SOL','BNB'].map(s => (
+                {assetOptions.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -175,7 +187,7 @@ export default function Portfolio({ user }) {
             onChange={e => setSelectedAsset(e.target.value)}
             className="market-select rounded-md px-3 py-1 text-sm"
           >
-            {['BTC','ETH','AAPL','GOOGL','MSFT','TSLA','AMZN','NVDA','SOL','BNB'].map(s => (
+            {assetOptions.map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
