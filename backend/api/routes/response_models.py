@@ -106,3 +106,14 @@ class SignalResponse(BaseModel):
     macd: Optional[MACDData] = None
     bollinger_bands: Optional[BollingerBands] = None
     quantum_walk: Optional[QuantumWalk] = None
+
+
+class HFTResponse(BaseModel):
+    success: bool
+    asset: str
+    cycles: int
+    trades_executed: int
+    avg_latency_ms: float
+    gross_profit: float
+    fees_paid: float
+    net_profit: float

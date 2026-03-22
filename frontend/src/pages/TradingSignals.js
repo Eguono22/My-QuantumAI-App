@@ -1,20 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { tradingService } from '../services/tradingService';
+import { marketService } from '../services/marketService';
 import TradingSignalCard from '../components/TradingSignalCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
+import { formatCurrency } from '../utils/formatters';
 
 export default function TradingSignals() {
   const [signals, setSignals] = useState([]);
+  const [assetOptions, setAssetOptions] = useState([]);
   const [filter, setFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [hftRunning, setHftRunning] = useState(false);
+  const [hftResult, setHftResult] = useState(null);
+  const [hftForm, setHftForm] = useState({
+    asset: 'BTC',
+    cycles: 20,
+    quantity: 0.01,
+    spread_bps: 6,
+  });
   const [alert, setAlert] = useState(null);
 
   const fetchSignals = async () => {
     try {
-      const data = await tradingService.getSignals();
+      const [data, overview] = await Promise.all([
+        tradingService.getSignals(),
+        marketService.getOverview(),
+      ]);
       setSignals(data);
+      const symbols = overview.map(item => item.symbol);
+      setAssetOptions(symbols);
+      if (symbols.length > 0) {
+        setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
+      }
     } catch (err) {
       setAlert({ type: 'error', message: 'Failed to load signals' });
     } finally {
@@ -34,6 +53,25 @@ export default function TradingSignals() {
       setAlert({ type: 'error', message: 'Failed to generate signals' });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleHftRun = async () => {
+    setHftRunning(true);
+    setHftResult(null);
+    try {
+      const result = await tradingService.executeHFT(
+        hftForm.asset,
+        Number(hftForm.cycles),
+        Number(hftForm.quantity),
+        Number(hftForm.spread_bps),
+      );
+      setHftResult(result);
+      setAlert({ type: 'success', message: `HFT batch completed on ${result.asset}.` });
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Failed to execute HFT batch' });
+    } finally {
+      setHftRunning(false);
     }
   };
 
@@ -59,6 +97,94 @@ export default function TradingSignals() {
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">HFT Executor</h2>
+            <p className="text-zinc-600 text-sm">Authenticated batch micro-trading engine</p>
+          </div>
+          <button
+            onClick={handleHftRun}
+            disabled={hftRunning}
+            className="market-btn-dark disabled:opacity-50 px-4 py-2 rounded-md font-semibold"
+          >
+            {hftRunning ? 'Running...' : 'Run HFT Batch'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Asset</label>
+            <select
+              value={hftForm.asset}
+              onChange={(e) => setHftForm({ ...hftForm, asset: e.target.value })}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              {(assetOptions.length ? assetOptions : ['BTC']).map(symbol => (
+                <option key={symbol} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Cycles</label>
+            <input
+              type="number"
+              min="1"
+              max="500"
+              value={hftForm.cycles}
+              onChange={(e) => setHftForm({ ...hftForm, cycles: e.target.value })}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Quantity</label>
+            <input
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={hftForm.quantity}
+              onChange={(e) => setHftForm({ ...hftForm, quantity: e.target.value })}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Spread (bps)</label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              step="0.1"
+              value={hftForm.spread_bps}
+              onChange={(e) => setHftForm({ ...hftForm, spread_bps: e.target.value })}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        {hftResult && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Trades</p>
+              <p className="font-semibold text-zinc-900">{hftResult.trades_executed}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Latency</p>
+              <p className="font-semibold text-zinc-900">{hftResult.avg_latency_ms} ms</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Gross PnL</p>
+              <p className="font-semibold text-zinc-900">{formatCurrency(hftResult.gross_profit)}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Net PnL</p>
+              <p className={`font-semibold ${hftResult.net_profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                {formatCurrency(hftResult.net_profit)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {['ALL', 'BUY', 'SELL', 'HOLD'].map(f => (

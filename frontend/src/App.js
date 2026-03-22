@@ -7,17 +7,34 @@ import TradingSignals from './pages/TradingSignals';
 import Portfolio from './pages/Portfolio';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import LoadingSpinner from './components/LoadingSpinner';
+import { authService } from './services/authService';
 
 function App() {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const username = localStorage.getItem('username');
-    if (token && username) {
-      setUser({ username, token });
-    }
+    const validateSession = async () => {
+      const token = localStorage.getItem('token');
+      const username = localStorage.getItem('username');
+      if (!token || !username) {
+        setAuthLoading(false);
+        return;
+      }
+      try {
+        const me = await authService.getMe();
+        setUser({ username: me.username || username, token });
+      } catch (err) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    validateSession();
   }, []);
 
   const handleLogout = () => {
@@ -25,6 +42,14 @@ function App() {
     localStorage.removeItem('username');
     setUser(null);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <Router>

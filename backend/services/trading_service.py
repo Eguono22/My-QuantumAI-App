@@ -1,6 +1,8 @@
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+import numpy as np
+import hashlib
 from models.database import Portfolio, Trade, TradingSignal
 from services.market_service import market_service, MOCK_ASSETS
 from quantum_ai.signals import SignalGenerator
@@ -138,5 +140,59 @@ class TradingService:
             "price": s.price,
             "timestamp": s.timestamp.isoformat()
         } for s in db_signals]
+
+    def execute_hft(self, db: Session, user_id: int, asset: str, cycles: int, quantity: float, spread_bps: float) -> Dict:
+        asset = asset.upper()
+        if asset not in MOCK_ASSETS:
+            raise ValueError(f"Unknown asset: {asset}")
+        if cycles < 1 or cycles > 500:
+            raise ValueError("Cycles must be between 1 and 500")
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than 0")
+        if spread_bps <= 0 or spread_bps > 100:
+            raise ValueError("Spread must be between 0 and 100 bps")
+
+        market_snapshot = market_service.get_asset(asset)
+        if not market_snapshot:
+            raise ValueError("Market data unavailable")
+        mid_price = market_snapshot["price"]
+
+        seed_input = f"{asset}-{user_id}-{datetime.now(timezone.utc).strftime('%Y%m%d%H')}"
+        seed = int(hashlib.sha256(seed_input.encode()).hexdigest(), 16) % (2 ** 32)
+        rng = np.random.default_rng(seed)
+
+        fee_bps = 2.0
+        gross_profit = 0.0
+        fees_paid = 0.0
+        latency_samples = []
+
+        for _ in range(cycles):
+            qty = quantity * float(rng.uniform(0.92, 1.08))
+            spread_fraction = spread_bps / 10000.0
+            noise = float(rng.normal(0, spread_fraction / 10))
+            buy_price = mid_price * (1 - spread_fraction / 2 + noise)
+            sell_price = mid_price * (1 + spread_fraction / 2 + noise)
+
+            self.execute_trade(db, user_id, asset, "buy", qty, buy_price)
+            self.execute_trade(db, user_id, asset, "sell", qty, sell_price)
+
+            cycle_notional = qty * (buy_price + sell_price)
+            fees_paid += cycle_notional * (fee_bps / 10000.0)
+            gross_profit += qty * (sell_price - buy_price)
+            latency_samples.append(float(rng.uniform(1.6, 9.4)))
+
+        net_profit = gross_profit - fees_paid
+        avg_latency_ms = float(np.mean(latency_samples)) if latency_samples else 0.0
+
+        return {
+            "success": True,
+            "asset": asset,
+            "cycles": cycles,
+            "trades_executed": cycles * 2,
+            "avg_latency_ms": round(avg_latency_ms, 2),
+            "gross_profit": round(gross_profit, 4),
+            "fees_paid": round(fees_paid, 4),
+            "net_profit": round(net_profit, 4),
+        }
 
 trading_service = TradingService()

@@ -9,6 +9,10 @@ export const tradingService = {
     const response = await api.post('/trading/signals/generate');
     return response.data;
   },
+  executeHFT: async (asset, cycles, quantity, spread_bps) => {
+    const response = await api.post('/trading/hft/execute', { asset, cycles, quantity, spread_bps });
+    return response.data;
+  },
   getPortfolio: async () => {
     const response = await api.get('/portfolio');
     return response.data;
