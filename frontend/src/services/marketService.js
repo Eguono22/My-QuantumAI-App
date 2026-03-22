@@ -13,4 +13,8 @@ export const marketService = {
     const response = await api.get(`/market/${symbol}/history?days=${days}`);
     return response.data;
   },
+  getSentiment: async (symbol) => {
+    const response = await api.get(`/market/${symbol}/sentiment`);
+    return response.data;
+  },
 };

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from services.market_service import market_service
-from api.routes.response_models import MarketOverviewItem, PriceHistoryItem
+from services.sentiment_service import sentiment_service
+from api.routes.response_models import MarketOverviewItem, PriceHistoryItem, SentimentResponse
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -12,6 +13,13 @@ def get_market_overview():
 @router.get("/{symbol}/history", response_model=List[PriceHistoryItem])
 def get_price_history(symbol: str, days: int = 30):
     data = market_service.get_price_history(symbol, days)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Asset {symbol} not found")
+    return data
+
+@router.get("/{symbol}/sentiment", response_model=SentimentResponse)
+def get_sentiment(symbol: str):
+    data = sentiment_service.analyze(symbol)
     if not data:
         raise HTTPException(status_code=404, detail=f"Asset {symbol} not found")
     return data

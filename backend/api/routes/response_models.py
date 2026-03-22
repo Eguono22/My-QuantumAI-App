@@ -39,6 +39,15 @@ class PriceHistoryItem(BaseModel):
     volume: float
 
 
+class SentimentResponse(BaseModel):
+    symbol: str
+    score: float
+    label: str
+    confidence: float
+    headlines: List[str]
+    updated_at: str
+
+
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 
 class PortfolioHolding(BaseModel):
