@@ -29,13 +29,13 @@ describe('SIGNAL_BG_COLORS', () => {
 });
 
 describe('API_BASE_URL', () => {
-  it('falls back to localhost:8000', () => {
-    expect(API_BASE_URL).toBe('http://localhost:8000');
+  it('falls back to localhost:8002', () => {
+    expect(API_BASE_URL).toBe('http://localhost:8002');
   });
 });
 
 describe('WS_BASE_URL', () => {
-  it('falls back to ws://localhost:8000', () => {
-    expect(WS_BASE_URL).toBe('ws://localhost:8000');
+  it('falls back to ws://localhost:8002', () => {
+    expect(WS_BASE_URL).toBe('ws://localhost:8002');
   });
 });
