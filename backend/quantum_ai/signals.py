@@ -64,7 +64,24 @@ class SignalGenerator:
         for i in range(1, len(data)):
             ema[i] = alpha * data[i] + (1 - alpha) * ema[i-1]
         return ema
-    
+
+    def _risk_level(self, realized_volatility: float, confidence: float) -> str:
+        """Classify risk for easier decisioning in the UI."""
+        if realized_volatility >= 0.035 or confidence < 0.58:
+            return "HIGH"
+        if realized_volatility >= 0.02 or confidence < 0.7:
+            return "MEDIUM"
+        return "LOW"
+
+    def _horizon(self, realized_volatility: float, confidence: float) -> str:
+        if realized_volatility >= 0.04 and confidence < 0.7:
+            return "SCALP"
+        if realized_volatility >= 0.02:
+            return "INTRADAY"
+        if confidence >= 0.75:
+            return "SWING"
+        return "INTRADAY"
+
     def generate_signal(self, asset: str, prices: List[float], volume: float = 1000000.0) -> Dict:
         """Generate trading signal using quantum AI algorithms."""
         if not prices:
@@ -129,15 +146,61 @@ class SignalGenerator:
         final_signal = max(signal_votes, key=signal_votes.get)
         total_votes = sum(signal_votes.values())
         confidence = signal_votes[final_signal] / total_votes if total_votes > 0 else 0.5
-        
+
+        ordered_votes = sorted(signal_votes.values(), reverse=True)
+        vote_margin = (ordered_votes[0] - ordered_votes[1]) / total_votes if total_votes > 0 and len(ordered_votes) > 1 else 0.0
+        boosted_confidence = float(min(confidence * CONFIDENCE_BOOST_FACTOR, 0.95))
+
+        returns = np.diff(np.array(prices[-25:])) / (np.array(prices[-25:-1]) + 1e-10) if len(prices) >= 25 else np.array([0.0])
+        realized_volatility = float(np.std(returns) * np.sqrt(24))
+        expected_move_pct = float(max(0.0, walk_result["magnitude"] * 100.0))
+        signal_strength = float(min(100.0, max(5.0, (boosted_confidence * 0.7 + vote_margin * 0.3) * 100.0)))
+        risk_level = self._risk_level(realized_volatility, boosted_confidence)
+        horizon = self._horizon(realized_volatility, boosted_confidence)
+
+        rationale = []
+        if rsi < 30:
+            rationale.append("RSI indicates oversold momentum.")
+        elif rsi > 70:
+            rationale.append("RSI indicates overbought momentum.")
+        else:
+            rationale.append("RSI sits in neutral territory.")
+
+        if macd_data["histogram"] > 0:
+            rationale.append("MACD histogram is positive.")
+        elif macd_data["histogram"] < 0:
+            rationale.append("MACD histogram is negative.")
+
+        if walk_result["direction"] == "UP":
+            rationale.append("Quantum walk projects upward drift.")
+        elif walk_result["direction"] == "DOWN":
+            rationale.append("Quantum walk projects downward drift.")
+        else:
+            rationale.append("Quantum walk sees mixed/sideways action.")
+
+        if current_price < bb_data["lower"]:
+            rationale.append("Price is below lower Bollinger band.")
+        elif current_price > bb_data["upper"]:
+            rationale.append("Price is above upper Bollinger band.")
+
         return {
             "asset": asset,
             "signal_type": final_signal,
-            "confidence": float(min(confidence * CONFIDENCE_BOOST_FACTOR, 0.95)),
+            "confidence": boosted_confidence,
             "price": current_price,
             "rsi": rsi,
             "macd": macd_data,
             "bollinger_bands": bb_data,
             "quantum_walk": walk_result,
+            "signal_strength": signal_strength,
+            "risk_level": risk_level,
+            "expected_move_pct": expected_move_pct,
+            "horizon": horizon,
+            "rationale": rationale[:4],
+            "vote_breakdown": {
+                "buy": int(signal_votes["BUY"]),
+                "sell": int(signal_votes["SELL"]),
+                "hold": int(signal_votes["HOLD"]),
+            },
             "timestamp": datetime.now(timezone.utc).isoformat()
         }

@@ -10,23 +10,22 @@ services:
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000/api}
-      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8002}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8002}
 
   backend:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
     ports:
-      - "8000:8000"
+      - "8002:8000"
     depends_on:
       - db
       - redis
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-changeme}@db:5432/quantumai
-      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set (generate with: openssl rand -hex 32)}
+      - "SECRET_KEY=${SECRET_KEY:-dev-local-secret-key-please-change}"
       - REDIS_URL=redis://redis:6379
-      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000","http://localhost:3001"]}
+      - "CORS_ORIGINS=${CORS_ORIGINS:-[\"http://localhost:3000\",\"http://localhost:3001\"]}"
 
   db:
     image: postgres:15-alpine

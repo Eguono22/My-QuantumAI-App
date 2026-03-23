@@ -22,6 +22,12 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+def normalize_username(username: str) -> str:
+    return username.strip().lower()
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
@@ -44,12 +50,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 @router.post("/register", response_model=TokenResponse)
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == request.username).first():
+    username = normalize_username(request.username)
+    email = normalize_email(request.email)
+    if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="Username already registered")
-    if db.query(User).filter(User.email == request.email).first():
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_pw = pwd_context.hash(request.password)
-    user = User(username=request.username, email=request.email, hashed_password=hashed_pw, created_at=datetime.now(timezone.utc))
+    user = User(username=username, email=email, hashed_password=hashed_pw, created_at=datetime.now(timezone.utc))
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -58,7 +66,8 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == request.username).first()
+    username = normalize_username(request.username)
+    user = db.query(User).filter(User.username == username).first()
     if not user or not pwd_context.verify(request.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": user.username})

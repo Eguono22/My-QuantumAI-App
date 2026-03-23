@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import TradingSignals from './pages/TradingSignals';
 import Portfolio from './pages/Portfolio';
+import Markets from './pages/Markets';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -62,6 +63,7 @@ function App() {
               <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/markets" element={<Markets />} />
                   <Route path="/signals" element={<TradingSignals />} />
                   <Route path="/portfolio" element={<Portfolio user={user} />} />
                   <Route path="/login" element={<Navigate to="/" />} />

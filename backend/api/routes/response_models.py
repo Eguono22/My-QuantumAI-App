@@ -104,6 +104,12 @@ class QuantumWalk(BaseModel):
     confidence: float
 
 
+class VoteBreakdown(BaseModel):
+    buy: int
+    sell: int
+    hold: int
+
+
 class SignalResponse(BaseModel):
     id: Optional[int] = None
     asset: str
@@ -115,6 +121,12 @@ class SignalResponse(BaseModel):
     macd: Optional[MACDData] = None
     bollinger_bands: Optional[BollingerBands] = None
     quantum_walk: Optional[QuantumWalk] = None
+    signal_strength: Optional[float] = None
+    risk_level: Optional[str] = None
+    expected_move_pct: Optional[float] = None
+    horizon: Optional[str] = None
+    rationale: Optional[List[str]] = None
+    vote_breakdown: Optional[VoteBreakdown] = None
 
 
 class HFTResponse(BaseModel):

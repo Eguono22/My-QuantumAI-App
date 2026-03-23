@@ -10,6 +10,10 @@ from quantum_ai.signals import SignalGenerator
 signal_generator = SignalGenerator()
 
 class TradingService:
+    def _build_signal_analytics(self, asset: str) -> Dict:
+        prices = market_service.get_prices_for_signal(asset)
+        return signal_generator.generate_signal(asset, prices)
+
     def get_portfolio(self, db: Session, user_id: int) -> List[Dict]:
         holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
         result = []
@@ -32,8 +36,8 @@ class TradingService:
             })
         return result
     
-    def execute_trade(self, db: Session, user_id: int, asset: str, action: str, 
-                     quantity: float, price: Optional[float] = None) -> Dict:
+    def execute_trade(self, db: Session, user_id: int, asset: str, action: str,
+                     quantity: float, price: Optional[float] = None, commit: bool = True) -> Dict:
         asset = asset.upper()
         if asset not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {asset}")
@@ -51,7 +55,7 @@ class TradingService:
             timestamp=datetime.now(timezone.utc)
         )
         db.add(trade)
-        
+
         portfolio = db.query(Portfolio).filter(
             Portfolio.user_id == user_id,
             Portfolio.asset == asset
@@ -77,8 +81,13 @@ class TradingService:
             portfolio.quantity -= quantity
             if portfolio.quantity <= 0:
                 db.delete(portfolio)
-        
-        db.commit()
+
+        # Commit when executing standalone trades; allow batched/transactional
+        # execution (e.g., HFT) to flush only and commit once after the batch.
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return {
             "success": True,
             "trade": {
@@ -131,15 +140,32 @@ class TradingService:
         db_signals = db.query(TradingSignal).order_by(TradingSignal.timestamp.desc()).limit(limit).all()
         if not db_signals:
             return self.generate_signals(db)
-        
-        return [{
-            "id": s.id,
-            "asset": s.asset,
-            "signal_type": s.signal_type,
-            "confidence": s.confidence,
-            "price": s.price,
-            "timestamp": s.timestamp.isoformat()
-        } for s in db_signals]
+
+        enriched = []
+        for s in db_signals:
+            try:
+                analytics = self._build_signal_analytics(s.asset)
+            except Exception:
+                analytics = {}
+            enriched.append({
+                "id": s.id,
+                "asset": s.asset,
+                "signal_type": s.signal_type,
+                "confidence": s.confidence,
+                "price": s.price,
+                "timestamp": s.timestamp.isoformat(),
+                "rsi": analytics.get("rsi"),
+                "macd": analytics.get("macd"),
+                "bollinger_bands": analytics.get("bollinger_bands"),
+                "quantum_walk": analytics.get("quantum_walk"),
+                "signal_strength": analytics.get("signal_strength"),
+                "risk_level": analytics.get("risk_level"),
+                "expected_move_pct": analytics.get("expected_move_pct"),
+                "horizon": analytics.get("horizon"),
+                "rationale": analytics.get("rationale"),
+                "vote_breakdown": analytics.get("vote_breakdown"),
+            })
+        return enriched
 
     def execute_hft(self, db: Session, user_id: int, asset: str, cycles: int, quantity: float, spread_bps: float) -> Dict:
         asset = asset.upper()
@@ -166,20 +192,23 @@ class TradingService:
         fees_paid = 0.0
         latency_samples = []
 
-        for _ in range(cycles):
-            qty = quantity * float(rng.uniform(0.92, 1.08))
-            spread_fraction = spread_bps / 10000.0
-            noise = float(rng.normal(0, spread_fraction / 10))
-            buy_price = mid_price * (1 - spread_fraction / 2 + noise)
-            sell_price = mid_price * (1 + spread_fraction / 2 + noise)
+        # Keep the batch in a single transaction to avoid repeated commits and
+        # reduce the chance of lock/timeouts on SQLite.
+        with db.begin():
+            for _ in range(cycles):
+                qty = quantity * float(rng.uniform(0.92, 1.08))
+                spread_fraction = spread_bps / 10000.0
+                noise = float(rng.normal(0, spread_fraction / 10))
+                buy_price = mid_price * (1 - spread_fraction / 2 + noise)
+                sell_price = mid_price * (1 + spread_fraction / 2 + noise)
 
-            self.execute_trade(db, user_id, asset, "buy", qty, buy_price)
-            self.execute_trade(db, user_id, asset, "sell", qty, sell_price)
+                self.execute_trade(db, user_id, asset, "buy", qty, buy_price, commit=False)
+                self.execute_trade(db, user_id, asset, "sell", qty, sell_price, commit=False)
 
-            cycle_notional = qty * (buy_price + sell_price)
-            fees_paid += cycle_notional * (fee_bps / 10000.0)
-            gross_profit += qty * (sell_price - buy_price)
-            latency_samples.append(float(rng.uniform(1.6, 9.4)))
+                cycle_notional = qty * (buy_price + sell_price)
+                fees_paid += cycle_notional * (fee_bps / 10000.0)
+                gross_profit += qty * (sell_price - buy_price)
+                latency_samples.append(float(rng.uniform(1.6, 9.4)))
 
         net_profit = gross_profit - fees_paid
         avg_latency_ms = float(np.mean(latency_samples)) if latency_samples else 0.0

@@ -12,7 +12,8 @@ def _generate_dev_secret() -> str:
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:////tmp/quantumai.db"
+    # Use a local project file in development so accounts persist across restarts.
+    DATABASE_URL: Optional[str] = None
     # No hardcoded default — a random key is generated when SECRET_KEY is absent.
     # In production set SECRET_KEY explicitly (e.g. `openssl rand -hex 32`).
     SECRET_KEY: Optional[str] = None
@@ -26,6 +27,19 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.DATABASE_URL is None:
+    if settings.APP_ENV != "development":
+        raise ValueError(
+            "DATABASE_URL must be set in non-development environments. "
+            "Example: postgresql://user:pass@host:5432/quantumai"
+        )
+    settings.DATABASE_URL = "sqlite:///./quantumai.db"
+    warnings.warn(
+        "DATABASE_URL not set - using sqlite:///./quantumai.db for development.",
+        UserWarning,
+        stacklevel=2,
+    )
 
 if settings.SECRET_KEY is None:
     if settings.APP_ENV != "development":

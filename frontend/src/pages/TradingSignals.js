@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { tradingService } from '../services/tradingService';
 import { marketService } from '../services/marketService';
 import TradingSignalCard from '../components/TradingSignalCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatPercent } from '../utils/formatters';
 
 export default function TradingSignals() {
   const [signals, setSignals] = useState([]);
@@ -20,9 +20,17 @@ export default function TradingSignals() {
     quantity: 0.01,
     spread_bps: 6,
   });
+  const [sortBy, setSortBy] = useState('confidence');
+  const [minConfidence, setMinConfidence] = useState(50);
+  const [assetQuery, setAssetQuery] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [selectedSignalId, setSelectedSignalId] = useState(null);
+  const [quickQty, setQuickQty] = useState({});
+  const [quickTradeLoading, setQuickTradeLoading] = useState({});
+  const [quickTradeResult, setQuickTradeResult] = useState({});
   const [alert, setAlert] = useState(null);
 
-  const fetchSignals = async () => {
+  const fetchSignals = useCallback(async () => {
     try {
       const [data, overview] = await Promise.all([
         tradingService.getSignals(),
@@ -39,9 +47,15 @@ export default function TradingSignals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchSignals(); }, []);
+  useEffect(() => { fetchSignals(); }, [fetchSignals]);
+
+  useEffect(() => {
+    if (!autoRefresh) return undefined;
+    const timer = setInterval(fetchSignals, 30000);
+    return () => clearInterval(timer);
+  }, [autoRefresh, fetchSignals]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -75,7 +89,101 @@ export default function TradingSignals() {
     }
   };
 
-  const filtered = filter === 'ALL' ? signals : signals.filter(s => s.signal_type === filter);
+  const handleSetHftAsset = (asset) => {
+    setHftForm((prev) => ({ ...prev, asset }));
+    setAlert({ type: 'success', message: `HFT asset set to ${asset}.` });
+  };
+
+  const handleOpenDetailedSignal = (signal) => {
+    setSelectedSignalId(signal.id ?? `${signal.asset}-${signal.timestamp}`);
+    setTimeout(() => {
+      const target = document.getElementById(`signal-card-${signal.id ?? `${signal.asset}-${signal.timestamp}`}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  };
+
+  const handleQuickTrade = async (signal, action) => {
+    const qty = Number(quickQty[signal.asset] ?? 1);
+    if (!qty || qty <= 0) {
+      setAlert({ type: 'error', message: 'Quick trade quantity must be greater than zero.' });
+      return;
+    }
+
+    const key = `${signal.asset}-${action}`;
+    setQuickTradeLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const result = await tradingService.executeTrade(signal.asset, action, qty, signal.price);
+      const trade = result?.trade;
+      setQuickTradeResult((prev) => ({
+        ...prev,
+        [signal.asset]: {
+          action,
+          quantity: qty,
+          price: trade?.price ?? signal.price,
+          at: new Date().toISOString(),
+          ok: true,
+        },
+      }));
+      setAlert({ type: 'success', message: `${action} order submitted for ${qty} ${signal.asset}.` });
+    } catch (err) {
+      setQuickTradeResult((prev) => ({
+        ...prev,
+        [signal.asset]: {
+          action,
+          quantity: qty,
+          price: signal.price,
+          at: new Date().toISOString(),
+          ok: false,
+          error: err.response?.data?.detail || 'Quick trade failed',
+        },
+      }));
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Quick trade failed. Please retry.' });
+    } finally {
+      setQuickTradeLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const bySignal = filter === 'ALL' ? signals : signals.filter((s) => s.signal_type === filter);
+    const byConfidence = bySignal.filter((s) => (Number(s.confidence) || 0) * 100 >= minConfidence);
+    const byAsset = assetQuery.trim()
+      ? byConfidence.filter((s) => s.asset.toLowerCase().includes(assetQuery.trim().toLowerCase()))
+      : byConfidence;
+
+    const sorted = [...byAsset].sort((a, b) => {
+      if (sortBy === 'asset') return a.asset.localeCompare(b.asset);
+      if (sortBy === 'strength') return (Number(b.signal_strength) || 0) - (Number(a.signal_strength) || 0);
+      if (sortBy === 'expected_move') return (Number(b.expected_move_pct) || 0) - (Number(a.expected_move_pct) || 0);
+      if (sortBy === 'latest') return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
+    });
+    return sorted;
+  }, [signals, filter, minConfidence, assetQuery, sortBy]);
+
+  const insightStats = useMemo(() => {
+    const total = filtered.length;
+    const buy = filtered.filter((s) => s.signal_type === 'BUY').length;
+    const sell = filtered.filter((s) => s.signal_type === 'SELL').length;
+    const hold = filtered.filter((s) => s.signal_type === 'HOLD').length;
+    const avgConfidence = total ? (filtered.reduce((acc, s) => acc + (Number(s.confidence) || 0), 0) / total) * 100 : 0;
+    return { total, buy, sell, hold, avgConfidence };
+  }, [filtered]);
+
+  const topOpportunities = useMemo(() => {
+    const scoreSignal = (signal) => {
+      const confidenceScore = Math.max(0, Math.min(100, (Number(signal.confidence) || 0) * 100));
+      const strengthScore = Math.max(0, Math.min(100, Number(signal.signal_strength) || 0));
+      const moveScore = Math.max(0, Math.min(100, (Number(signal.expected_move_pct) || 0) * 8));
+      const finalScore = confidenceScore * 0.55 + strengthScore * 0.3 + moveScore * 0.15;
+      return finalScore;
+    };
+
+    return [...filtered]
+      .filter((signal) => signal.signal_type !== 'HOLD')
+      .sort((a, b) => scoreSignal(b) - scoreSignal(a))
+      .slice(0, 5)
+      .map((signal) => ({ ...signal, opportunity_score: scoreSignal(signal) }));
+  }, [filtered]);
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -200,8 +308,206 @@ export default function TradingSignals() {
         ))}
       </div>
 
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Signal Intelligence Controls</h2>
+          <button
+            onClick={() => setAutoRefresh((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold border ${autoRefresh ? 'bg-zinc-900 text-white border-black' : 'bg-white text-zinc-700 border-zinc-300'}`}
+          >
+            Auto Refresh: {autoRefresh ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs text-zinc-600 mb-1">Asset Search</label>
+            <input
+              value={assetQuery}
+              onChange={(e) => setAssetQuery(e.target.value)}
+              placeholder="Type symbol (e.g. BTC, AAPL)"
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              <option value="confidence">Confidence</option>
+              <option value="strength">Strength</option>
+              <option value="expected_move">Expected Move</option>
+              <option value="latest">Latest</option>
+              <option value="asset">Asset</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Min Confidence: {minConfidence}%</label>
+            <input
+              type="range"
+              min="0"
+              max="95"
+              step="5"
+              value={minConfidence}
+              onChange={(e) => setMinConfidence(Number(e.target.value))}
+              className="w-full accent-amber-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+          <div className="market-panel-soft rounded-md p-2">
+            <p className="text-zinc-500 text-xs">Visible Signals</p>
+            <p className="font-semibold text-zinc-900">{insightStats.total}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-2">
+            <p className="text-zinc-500 text-xs">Buy</p>
+            <p className="font-semibold text-emerald-700">{insightStats.buy}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-2">
+            <p className="text-zinc-500 text-xs">Sell</p>
+            <p className="font-semibold text-red-700">{insightStats.sell}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-2">
+            <p className="text-zinc-500 text-xs">Hold</p>
+            <p className="font-semibold text-amber-700">{insightStats.hold}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-2">
+            <p className="text-zinc-500 text-xs">Avg Confidence</p>
+            <p className="font-semibold text-zinc-900">{insightStats.avgConfidence.toFixed(1)}%</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Top Opportunities</h2>
+            <p className="text-zinc-600 text-sm">Ranked by confidence, strength, and expected move</p>
+          </div>
+          <div className="text-xs text-zinc-500">
+            Showing {topOpportunities.length} of {filtered.filter((s) => s.signal_type !== 'HOLD').length} actionable signals
+          </div>
+        </div>
+
+        {!!topOpportunities.length && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            {topOpportunities.map((signal) => {
+              const actionClass = signal.signal_type === 'BUY' ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
+              const buyLoading = !!quickTradeLoading[`${signal.asset}-BUY`];
+              const sellLoading = !!quickTradeLoading[`${signal.asset}-SELL`];
+              const latestTrade = quickTradeResult[signal.asset];
+              return (
+                <div key={`opportunity-${signal.id ?? signal.asset}`} className="market-panel-soft rounded-md p-3 border border-zinc-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-display font-bold text-zinc-900 text-lg">{signal.asset}</p>
+                      <p className="text-xs text-zinc-500">Score {signal.opportunity_score.toFixed(1)}/100</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${actionClass}`}>
+                      {signal.signal_type}
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Price</span>
+                      <span className="font-semibold text-zinc-900">{formatCurrency(signal.price)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Confidence</span>
+                      <span className="font-semibold text-zinc-900">{((Number(signal.confidence) || 0) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Expected Move</span>
+                      <span className="font-semibold text-zinc-900">
+                        {signal.expected_move_pct !== undefined && signal.expected_move_pct !== null ? formatPercent(signal.expected_move_pct) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Risk</span>
+                      <span className="font-semibold text-zinc-900">{signal.risk_level || 'MEDIUM'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-1">
+                    <button
+                      onClick={() => handleSetHftAsset(signal.asset)}
+                      className="px-2 py-1 text-[11px] rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
+                    >
+                      Set HFT
+                    </button>
+                    <button
+                      onClick={() => handleOpenDetailedSignal(signal)}
+                      className="px-2 py-1 text-[11px] rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
+                    >
+                      Open Card
+                    </button>
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      value={quickQty[signal.asset] ?? ''}
+                      onChange={(e) => setQuickQty((prev) => ({ ...prev, [signal.asset]: e.target.value }))}
+                      placeholder="Qty"
+                      className="market-input rounded px-2 py-1 text-[11px]"
+                    />
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => handleQuickTrade(signal, 'BUY')}
+                      disabled={buyLoading}
+                      className="market-btn-primary px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
+                    >
+                      {buyLoading ? 'Buying...' : 'Quick Buy'}
+                    </button>
+                    <button
+                      onClick={() => handleQuickTrade(signal, 'SELL')}
+                      disabled={sellLoading}
+                      className="market-btn-dark px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
+                    >
+                      {sellLoading ? 'Selling...' : 'Quick Sell'}
+                    </button>
+                  </div>
+
+                  {latestTrade && (
+                    <div className={`mt-2 rounded px-2 py-1 text-[11px] border ${
+                      latestTrade.ok
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {latestTrade.ok
+                        ? `Last ${latestTrade.action}: ${latestTrade.quantity} @ ${formatCurrency(latestTrade.price)}`
+                        : `Last ${latestTrade.action} failed: ${latestTrade.error}`}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!topOpportunities.length && (
+          <div className="text-sm text-zinc-500">No buy/sell opportunities match the active filters.</div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((signal, i) => <TradingSignalCard key={signal.id ?? i} signal={signal} />)}
+        {filtered.map((signal, i) => {
+          const signalKey = signal.id ?? `${signal.asset}-${signal.timestamp}`;
+          const selected = selectedSignalId === signalKey;
+          return (
+            <div
+              key={signal.id ?? i}
+              id={`signal-card-${signalKey}`}
+              className={selected ? 'ring-2 ring-amber-400 rounded-md' : ''}
+            >
+              <TradingSignalCard signal={signal} />
+            </div>
+          );
+        })}
       </div>
 
       {filtered.length === 0 && (
