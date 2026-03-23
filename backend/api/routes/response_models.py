@@ -73,6 +73,8 @@ class TradeDetail(BaseModel):
 class TradeResponse(BaseModel):
     success: bool
     trade: TradeDetail
+    order: Optional[dict] = None
+    protection: Optional[dict] = None
 
 
 class PerformanceResponse(BaseModel):
@@ -146,3 +148,47 @@ class HFTResponse(BaseModel):
     gross_profit: float
     fees_paid: float
     net_profit: float
+
+
+# ── MT5-style features ───────────────────────────────────────────────────────
+
+class WatchlistItemResponse(BaseModel):
+    id: int
+    symbol: str
+    added_at: str
+
+
+class PriceAlertResponse(BaseModel):
+    id: int
+    symbol: str
+    condition: str
+    target_price: float
+    last_price: Optional[float] = None
+    triggered: bool
+    created_at: str
+    triggered_at: Optional[str] = None
+
+
+class BacktestTradeResponse(BaseModel):
+    timestamp: str
+    action: str
+    entry_price: float
+    exit_price: float
+    quantity: float
+    pnl: float
+    confidence: float
+
+
+class StrategyBacktestResponse(BaseModel):
+    asset: str
+    bars_tested: int
+    trades: int
+    wins: int
+    losses: int
+    win_rate: float
+    total_pnl: float
+    total_pnl_pct: float
+    ending_capital: float
+    max_drawdown_pct: float
+    avg_trade_pnl: float
+    trade_log: List[BacktestTradeResponse]

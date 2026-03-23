@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 import numpy as np
 import hashlib
-from models.database import Portfolio, Trade, TradingSignal
+from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert
 from services.market_service import market_service, MOCK_ASSETS
 from quantum_ai.signals import SignalGenerator
 
@@ -36,22 +36,86 @@ class TradingService:
             })
         return result
     
-    def execute_trade(self, db: Session, user_id: int, asset: str, action: str,
-                     quantity: float, price: Optional[float] = None, commit: bool = True) -> Dict:
+    def execute_trade(
+        self,
+        db: Session,
+        user_id: int,
+        asset: str,
+        action: str,
+        quantity: float,
+        price: Optional[float] = None,
+        commit: bool = True,
+        order_type: str = "MARKET",
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_pct: Optional[float] = None,
+        risk_percent: Optional[float] = None,
+    ) -> Dict:
         asset = asset.upper()
+        action = action.lower()
+        order_type = (order_type or "MARKET").upper()
         if asset not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {asset}")
-        
-        if price is None:
-            asset_data = market_service.get_asset(asset)
-            price = asset_data["price"]
+        if action not in {"buy", "sell"}:
+            raise ValueError("Action must be BUY or SELL")
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than 0")
+        if order_type not in {"MARKET", "LIMIT", "STOP"}:
+            raise ValueError("Order type must be MARKET, LIMIT, or STOP")
+
+        asset_data = market_service.get_asset(asset)
+        market_price = asset_data["price"] if asset_data else None
+        if market_price is None:
+            raise ValueError("Market data unavailable")
+
+        executable = True
+        execution_price = market_price
+        trigger_price = None
+        reason = None
+        if order_type == "LIMIT":
+            if price is None or price <= 0:
+                raise ValueError("Limit orders require a positive limit price")
+            trigger_price = float(price)
+            if action == "buy":
+                executable = market_price <= trigger_price
+                execution_price = min(market_price, trigger_price)
+            else:
+                executable = market_price >= trigger_price
+                execution_price = max(market_price, trigger_price)
+            if not executable:
+                reason = f"Limit order not filled: market {market_price} has not reached {trigger_price}"
+        elif order_type == "STOP":
+            if price is None or price <= 0:
+                raise ValueError("Stop orders require a positive stop trigger")
+            trigger_price = float(price)
+            if action == "buy":
+                executable = market_price >= trigger_price
+            else:
+                executable = market_price <= trigger_price
+            execution_price = market_price
+            if not executable:
+                reason = f"Stop order not triggered: market {market_price} has not crossed {trigger_price}"
+        else:
+            execution_price = market_price
+
+        if not executable:
+            raise ValueError(reason)
+
+        if stop_loss is not None and stop_loss <= 0:
+            raise ValueError("Stop loss must be greater than 0")
+        if take_profit is not None and take_profit <= 0:
+            raise ValueError("Take profit must be greater than 0")
+        if trailing_stop_pct is not None and trailing_stop_pct <= 0:
+            raise ValueError("Trailing stop % must be greater than 0")
+        if risk_percent is not None and risk_percent <= 0:
+            raise ValueError("Risk % must be greater than 0")
         
         trade = Trade(
             user_id=user_id,
             asset=asset,
-            action=action.lower(),
+            action=action,
             quantity=quantity,
-            price=price,
+            price=execution_price,
             timestamp=datetime.now(timezone.utc)
         )
         db.add(trade)
@@ -61,9 +125,9 @@ class TradingService:
             Portfolio.asset == asset
         ).first()
         
-        if action.lower() == "buy":
+        if action == "buy":
             if portfolio:
-                total_cost = portfolio.quantity * portfolio.avg_price + quantity * price
+                total_cost = portfolio.quantity * portfolio.avg_price + quantity * execution_price
                 total_qty = portfolio.quantity + quantity
                 portfolio.avg_price = total_cost / total_qty
                 portfolio.quantity = total_qty
@@ -72,10 +136,10 @@ class TradingService:
                     user_id=user_id,
                     asset=asset,
                     quantity=quantity,
-                    avg_price=price
+                    avg_price=execution_price
                 )
                 db.add(portfolio)
-        elif action.lower() == "sell":
+        elif action == "sell":
             if not portfolio or portfolio.quantity < quantity:
                 raise ValueError("Insufficient holdings")
             portfolio.quantity -= quantity
@@ -94,10 +158,22 @@ class TradingService:
                 "asset": asset,
                 "action": action,
                 "quantity": quantity,
-                "price": price,
-                "total_value": round(quantity * price, 2),
+                "price": round(execution_price, 6),
+                "total_value": round(quantity * execution_price, 2),
                 "timestamp": trade.timestamp.isoformat()
-            }
+            },
+            "order": {
+                "order_type": order_type,
+                "status": "FILLED",
+                "trigger_price": trigger_price,
+                "market_price": round(market_price, 6),
+            },
+            "protection": {
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "trailing_stop_pct": trailing_stop_pct,
+                "risk_percent": risk_percent,
+            },
         }
     
     def get_performance(self, db: Session, user_id: int) -> Dict:
@@ -230,6 +306,234 @@ class TradingService:
             "gross_profit": round(gross_profit, 4),
             "fees_paid": round(fees_paid, 4),
             "net_profit": round(net_profit, 4),
+        }
+
+    def get_watchlist(self, db: Session, user_id: int) -> List[Dict]:
+        items = (
+            db.query(WatchlistItem)
+            .filter(WatchlistItem.user_id == user_id)
+            .order_by(WatchlistItem.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "id": item.id,
+                "symbol": item.symbol,
+                "added_at": item.created_at.isoformat(),
+            }
+            for item in items
+        ]
+
+    def add_watchlist_item(self, db: Session, user_id: int, symbol: str) -> Dict:
+        symbol = symbol.upper()
+        if symbol not in MOCK_ASSETS:
+            raise ValueError(f"Unknown asset: {symbol}")
+
+        existing = (
+            db.query(WatchlistItem)
+            .filter(WatchlistItem.user_id == user_id, WatchlistItem.symbol == symbol)
+            .first()
+        )
+        if existing:
+            return {
+                "id": existing.id,
+                "symbol": existing.symbol,
+                "added_at": existing.created_at.isoformat(),
+            }
+
+        item = WatchlistItem(user_id=user_id, symbol=symbol, created_at=datetime.now(timezone.utc))
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return {
+            "id": item.id,
+            "symbol": item.symbol,
+            "added_at": item.created_at.isoformat(),
+        }
+
+    def remove_watchlist_item(self, db: Session, user_id: int, item_id: int) -> None:
+        item = (
+            db.query(WatchlistItem)
+            .filter(WatchlistItem.user_id == user_id, WatchlistItem.id == item_id)
+            .first()
+        )
+        if not item:
+            raise ValueError("Watchlist item not found")
+        db.delete(item)
+        db.commit()
+
+    def _refresh_alert_statuses(self, db: Session, alerts: List[PriceAlert]) -> bool:
+        changed = False
+        for alert in alerts:
+            market = market_service.get_asset(alert.symbol)
+            if not market:
+                continue
+            price = float(market["price"])
+            alert.last_price = price
+            if not alert.triggered:
+                crossed = (alert.condition == "ABOVE" and price >= alert.target_price) or (
+                    alert.condition == "BELOW" and price <= alert.target_price
+                )
+                if crossed:
+                    alert.triggered = 1
+                    alert.triggered_at = datetime.now(timezone.utc)
+                    changed = True
+        return changed
+
+    def get_price_alerts(self, db: Session, user_id: int, include_triggered: bool = True) -> List[Dict]:
+        query = db.query(PriceAlert).filter(PriceAlert.user_id == user_id)
+        if not include_triggered:
+            query = query.filter(PriceAlert.triggered == 0)
+        alerts = query.order_by(PriceAlert.created_at.desc()).all()
+        changed = self._refresh_alert_statuses(db, alerts)
+        if changed:
+            db.commit()
+        return [
+            {
+                "id": alert.id,
+                "symbol": alert.symbol,
+                "condition": alert.condition,
+                "target_price": alert.target_price,
+                "last_price": alert.last_price,
+                "triggered": bool(alert.triggered),
+                "created_at": alert.created_at.isoformat(),
+                "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+            }
+            for alert in alerts
+        ]
+
+    def add_price_alert(self, db: Session, user_id: int, symbol: str, condition: str, target_price: float) -> Dict:
+        symbol = symbol.upper()
+        condition = condition.upper()
+        if symbol not in MOCK_ASSETS:
+            raise ValueError(f"Unknown asset: {symbol}")
+        if condition not in {"ABOVE", "BELOW"}:
+            raise ValueError("Condition must be ABOVE or BELOW")
+        if target_price <= 0:
+            raise ValueError("Target price must be greater than 0")
+
+        alert = PriceAlert(
+            user_id=user_id,
+            symbol=symbol,
+            condition=condition,
+            target_price=target_price,
+            triggered=0,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(alert)
+        db.commit()
+        db.refresh(alert)
+        self._refresh_alert_statuses(db, [alert])
+        db.commit()
+        return {
+            "id": alert.id,
+            "symbol": alert.symbol,
+            "condition": alert.condition,
+            "target_price": alert.target_price,
+            "last_price": alert.last_price,
+            "triggered": bool(alert.triggered),
+            "created_at": alert.created_at.isoformat(),
+            "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+        }
+
+    def delete_price_alert(self, db: Session, user_id: int, alert_id: int) -> None:
+        alert = (
+            db.query(PriceAlert)
+            .filter(PriceAlert.user_id == user_id, PriceAlert.id == alert_id)
+            .first()
+        )
+        if not alert:
+            raise ValueError("Price alert not found")
+        db.delete(alert)
+        db.commit()
+
+    def backtest_signals(
+        self,
+        asset: str,
+        days: int = 30,
+        starting_capital: float = 10000.0,
+        risk_per_trade_pct: float = 1.0,
+    ) -> Dict:
+        asset = asset.upper()
+        if asset not in MOCK_ASSETS:
+            raise ValueError(f"Unknown asset: {asset}")
+        if days < 5 or days > 365:
+            raise ValueError("Days must be between 5 and 365")
+        if starting_capital <= 0:
+            raise ValueError("Starting capital must be greater than 0")
+        if risk_per_trade_pct <= 0 or risk_per_trade_pct > 20:
+            raise ValueError("Risk per trade % must be between 0 and 20")
+
+        history = market_service.get_price_history(asset, days)
+        closes = [float(candle["close"]) for candle in history]
+        if len(closes) < 60:
+            raise ValueError("Not enough history for backtest")
+
+        lookback = 48
+        capital = float(starting_capital)
+        equity_peak = capital
+        max_drawdown_pct = 0.0
+        trades = []
+        wins = 0
+        losses = 0
+
+        for i in range(lookback, len(closes) - 1):
+            window = closes[max(0, i - lookback): i + 1]
+            signal = signal_generator.generate_signal(asset, window)
+            action = signal.get("signal_type", "HOLD")
+            if action == "HOLD":
+                equity_peak = max(equity_peak, capital)
+                drawdown = ((equity_peak - capital) / equity_peak * 100) if equity_peak > 0 else 0
+                max_drawdown_pct = max(max_drawdown_pct, drawdown)
+                continue
+
+            entry_price = closes[i]
+            exit_price = closes[i + 1]
+            position_risk = capital * (risk_per_trade_pct / 100.0)
+            quantity = position_risk / entry_price if entry_price > 0 else 0
+            if quantity <= 0:
+                continue
+
+            direction = 1 if action == "BUY" else -1
+            pnl = (exit_price - entry_price) * quantity * direction
+            capital += pnl
+            if pnl >= 0:
+                wins += 1
+            else:
+                losses += 1
+
+            trades.append({
+                "timestamp": history[i + 1]["timestamp"],
+                "action": action,
+                "entry_price": round(entry_price, 6),
+                "exit_price": round(exit_price, 6),
+                "quantity": round(quantity, 8),
+                "pnl": round(pnl, 6),
+                "confidence": round(float(signal.get("confidence", 0.5)), 4),
+            })
+
+            equity_peak = max(equity_peak, capital)
+            drawdown = ((equity_peak - capital) / equity_peak * 100) if equity_peak > 0 else 0
+            max_drawdown_pct = max(max_drawdown_pct, drawdown)
+
+        total_trades = len(trades)
+        total_pnl = capital - starting_capital
+        win_rate = (wins / total_trades * 100) if total_trades else 0.0
+        avg_trade_pnl = (total_pnl / total_trades) if total_trades else 0.0
+
+        return {
+            "asset": asset,
+            "bars_tested": len(closes),
+            "trades": total_trades,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round(win_rate, 2),
+            "total_pnl": round(total_pnl, 2),
+            "total_pnl_pct": round((total_pnl / starting_capital) * 100, 2),
+            "ending_capital": round(capital, 2),
+            "max_drawdown_pct": round(max_drawdown_pct, 2),
+            "avg_trade_pnl": round(avg_trade_pnl, 4),
+            "trade_log": trades[-100:],
         }
 
 trading_service = TradingService()

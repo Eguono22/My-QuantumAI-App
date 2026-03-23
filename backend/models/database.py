@@ -19,6 +19,8 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     portfolio = relationship("Portfolio", back_populates="user")
     trades = relationship("Trade", back_populates="user")
+    watchlist_items = relationship("WatchlistItem", back_populates="user")
+    price_alerts = relationship("PriceAlert", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -48,6 +50,27 @@ class TradingSignal(Base):
     confidence = Column(Float, nullable=False)
     price = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    symbol = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="watchlist_items")
+
+class PriceAlert(Base):
+    __tablename__ = "price_alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    symbol = Column(String, nullable=False, index=True)
+    condition = Column(String, nullable=False)  # ABOVE / BELOW
+    target_price = Column(Float, nullable=False)
+    triggered = Column(Integer, nullable=False, default=0)
+    last_price = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    triggered_at = Column(DateTime, nullable=True)
+    user = relationship("User", back_populates="price_alerts")
 
 def get_db():
     db = SessionLocal()

@@ -18,17 +18,33 @@ export default function Portfolio({ user }) {
   const [alert, setAlert] = useState(null);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [port, perf, hist, overview] = await Promise.all([
-        tradingService.getPortfolio(),
-        tradingService.getPerformance(),
-        marketService.getHistory(selectedAsset, 30),
-        marketService.getOverview(),
-      ]);
-      setPortfolio(port);
-      setPerformance(perf);
-      setPriceHistory(hist);
-      const symbols = overview.map((item) => item.symbol);
+    const [portRes, perfRes, histRes, overviewRes] = await Promise.allSettled([
+      tradingService.getPortfolio(),
+      tradingService.getPerformance(),
+      marketService.getHistory(selectedAsset, 30),
+      marketService.getOverview(),
+    ]);
+
+    if (portRes.status === 'fulfilled') {
+      setPortfolio(portRes.value);
+    } else {
+      setPortfolio([]);
+    }
+
+    if (perfRes.status === 'fulfilled') {
+      setPerformance(perfRes.value);
+    } else {
+      setPerformance(null);
+    }
+
+    if (histRes.status === 'fulfilled') {
+      setPriceHistory(histRes.value);
+    } else {
+      setPriceHistory([]);
+    }
+
+    if (overviewRes.status === 'fulfilled') {
+      const symbols = overviewRes.value.map((item) => item.symbol);
       setAssetOptions(symbols);
       if (!symbols.includes(selectedAsset) && symbols.length > 0) {
         setSelectedAsset(symbols[0]);
@@ -38,11 +54,17 @@ export default function Portfolio({ user }) {
           symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }
         ));
       }
-    } catch (err) {
-      setAlert({ type: 'error', message: 'Failed to load portfolio data' });
-    } finally {
-      setLoading(false);
     }
+
+    const coreFailed = portRes.status === 'rejected' && perfRes.status === 'rejected';
+    if (coreFailed) {
+      const detail = portRes.reason?.response?.data?.detail || perfRes.reason?.response?.data?.detail;
+      setAlert({ type: 'error', message: detail || 'Failed to load portfolio data' });
+    } else if (histRes.status === 'rejected' || overviewRes.status === 'rejected') {
+      setAlert({ type: 'error', message: 'Some market widgets could not be loaded. Portfolio data is available.' });
+    }
+
+    setLoading(false);
   }, [selectedAsset]);
 
   useEffect(() => { fetchData(); }, [fetchData]);

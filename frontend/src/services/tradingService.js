@@ -17,12 +17,46 @@ export const tradingService = {
     const response = await api.get('/portfolio');
     return response.data;
   },
-  executeTrade: async (asset, action, quantity, price) => {
-    const response = await api.post('/portfolio/trade', { asset, action, quantity, price });
+  executeTrade: async (asset, action, quantity, price, options = {}) => {
+    const payload = { asset, action, quantity, price, ...options };
+    const response = await api.post('/portfolio/trade', payload);
     return response.data;
   },
   getPerformance: async () => {
     const response = await api.get('/portfolio/performance');
+    return response.data;
+  },
+  getWatchlist: async () => {
+    const response = await api.get('/trading/watchlist');
+    return response.data;
+  },
+  addWatchlistItem: async (symbol) => {
+    const response = await api.post('/trading/watchlist', { symbol });
+    return response.data;
+  },
+  removeWatchlistItem: async (itemId) => {
+    const response = await api.delete(`/trading/watchlist/${itemId}`);
+    return response.data;
+  },
+  getPriceAlerts: async (includeTriggered = true) => {
+    const response = await api.get(`/trading/alerts?include_triggered=${includeTriggered}`);
+    return response.data;
+  },
+  createPriceAlert: async (symbol, condition, targetPrice) => {
+    const response = await api.post('/trading/alerts', { symbol, condition, target_price: targetPrice });
+    return response.data;
+  },
+  removePriceAlert: async (alertId) => {
+    const response = await api.delete(`/trading/alerts/${alertId}`);
+    return response.data;
+  },
+  runSignalBacktest: async (asset, days, startingCapital, riskPerTradePct) => {
+    const response = await api.post('/trading/backtest', {
+      asset,
+      days,
+      starting_capital: startingCapital,
+      risk_per_trade_pct: riskPerTradePct,
+    });
     return response.data;
   },
 };

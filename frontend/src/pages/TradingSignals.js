@@ -40,18 +40,54 @@ export default function TradingSignals() {
     maxPortfolioHeatPct: 6,
   });
   const [alert, setAlert] = useState(null);
+  const [watchlist, setWatchlist] = useState([]);
+  const [priceAlerts, setPriceAlerts] = useState([]);
+  const [watchSymbol, setWatchSymbol] = useState('BTC');
+  const [alertForm, setAlertForm] = useState({
+    symbol: 'BTC',
+    condition: 'ABOVE',
+    targetPrice: '',
+  });
+  const [advancedOrder, setAdvancedOrder] = useState({
+    asset: 'BTC',
+    action: 'BUY',
+    orderType: 'MARKET',
+    quantity: 0.01,
+    triggerPrice: '',
+    stopLoss: '',
+    takeProfit: '',
+    trailingStopPct: '',
+    riskPercent: '',
+  });
+  const [advancedOrderLoading, setAdvancedOrderLoading] = useState(false);
+  const [backtestForm, setBacktestForm] = useState({
+    asset: 'BTC',
+    days: 30,
+    startingCapital: 10000,
+    riskPerTradePct: 1,
+  });
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestResult, setBacktestResult] = useState(null);
 
   const fetchSignals = useCallback(async () => {
     try {
-      const [data, overview] = await Promise.all([
+      const [data, overview, watch, alerts] = await Promise.all([
         tradingService.getSignals(),
         marketService.getOverview(),
+        tradingService.getWatchlist(),
+        tradingService.getPriceAlerts(true),
       ]);
       setSignals(data);
       const symbols = overview.map(item => item.symbol);
       setAssetOptions(symbols);
+      setWatchlist(watch);
+      setPriceAlerts(alerts);
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
+        setWatchSymbol((prev) => (symbols.includes(prev) ? prev : symbols[0]));
+        setAlertForm((prev) => (symbols.includes(prev.symbol) ? prev : { ...prev, symbol: symbols[0] }));
+        setAdvancedOrder((prev) => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
+        setBacktestForm((prev) => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
       }
     } catch (err) {
       setAlert({ type: 'error', message: 'Failed to load signals' });
@@ -205,6 +241,108 @@ export default function TradingSignals() {
       type: 'success',
       message: `Applied ${presetKey.toLowerCase()} risk preset.`,
     });
+  };
+
+  const handleSubmitAdvancedOrder = async () => {
+    const quantity = Number(advancedOrder.quantity);
+    if (!quantity || quantity <= 0) {
+      setAlert({ type: 'error', message: 'Advanced order quantity must be greater than zero.' });
+      return;
+    }
+    if (advancedOrder.orderType !== 'MARKET' && (!Number(advancedOrder.triggerPrice) || Number(advancedOrder.triggerPrice) <= 0)) {
+      setAlert({ type: 'error', message: 'Limit/Stop orders require a valid trigger price.' });
+      return;
+    }
+
+    setAdvancedOrderLoading(true);
+    try {
+      const result = await tradingService.executeTrade(
+        advancedOrder.asset,
+        advancedOrder.action,
+        quantity,
+        advancedOrder.orderType === 'MARKET' ? undefined : Number(advancedOrder.triggerPrice),
+        {
+          order_type: advancedOrder.orderType,
+          stop_loss: advancedOrder.stopLoss ? Number(advancedOrder.stopLoss) : undefined,
+          take_profit: advancedOrder.takeProfit ? Number(advancedOrder.takeProfit) : undefined,
+          trailing_stop_pct: advancedOrder.trailingStopPct ? Number(advancedOrder.trailingStopPct) : undefined,
+          risk_percent: advancedOrder.riskPercent ? Number(advancedOrder.riskPercent) : undefined,
+        }
+      );
+      const filledPrice = result?.trade?.price;
+      setAlert({
+        type: 'success',
+        message: `${advancedOrder.orderType} ${advancedOrder.action} filled on ${advancedOrder.asset}${filledPrice ? ` at ${formatCurrency(filledPrice)}` : ''}.`,
+      });
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Advanced order failed.' });
+    } finally {
+      setAdvancedOrderLoading(false);
+    }
+  };
+
+  const handleAddWatchlist = async () => {
+    try {
+      await tradingService.addWatchlistItem(watchSymbol);
+      const items = await tradingService.getWatchlist();
+      setWatchlist(items);
+      setAlert({ type: 'success', message: `${watchSymbol} added to watchlist.` });
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Could not add watchlist item.' });
+    }
+  };
+
+  const handleRemoveWatchlist = async (itemId) => {
+    try {
+      await tradingService.removeWatchlistItem(itemId);
+      setWatchlist((prev) => prev.filter((item) => item.id !== itemId));
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Could not remove watchlist item.' });
+    }
+  };
+
+  const handleCreateAlert = async () => {
+    const target = Number(alertForm.targetPrice);
+    if (!target || target <= 0) {
+      setAlert({ type: 'error', message: 'Target price must be greater than zero.' });
+      return;
+    }
+    try {
+      await tradingService.createPriceAlert(alertForm.symbol, alertForm.condition, target);
+      const alerts = await tradingService.getPriceAlerts(true);
+      setPriceAlerts(alerts);
+      setAlert({ type: 'success', message: `${alertForm.symbol} alert created.` });
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Could not create price alert.' });
+    }
+  };
+
+  const handleRemoveAlert = async (alertId) => {
+    try {
+      await tradingService.removePriceAlert(alertId);
+      setPriceAlerts((prev) => prev.filter((item) => item.id !== alertId));
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Could not remove alert.' });
+    }
+  };
+
+  const handleRunBacktest = async () => {
+    setBacktestLoading(true);
+    try {
+      const result = await tradingService.runSignalBacktest(
+        backtestForm.asset,
+        Number(backtestForm.days),
+        Number(backtestForm.startingCapital),
+        Number(backtestForm.riskPerTradePct),
+      );
+      setBacktestResult(result);
+      setAlert({ type: 'success', message: `Backtest finished for ${result.asset}.` });
+    } catch (err) {
+      setBacktestResult(null);
+      setAlert({ type: 'error', message: err.response?.data?.detail || 'Backtest failed.' });
+    } finally {
+      setBacktestLoading(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -427,6 +565,353 @@ export default function TradingSignals() {
                 {formatCurrency(hftResult.net_profit)}
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div>
+          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Advanced Order Ticket</h2>
+          <p className="text-zinc-600 text-sm">Market, limit, and stop orders with optional SL/TP and trailing stop</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Asset</label>
+            <select
+              value={advancedOrder.asset}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, asset: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              {(assetOptions.length ? assetOptions : ['BTC']).map((symbol) => (
+                <option key={`adv-${symbol}`} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Action</label>
+            <select
+              value={advancedOrder.action}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, action: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              <option value="BUY">BUY</option>
+              <option value="SELL">SELL</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Order Type</label>
+            <select
+              value={advancedOrder.orderType}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, orderType: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              <option value="MARKET">MARKET</option>
+              <option value="LIMIT">LIMIT</option>
+              <option value="STOP">STOP</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Quantity</label>
+            <input
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={advancedOrder.quantity}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, quantity: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          {advancedOrder.orderType !== 'MARKET' && (
+            <div>
+              <label className="block text-xs text-zinc-600 mb-1">{advancedOrder.orderType === 'LIMIT' ? 'Limit Price' : 'Stop Trigger'}</label>
+              <input
+                type="number"
+                min="0.0001"
+                step="0.0001"
+                value={advancedOrder.triggerPrice}
+                onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, triggerPrice: e.target.value }))}
+                className="market-input rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Stop Loss (optional)</label>
+            <input
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={advancedOrder.stopLoss}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, stopLoss: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Take Profit (optional)</label>
+            <input
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={advancedOrder.takeProfit}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, takeProfit: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Trailing Stop % (optional)</label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={advancedOrder.trailingStopPct}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, trailingStopPct: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Risk % (optional)</label>
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={advancedOrder.riskPercent}
+              onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, riskPercent: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <button
+          onClick={handleSubmitAdvancedOrder}
+          disabled={advancedOrderLoading}
+          className="market-btn-primary px-4 py-2 rounded-md font-semibold disabled:opacity-50"
+        >
+          {advancedOrderLoading ? 'Placing Order...' : 'Place Advanced Order'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="market-panel rounded-md p-4 space-y-4">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Watchlist</h2>
+            <p className="text-zinc-600 text-sm">Track your preferred symbols like a market watch window</p>
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={watchSymbol}
+              onChange={(e) => setWatchSymbol(e.target.value)}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              {(assetOptions.length ? assetOptions : ['BTC']).map((symbol) => (
+                <option key={`watch-${symbol}`} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+            <button onClick={handleAddWatchlist} className="market-btn-dark px-3 py-2 rounded-md text-sm font-semibold">
+              Add
+            </button>
+          </div>
+          <div className="space-y-2">
+            {watchlist.map((item) => (
+              <div key={`watch-item-${item.id}`} className="market-panel-soft rounded-md p-2 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-zinc-900">{item.symbol}</p>
+                  <p className="text-[11px] text-zinc-500">Added {new Date(item.added_at).toLocaleString()}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveWatchlist(item.id)}
+                  className="px-2 py-1 rounded border border-red-200 text-red-700 text-xs hover:bg-red-50"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {!watchlist.length && <div className="text-sm text-zinc-500">No watchlist symbols yet.</div>}
+          </div>
+        </div>
+
+        <div className="market-panel rounded-md p-4 space-y-4">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Price Alerts</h2>
+            <p className="text-zinc-600 text-sm">Set above/below triggers and monitor hits in real time</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <select
+              value={alertForm.symbol}
+              onChange={(e) => setAlertForm((prev) => ({ ...prev, symbol: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              {(assetOptions.length ? assetOptions : ['BTC']).map((symbol) => (
+                <option key={`alert-symbol-${symbol}`} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+            <select
+              value={alertForm.condition}
+              onChange={(e) => setAlertForm((prev) => ({ ...prev, condition: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              <option value="ABOVE">ABOVE</option>
+              <option value="BELOW">BELOW</option>
+            </select>
+            <input
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={alertForm.targetPrice}
+              onChange={(e) => setAlertForm((prev) => ({ ...prev, targetPrice: e.target.value }))}
+              placeholder="Target price"
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+            <button onClick={handleCreateAlert} className="market-btn-primary px-3 py-2 rounded-md text-sm font-semibold">
+              Create
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {priceAlerts.map((item) => (
+              <div key={`price-alert-${item.id}`} className={`rounded-md p-2 border ${item.triggered ? 'bg-emerald-50 border-emerald-200' : 'market-panel-soft border-market-line'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-zinc-900">{item.symbol} {item.condition} {formatCurrency(item.target_price)}</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Last: {item.last_price ? formatCurrency(item.last_price) : 'N/A'} | Created {new Date(item.created_at).toLocaleString()}
+                    </p>
+                    {item.triggered && (
+                      <p className="text-[11px] text-emerald-700">Triggered {item.triggered_at ? new Date(item.triggered_at).toLocaleString() : ''}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveAlert(item.id)}
+                    className="px-2 py-1 rounded border border-red-200 text-red-700 text-xs hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!priceAlerts.length && <div className="text-sm text-zinc-500">No active alerts.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Strategy Tester</h2>
+            <p className="text-zinc-600 text-sm">Backtest AI signal directionality on synthetic historical candles</p>
+          </div>
+          <button
+            onClick={handleRunBacktest}
+            disabled={backtestLoading}
+            className="market-btn-dark px-4 py-2 rounded-md font-semibold disabled:opacity-50"
+          >
+            {backtestLoading ? 'Testing...' : 'Run Backtest'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Asset</label>
+            <select
+              value={backtestForm.asset}
+              onChange={(e) => setBacktestForm((prev) => ({ ...prev, asset: e.target.value }))}
+              className="market-select rounded-md px-3 py-2 text-sm"
+            >
+              {(assetOptions.length ? assetOptions : ['BTC']).map((symbol) => (
+                <option key={`backtest-${symbol}`} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Days</label>
+            <input
+              type="number"
+              min="5"
+              max="365"
+              value={backtestForm.days}
+              onChange={(e) => setBacktestForm((prev) => ({ ...prev, days: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Starting Capital</label>
+            <input
+              type="number"
+              min="100"
+              step="100"
+              value={backtestForm.startingCapital}
+              onChange={(e) => setBacktestForm((prev) => ({ ...prev, startingCapital: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-600 mb-1">Risk per Trade %</label>
+            <input
+              type="number"
+              min="0.1"
+              max="20"
+              step="0.1"
+              value={backtestForm.riskPerTradePct}
+              onChange={(e) => setBacktestForm((prev) => ({ ...prev, riskPerTradePct: e.target.value }))}
+              className="market-input rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        {backtestResult && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Trades</p>
+                <p className="font-semibold text-zinc-900">{backtestResult.trades}</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Win Rate</p>
+                <p className="font-semibold text-zinc-900">{backtestResult.win_rate}%</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Total PnL</p>
+                <p className={`font-semibold ${backtestResult.total_pnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {formatCurrency(backtestResult.total_pnl)}
+                </p>
+              </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Ending Capital</p>
+                <p className="font-semibold text-zinc-900">{formatCurrency(backtestResult.ending_capital)}</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Max Drawdown</p>
+                <p className="font-semibold text-zinc-900">{backtestResult.max_drawdown_pct}%</p>
+              </div>
+            </div>
+            {!!backtestResult.trade_log?.length && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-zinc-100 text-zinc-700 uppercase text-xs tracking-wide">
+                    <tr>
+                      <th className="text-left px-3 py-2">Time</th>
+                      <th className="text-left px-3 py-2">Action</th>
+                      <th className="text-right px-3 py-2">Entry</th>
+                      <th className="text-right px-3 py-2">Exit</th>
+                      <th className="text-right px-3 py-2">Qty</th>
+                      <th className="text-right px-3 py-2">Confidence</th>
+                      <th className="text-right px-3 py-2">PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backtestResult.trade_log.slice(-12).map((trade, idx) => (
+                      <tr key={`backtest-trade-${idx}`} className="border-t border-zinc-200">
+                        <td className="px-3 py-2 text-zinc-700">{new Date(trade.timestamp).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-zinc-900 font-semibold">{trade.action}</td>
+                        <td className="px-3 py-2 text-right text-zinc-900">{formatCurrency(trade.entry_price)}</td>
+                        <td className="px-3 py-2 text-right text-zinc-900">{formatCurrency(trade.exit_price)}</td>
+                        <td className="px-3 py-2 text-right text-zinc-900">{trade.quantity.toFixed(4)}</td>
+                        <td className="px-3 py-2 text-right text-zinc-900">{(Number(trade.confidence || 0) * 100).toFixed(1)}%</td>
+                        <td className={`px-3 py-2 text-right font-semibold ${trade.pnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {formatCurrency(trade.pnl)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

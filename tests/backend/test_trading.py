@@ -94,3 +94,30 @@ class TestTradingService:
         assert eth_holding["quantity"] == 2.0
         
         db.close()
+
+    def test_limit_order_rejects_when_not_reached(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser3", email="test3@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        with pytest.raises(ValueError, match="Limit order not filled"):
+            self.service.execute_trade(db, user.id, "BTC", "buy", 0.1, 1.0, order_type="LIMIT")
+
+        db.close()
+
+    def test_backtest_returns_metrics(self):
+        result = self.service.backtest_signals("BTC", days=30, starting_capital=10000, risk_per_trade_pct=1)
+        assert result["asset"] == "BTC"
+        assert "win_rate" in result
+        assert "max_drawdown_pct" in result
+        assert "trade_log" in result
