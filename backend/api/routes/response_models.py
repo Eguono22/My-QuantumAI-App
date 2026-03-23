@@ -123,8 +123,16 @@ class SignalResponse(BaseModel):
     quantum_walk: Optional[QuantumWalk] = None
     signal_strength: Optional[float] = None
     risk_level: Optional[str] = None
+    market_regime: Optional[str] = None
     expected_move_pct: Optional[float] = None
     horizon: Optional[str] = None
+    entry_price: Optional[float] = None
+    take_profit: Optional[float] = None
+    stop_loss: Optional[float] = None
+    risk_reward_ratio: Optional[float] = None
+    signal_half_life_min: Optional[int] = None
+    confidence_decay_per_hour: Optional[float] = None
+    expires_at: Optional[str] = None
     rationale: Optional[List[str]] = None
     vote_breakdown: Optional[VoteBreakdown] = None
 

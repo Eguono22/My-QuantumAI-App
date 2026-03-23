@@ -14,6 +14,10 @@ export default function TradingSignalCard({ signal }) {
   const buyPct = totalVotes ? ((signal.vote_breakdown.buy / totalVotes) * 100).toFixed(0) : 0;
   const sellPct = totalVotes ? ((signal.vote_breakdown.sell / totalVotes) * 100).toFixed(0) : 0;
   const holdPct = totalVotes ? ((signal.vote_breakdown.hold / totalVotes) * 100).toFixed(0) : 0;
+  const regimeLabel = (signal.market_regime || 'RANGE').replace('_', ' ');
+  const expiresMinutes = signal.expires_at
+    ? Math.max(0, Math.round((new Date(signal.expires_at).getTime() - Date.now()) / 60000))
+    : null;
 
   return (
     <div className={`rounded-md p-4 border ${bgColor} transition hover:opacity-95`}>
@@ -60,7 +64,33 @@ export default function TradingSignalCard({ signal }) {
           <p className="text-zinc-500 uppercase">Horizon</p>
           <p className="font-semibold text-zinc-900">{signal.horizon || 'INTRADAY'}</p>
         </div>
+        <div className="bg-white/70 border border-white rounded px-2 py-1">
+          <p className="text-zinc-500 uppercase">Regime</p>
+          <p className="font-semibold text-zinc-900">{regimeLabel}</p>
+        </div>
+        <div className="bg-white/70 border border-white rounded px-2 py-1">
+          <p className="text-zinc-500 uppercase">R:R</p>
+          <p className="font-semibold text-zinc-900">{signal.risk_reward_ratio ? signal.risk_reward_ratio.toFixed(2) : 'N/A'}</p>
+        </div>
       </div>
+
+      {(signal.entry_price || signal.take_profit || signal.stop_loss) && (
+        <div className="mt-3 text-xs text-zinc-700 bg-white/70 border border-white rounded px-2 py-2 space-y-1">
+          <p className="text-zinc-500 uppercase">Trade Plan</p>
+          <div className="flex justify-between"><span>Entry</span><span className="font-semibold text-zinc-900">{signal.entry_price ? formatCurrency(signal.entry_price) : 'N/A'}</span></div>
+          <div className="flex justify-between"><span>Take Profit</span><span className="font-semibold text-zinc-900">{signal.take_profit ? formatCurrency(signal.take_profit) : 'N/A'}</span></div>
+          <div className="flex justify-between"><span>Stop Loss</span><span className="font-semibold text-zinc-900">{signal.stop_loss ? formatCurrency(signal.stop_loss) : 'N/A'}</span></div>
+        </div>
+      )}
+
+      {(signal.signal_half_life_min || signal.confidence_decay_per_hour || expiresMinutes !== null) && (
+        <div className="mt-3 text-xs text-zinc-700 bg-white/70 border border-white rounded px-2 py-2">
+          <p className="text-zinc-500 uppercase mb-1">Signal Decay</p>
+          <div className="flex justify-between"><span>Half-life</span><span className="font-semibold text-zinc-900">{signal.signal_half_life_min ? `${signal.signal_half_life_min}m` : 'N/A'}</span></div>
+          <div className="flex justify-between"><span>Confidence Decay</span><span className="font-semibold text-zinc-900">{signal.confidence_decay_per_hour ? `${signal.confidence_decay_per_hour.toFixed(1)}%/h` : 'N/A'}</span></div>
+          <div className="flex justify-between"><span>Expires In</span><span className="font-semibold text-zinc-900">{expiresMinutes !== null ? `${expiresMinutes}m` : 'N/A'}</span></div>
+        </div>
+      )}
 
       {signal.vote_breakdown && (
         <div className="mt-3 text-xs text-zinc-700">

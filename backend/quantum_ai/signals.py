@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Dict, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from quantum_ai.algorithms import QuantumInspiredOptimizer, MarketStateEncoder, QuantumCircuitSimulator
 
 # Boost factor applied to raw vote-proportion confidence to better reflect
@@ -82,6 +82,43 @@ class SignalGenerator:
             return "SWING"
         return "INTRADAY"
 
+    def _market_regime(self, trend_strength: float, realized_volatility: float) -> str:
+        if realized_volatility >= 0.045:
+            return "HIGH_VOL"
+        if abs(trend_strength) <= 0.0015:
+            return "RANGE"
+        return "TREND_UP" if trend_strength > 0 else "TREND_DOWN"
+
+    def _position_levels(self, signal_type: str, current_price: float, expected_move_pct: float, risk_level: str) -> Dict:
+        expected_fraction = max(expected_move_pct / 100.0, 0.002)
+        risk_multiplier = 1.35 if risk_level == "HIGH" else 1.15 if risk_level == "MEDIUM" else 1.0
+        stop_fraction = expected_fraction * risk_multiplier * 0.55
+        tp_fraction = expected_fraction * (1.6 if signal_type != "HOLD" else 1.0)
+
+        if signal_type == "BUY":
+            entry = current_price
+            stop_loss = current_price * (1 - stop_fraction)
+            take_profit = current_price * (1 + tp_fraction)
+        elif signal_type == "SELL":
+            entry = current_price
+            stop_loss = current_price * (1 + stop_fraction)
+            take_profit = current_price * (1 - tp_fraction)
+        else:
+            entry = current_price
+            stop_loss = current_price * (1 - stop_fraction * 0.7)
+            take_profit = current_price * (1 + tp_fraction * 0.7)
+
+        risk_per_unit = abs(entry - stop_loss)
+        reward_per_unit = abs(take_profit - entry)
+        rr = reward_per_unit / risk_per_unit if risk_per_unit > 0 else 1.0
+
+        return {
+            "entry_price": float(entry),
+            "take_profit": float(take_profit),
+            "stop_loss": float(stop_loss),
+            "risk_reward_ratio": float(max(0.5, min(rr, 8.0)))
+        }
+
     def generate_signal(self, asset: str, prices: List[float], volume: float = 1000000.0) -> Dict:
         """Generate trading signal using quantum AI algorithms."""
         if not prices:
@@ -157,6 +194,17 @@ class SignalGenerator:
         signal_strength = float(min(100.0, max(5.0, (boosted_confidence * 0.7 + vote_margin * 0.3) * 100.0)))
         risk_level = self._risk_level(realized_volatility, boosted_confidence)
         horizon = self._horizon(realized_volatility, boosted_confidence)
+        trend_strength = float(np.mean(returns[-8:])) if len(returns) >= 8 else 0.0
+        market_regime = self._market_regime(trend_strength, realized_volatility)
+        levels = self._position_levels(final_signal, current_price, expected_move_pct, risk_level)
+
+        half_life_min = 45 if horizon == "SCALP" else 180 if horizon == "INTRADAY" else 720
+        if risk_level == "HIGH":
+            half_life_min = int(half_life_min * 0.7)
+        elif risk_level == "LOW":
+            half_life_min = int(half_life_min * 1.2)
+        confidence_decay_per_hour = float(min(45.0, max(3.0, 100.0 / max(half_life_min / 60.0, 0.25))))
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=half_life_min)
 
         rationale = []
         if rsi < 30:
@@ -194,8 +242,16 @@ class SignalGenerator:
             "quantum_walk": walk_result,
             "signal_strength": signal_strength,
             "risk_level": risk_level,
+            "market_regime": market_regime,
             "expected_move_pct": expected_move_pct,
             "horizon": horizon,
+            "entry_price": levels["entry_price"],
+            "take_profit": levels["take_profit"],
+            "stop_loss": levels["stop_loss"],
+            "risk_reward_ratio": levels["risk_reward_ratio"],
+            "signal_half_life_min": half_life_min,
+            "confidence_decay_per_hour": confidence_decay_per_hour,
+            "expires_at": expires_at.isoformat(),
             "rationale": rationale[:4],
             "vote_breakdown": {
                 "buy": int(signal_votes["BUY"]),
