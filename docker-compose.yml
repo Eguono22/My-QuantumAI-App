@@ -24,6 +24,7 @@ services:
       - redis
     environment:
       - "SECRET_KEY=${SECRET_KEY:-dev-local-secret-key-please-change}"
+      - "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-changeme}@db:5432/quantumai}"
       - REDIS_URL=redis://redis:6379
       - "CORS_ORIGINS=${CORS_ORIGINS:-[\"http://localhost:3000\",\"http://localhost:3001\"]}"
 

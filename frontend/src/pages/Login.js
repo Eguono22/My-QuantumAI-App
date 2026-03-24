@@ -35,11 +35,12 @@ export default function Login({ onLogin }) {
         {error && <Alert type="error" message={error} onClose={() => setError('')} />}
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm text-zinc-600 mb-1">Username</label>
+            <label className="block text-sm text-zinc-600 mb-1">Username or Email</label>
             <input
               type="text"
               value={form.username}
               onChange={e => setForm({...form, username: e.target.value})}
+              placeholder="Enter username or email"
               className="market-input rounded-md px-4 py-3"
               required
             />

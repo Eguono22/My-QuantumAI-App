@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
@@ -28,6 +29,13 @@ def normalize_username(username: str) -> str:
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
+def verify_password(plain_password: str, user: User) -> bool:
+    """Support hashed passwords and legacy plaintext rows from early dev builds."""
+    try:
+        return pwd_context.verify(plain_password, user.hashed_password)
+    except Exception:
+        return plain_password == user.hashed_password
+
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
@@ -52,9 +60,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
     username = normalize_username(request.username)
     email = normalize_email(request.email)
-    if db.query(User).filter(User.username == username).first():
+    existing_username = db.query(User).filter(func.lower(User.username) == username).first()
+    if existing_username:
         raise HTTPException(status_code=400, detail="Username already registered")
-    if db.query(User).filter(User.email == email).first():
+    existing_email = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_pw = pwd_context.hash(request.password)
     user = User(username=username, email=email, hashed_password=hashed_pw, created_at=datetime.now(timezone.utc))
@@ -66,10 +76,30 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
-    username = normalize_username(request.username)
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not pwd_context.verify(request.password, user.hashed_password):
+    identifier = request.username.strip()
+    username = normalize_username(identifier)
+    email = normalize_email(identifier)
+
+    user = db.query(User).filter(
+        or_(
+            func.lower(User.username) == username,
+            func.lower(User.email) == email,
+        )
+    ).first()
+
+    if not user or not verify_password(request.password, user):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    # Normalize legacy rows in-place after successful login.
+    updated = False
+    if user.username != normalize_username(user.username):
+        user.username = normalize_username(user.username)
+        updated = True
+    if user.email != normalize_email(user.email):
+        user.email = normalize_email(user.email)
+        updated = True
+    if updated:
+        db.commit()
+        db.refresh(user)
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "username": user.username}
 
