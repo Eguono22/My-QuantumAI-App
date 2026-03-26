@@ -29,7 +29,7 @@ export default function Login({ onLogin }) {
       <div className="w-full max-w-md market-panel p-8 rounded-md animate-fadeRise">
         <div className="text-center mb-8">
           <span className="text-4xl text-market-yellow">▥</span>
-          <h1 className="text-3xl font-display font-bold text-zinc-900 mt-2 uppercase tracking-wide">QuantumAI Markets</h1>
+          <h1 className="text-3xl font-display font-bold text-zinc-900 mt-2 uppercase tracking-wide">QuantumAI Trader</h1>
           <p className="text-zinc-600 mt-1">Sign in to your account</p>
         </div>
         {error && <Alert type="error" message={error} onClose={() => setError('')} />}

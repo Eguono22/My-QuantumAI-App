@@ -18,7 +18,7 @@ export default function Navbar({ user, onLogout, onToggleSidebar }) {
           <Link to="/" className="flex items-center space-x-3">
             <span className="text-xl md:text-2xl text-market-yellow">▥</span>
             <span className="text-xl md:text-2xl font-display font-bold tracking-wide uppercase">
-              QuantumAI Markets
+              QuantumAI Trader
             </span>
           </Link>
         </div>
