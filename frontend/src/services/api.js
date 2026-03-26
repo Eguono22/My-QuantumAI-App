@@ -17,7 +17,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail;
+    const isAuthFailure =
+      status === 401 ||
+      (status === 403 && (detail === 'Not authenticated' || detail === 'Could not validate credentials'));
+
+    if (isAuthFailure) {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
       window.location.href = '/login';
