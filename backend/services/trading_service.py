@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
 import hashlib
 from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert
@@ -10,6 +11,30 @@ from quantum_ai.signals import SignalGenerator
 signal_generator = SignalGenerator()
 
 class TradingService:
+    def _fallback_signal(self, asset: str) -> Dict:
+        asset_data = market_service.get_asset(asset)
+        fallback_price = float(asset_data["price"]) if asset_data else 0.0
+        now = datetime.now(timezone.utc).isoformat()
+        return {
+            "asset": asset,
+            "signal_type": "HOLD",
+            "confidence": 0.5,
+            "price": fallback_price,
+            "timestamp": now,
+            "rationale": ["Fallback signal generated after upstream data issue."],
+        }
+
+    def _generate_signals_ephemeral(self) -> List[Dict]:
+        signals = []
+        for symbol in MOCK_ASSETS.keys():
+            try:
+                prices = market_service.get_prices_for_signal(symbol)
+                signal = signal_generator.generate_signal(symbol, prices)
+            except Exception:
+                signal = self._fallback_signal(symbol)
+            signals.append(signal)
+        return signals
+
     def _build_signal_analytics(self, asset: str) -> Dict:
         prices = market_service.get_prices_for_signal(asset)
         return signal_generator.generate_signal(asset, prices)
@@ -196,26 +221,38 @@ class TradingService:
     def generate_signals(self, db: Session) -> List[Dict]:
         signals = []
         for symbol in MOCK_ASSETS.keys():
-            prices = market_service.get_prices_for_signal(symbol)
-            signal = signal_generator.generate_signal(symbol, prices)
-            
-            db_signal = TradingSignal(
-                asset=symbol,
-                signal_type=signal["signal_type"],
-                confidence=signal["confidence"],
-                price=signal["price"],
-                timestamp=datetime.now(timezone.utc)
-            )
-            db.add(db_signal)
+            try:
+                prices = market_service.get_prices_for_signal(symbol)
+                signal = signal_generator.generate_signal(symbol, prices)
+                db_signal = TradingSignal(
+                    asset=symbol,
+                    signal_type=signal["signal_type"],
+                    confidence=signal["confidence"],
+                    price=signal["price"],
+                    timestamp=datetime.now(timezone.utc)
+                )
+                db.add(db_signal)
+            except Exception:
+                signal = self._fallback_signal(symbol)
             signals.append(signal)
-        
-        db.commit()
+
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            return self._generate_signals_ephemeral()
         return signals
     
     def get_signals(self, db: Session, limit: int = 50) -> List[Dict]:
-        db_signals = db.query(TradingSignal).order_by(TradingSignal.timestamp.desc()).limit(limit).all()
+        try:
+            db_signals = db.query(TradingSignal).order_by(TradingSignal.timestamp.desc()).limit(limit).all()
+        except SQLAlchemyError:
+            return self._generate_signals_ephemeral()
         if not db_signals:
-            return self.generate_signals(db)
+            try:
+                return self.generate_signals(db)
+            except Exception:
+                return self._generate_signals_ephemeral()
 
         enriched = []
         for s in db_signals:

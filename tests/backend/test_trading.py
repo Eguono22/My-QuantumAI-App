@@ -2,6 +2,7 @@ import pytest
 import sys
 import os
 import datetime
+from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
@@ -121,3 +122,13 @@ class TestTradingService:
         assert "win_rate" in result
         assert "max_drawdown_pct" in result
         assert "trade_log" in result
+
+    def test_get_signals_falls_back_when_db_unavailable(self):
+        class BrokenDB:
+            def query(self, *_args, **_kwargs):
+                raise SQLAlchemyError("database unavailable")
+
+        signals = self.service.get_signals(BrokenDB())
+        assert isinstance(signals, list)
+        assert len(signals) > 0
+        assert all("asset" in s for s in signals)
