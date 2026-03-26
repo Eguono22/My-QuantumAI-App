@@ -28,9 +28,20 @@ function App() {
         const me = await authService.getMe();
         setUser({ username: me.username || username, token });
       } catch (err) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        setUser(null);
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail;
+        const isAuthFailure =
+          status === 401 ||
+          (status === 403 && (detail === 'Not authenticated' || detail === 'Could not validate credentials'));
+
+        if (isAuthFailure) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('username');
+          setUser(null);
+        } else {
+          // Preserve session on transient network/server errors.
+          setUser({ username, token });
+        }
       } finally {
         setAuthLoading(false);
       }
