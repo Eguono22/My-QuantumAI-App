@@ -71,17 +71,34 @@ export default function TradingSignals() {
 
   const fetchSignals = useCallback(async () => {
     try {
-      const [data, overview, watch, alerts] = await Promise.all([
+      const [signalsResult, overviewResult, watchResult, alertsResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
         tradingService.getPriceAlerts(true),
       ]);
+
+      if (signalsResult.status !== 'fulfilled') {
+        throw signalsResult.reason;
+      }
+
+      const data = Array.isArray(signalsResult.value) ? signalsResult.value : [];
       setSignals(data);
-      const symbols = overview.map(item => item.symbol);
+
+      const overview = overviewResult.status === 'fulfilled' && Array.isArray(overviewResult.value)
+        ? overviewResult.value
+        : [];
+      const fallbackSymbols = [...new Set(data.map((s) => s.asset).filter(Boolean))];
+      const symbols = overview.length > 0 ? overview.map((item) => item.symbol) : fallbackSymbols;
       setAssetOptions(symbols);
-      setWatchlist(watch);
-      setPriceAlerts(alerts);
+
+      setWatchlist(
+        watchResult.status === 'fulfilled' && Array.isArray(watchResult.value) ? watchResult.value : []
+      );
+      setPriceAlerts(
+        alertsResult.status === 'fulfilled' && Array.isArray(alertsResult.value) ? alertsResult.value : []
+      );
+
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
         setWatchSymbol((prev) => (symbols.includes(prev) ? prev : symbols[0]));
@@ -90,7 +107,7 @@ export default function TradingSignals() {
         setBacktestForm((prev) => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
       }
     } catch (err) {
-      setAlert({ type: 'error', message: 'Failed to load signals' });
+      setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to load signals' });
     } finally {
       setLoading(false);
     }
