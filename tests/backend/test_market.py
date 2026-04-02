@@ -38,6 +38,29 @@ class TestMarketService:
     def test_get_price_history_returns_data(self):
         history = self.service.get_price_history("BTC", days=7)
         assert len(history) > 0
+
+    def test_get_market_prediction_returns_data(self):
+        prediction = self.service.get_market_prediction("BTC", days=45, horizon_hours=12)
+        assert prediction is not None
+        required = [
+            "symbol",
+            "current_price",
+            "predicted_price",
+            "expected_return_pct",
+            "direction",
+            "confidence",
+            "interval_low",
+            "interval_high",
+            "generated_at",
+        ]
+        for field in required:
+            assert field in prediction
+        assert prediction["direction"] in ["UP", "DOWN", "NEUTRAL"]
+        assert 0.5 <= prediction["confidence"] <= 0.95
+
+    def test_get_market_prediction_unknown_returns_none(self):
+        prediction = self.service.get_market_prediction("UNKNOWN_XYZ")
+        assert prediction is None
     
     def test_price_history_has_ohlcv(self):
         history = self.service.get_price_history("ETH", days=5)

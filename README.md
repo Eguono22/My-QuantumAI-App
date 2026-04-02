@@ -57,6 +57,7 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 | GET | `/market/overview` | No | All asset prices |
 | GET | `/market/{symbol}` | No | Single asset data |
 | GET | `/market/{symbol}/history` | No | OHLCV price history |
+| GET | `/market/{symbol}/prediction` | No | AI-based market prediction |
 | GET | `/trading/signals` | No | Latest AI signals |
 | POST | `/trading/signals/generate` | Yes | Generate new signals |
 | GET | `/portfolio` | Yes | User portfolio |

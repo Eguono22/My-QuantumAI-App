@@ -2,6 +2,7 @@ import hashlib
 import numpy as np
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
+from quantum_ai.algorithms import MarketPredictionModel
 
 MOCK_ASSETS = {
     # US equities
@@ -127,6 +128,9 @@ def generate_price_history(symbol: str, base_price: float, volatility: float, da
     return history
 
 class MarketService:
+    def __init__(self):
+        self.prediction_model = MarketPredictionModel()
+
     def get_market_overview(self) -> List[Dict]:
         """Get overview of all tracked assets."""
         overview = []
@@ -188,5 +192,34 @@ class MarketService:
         info = MOCK_ASSETS[symbol]
         history = generate_price_history(symbol, info["base_price"], info["volatility"], 30)
         return [h["close"] for h in history]
+
+    def get_market_prediction(self, symbol: str, days: int = 60, horizon_hours: int = 24) -> Dict:
+        """Predict future price movement for a symbol."""
+        symbol = symbol.upper()
+        if symbol not in MOCK_ASSETS:
+            return None
+
+        days = max(7, min(days, 365))
+        horizon_hours = max(1, min(horizon_hours, 72))
+
+        history = self.get_price_history(symbol, days)
+        closes = np.array([float(row["close"]) for row in history], dtype=float)
+        if len(closes) < 10:
+            return None
+
+        forecast = self.prediction_model.forecast(closes, horizon_steps=horizon_hours)
+        latest_price = float(closes[-1])
+        return {
+            "symbol": symbol,
+            "current_price": latest_price,
+            "predicted_price": round(float(forecast["predicted_price"]), 6),
+            "expected_return_pct": round(float(forecast["expected_return_pct"]), 4),
+            "direction": forecast["direction"],
+            "confidence": round(float(forecast["confidence"]), 4),
+            "horizon_hours": horizon_hours,
+            "interval_low": round(float(forecast["interval_low"]), 6),
+            "interval_high": round(float(forecast["interval_high"]), 6),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
 
 market_service = MarketService()

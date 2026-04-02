@@ -4,7 +4,12 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
-from quantum_ai.algorithms import QuantumInspiredOptimizer, MarketStateEncoder, QuantumCircuitSimulator
+from quantum_ai.algorithms import (
+    QuantumInspiredOptimizer,
+    MarketStateEncoder,
+    QuantumCircuitSimulator,
+    MarketPredictionModel,
+)
 from quantum_ai.signals import SignalGenerator
 
 class TestQuantumInspiredOptimizer:
@@ -96,3 +101,26 @@ class TestSignalGenerator:
         assert result["asset"] == "BTC"
         assert result["signal_type"] in ["BUY", "SELL", "HOLD"]
         assert 0.0 <= result["confidence"] <= 1.0
+
+
+class TestMarketPredictionModel:
+    def setup_method(self):
+        self.model = MarketPredictionModel(window_size=24)
+
+    def test_forecast_returns_expected_fields(self):
+        prices = np.array([100 + i * 0.3 + np.random.normal(0, 0.2) for i in range(120)])
+        result = self.model.forecast(prices, horizon_steps=12)
+        assert "predicted_price" in result
+        assert "expected_return_pct" in result
+        assert "direction" in result
+        assert "confidence" in result
+        assert "interval_low" in result
+        assert "interval_high" in result
+        assert result["direction"] in ["UP", "DOWN", "NEUTRAL"]
+        assert 0.5 <= result["confidence"] <= 0.95
+
+    def test_forecast_with_insufficient_data_falls_back(self):
+        prices = np.array([100.0, 100.5, 100.7])
+        result = self.model.forecast(prices, horizon_steps=6)
+        assert result["predicted_price"] == prices[-1]
+        assert result["direction"] == "NEUTRAL"

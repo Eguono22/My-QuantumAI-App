@@ -1,5 +1,6 @@
 import numpy as np
-from typing import List, Dict, Tuple
+from typing import Dict
+from sklearn.linear_model import Ridge
 
 EPSILON = 1e-10  # Small constant to prevent division-by-zero
 
@@ -197,3 +198,112 @@ class QuantumCircuitSimulator:
             confidence = 1.0 - abs(buy_prob - sell_prob)
         
         return {"signal": signal, "confidence": float(min(confidence, 0.95))}
+
+
+class MarketPredictionModel:
+    """
+    Lightweight predictive model for next-step market returns.
+    Trains on rolling statistical features and forecasts future prices
+    by recursively applying predicted log-returns.
+    """
+
+    def __init__(self, window_size: int = 36, alpha: float = 1.0):
+        self.window_size = window_size
+        self.model = Ridge(alpha=alpha)
+        self.is_fitted = False
+        self.residual_std = 0.0
+
+    def _features_from_window(self, prices_window: np.ndarray) -> np.ndarray:
+        log_prices = np.log(prices_window + EPSILON)
+        returns = np.diff(log_prices)
+        trend_x = np.arange(len(prices_window))
+        slope = np.polyfit(trend_x, prices_window, deg=1)[0]
+
+        return np.array([
+            float(returns[-1]) if len(returns) > 0 else 0.0,
+            float(np.mean(returns)) if len(returns) > 0 else 0.0,
+            float(np.std(returns)) if len(returns) > 0 else 0.0,
+            float(prices_window[-1] / (prices_window[0] + EPSILON) - 1.0),
+            float(np.mean(prices_window[-6:]) / (prices_window[-1] + EPSILON) - 1.0),
+            float(slope / (np.mean(prices_window) + EPSILON)),
+        ])
+
+    def fit(self, price_history: np.ndarray, window_size: int | None = None) -> None:
+        effective_window = window_size or self.window_size
+        if len(price_history) < effective_window + 2:
+            raise ValueError("Not enough history to fit market prediction model")
+
+        X = []
+        y = []
+        for idx in range(effective_window, len(price_history) - 1):
+            window = price_history[idx - effective_window:idx]
+            next_log_return = np.log((price_history[idx + 1] + EPSILON) / (price_history[idx] + EPSILON))
+            X.append(self._features_from_window(window))
+            y.append(float(next_log_return))
+
+        X_arr = np.array(X)
+        y_arr = np.array(y)
+        self.model.fit(X_arr, y_arr)
+        fitted = self.model.predict(X_arr)
+        self.residual_std = float(np.std(y_arr - fitted))
+        self.is_fitted = True
+
+    def forecast(self, price_history: np.ndarray, horizon_steps: int = 24) -> Dict:
+        if len(price_history) < 8:
+            current = float(price_history[-1]) if len(price_history) else 0.0
+            return {
+                "predicted_price": current,
+                "expected_return_pct": 0.0,
+                "direction": "NEUTRAL",
+                "confidence": 0.5,
+                "horizon_steps": horizon_steps,
+                "interval_low": current,
+                "interval_high": current,
+            }
+
+        prices = np.array(price_history, dtype=float)
+        effective_window = self.window_size
+        if len(prices) < effective_window + 2:
+            effective_window = max(8, min(24, len(prices) - 2))
+        self.fit(prices, window_size=effective_window)
+
+        simulated = prices.tolist()
+        predicted_returns = []
+        for _ in range(max(1, horizon_steps)):
+            window = np.array(simulated[-effective_window:], dtype=float)
+            features = self._features_from_window(window).reshape(1, -1)
+            pred_return = float(self.model.predict(features)[0])
+            pred_return = float(np.clip(pred_return, -0.2, 0.2))
+            predicted_returns.append(pred_return)
+            next_price = float(simulated[-1] * np.exp(pred_return))
+            simulated.append(max(next_price, EPSILON))
+
+        current_price = float(prices[-1])
+        predicted_price = float(simulated[-1])
+        expected_return_pct = float((predicted_price / (current_price + EPSILON) - 1.0) * 100.0)
+
+        if expected_return_pct > 0.2:
+            direction = "UP"
+        elif expected_return_pct < -0.2:
+            direction = "DOWN"
+        else:
+            direction = "NEUTRAL"
+
+        avg_pred = float(np.mean(np.abs(predicted_returns))) if predicted_returns else 0.0
+        uncertainty = self.residual_std * np.sqrt(max(1, horizon_steps))
+        signal_to_noise = avg_pred / (uncertainty + EPSILON)
+        confidence = float(np.clip(0.5 + 0.4 * np.tanh(signal_to_noise), 0.5, 0.95))
+
+        spread = 1.96 * uncertainty
+        interval_low = float(predicted_price * np.exp(-spread))
+        interval_high = float(predicted_price * np.exp(spread))
+
+        return {
+            "predicted_price": predicted_price,
+            "expected_return_pct": expected_return_pct,
+            "direction": direction,
+            "confidence": confidence,
+            "horizon_steps": int(max(1, horizon_steps)),
+            "interval_low": interval_low,
+            "interval_high": interval_high,
+        }

@@ -48,6 +48,19 @@ class SentimentResponse(BaseModel):
     updated_at: str
 
 
+class MarketPredictionResponse(BaseModel):
+    symbol: str
+    current_price: float
+    predicted_price: float
+    expected_return_pct: float
+    direction: str
+    confidence: float
+    horizon_hours: int
+    interval_low: float
+    interval_high: float
+    generated_at: str
+
+
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 
 class PortfolioHolding(BaseModel):
