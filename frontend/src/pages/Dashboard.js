@@ -9,6 +9,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 export default function Dashboard() {
   const [marketData, setMarketData] = useState([]);
   const [signals, setSignals] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [startupHealth, setStartupHealth] = useState(null);
   const [sentiment, setSentiment] = useState(null);
   const [sentimentAsset, setSentimentAsset] = useState('BTC');
   const [loading, setLoading] = useState(true);
@@ -16,12 +18,16 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [market, sigs] = await Promise.all([
+        const [market, sigs, health, orderData] = await Promise.all([
           marketService.getOverview(),
-          tradingService.getSignals()
+          tradingService.getSignals(),
+          tradingService.getStartupHealth().catch(() => null),
+          tradingService.getOrders().catch(() => []),
         ]);
         setMarketData(market);
         setSignals(sigs.slice(0, 6));
+        setStartupHealth(health);
+        setOrders(orderData);
         if (market.length > 0) {
           const nextAsset = market.some(item => item.symbol === sentimentAsset)
             ? sentimentAsset
@@ -47,6 +53,7 @@ export default function Dashboard() {
     { label: 'Buy Signals', value: signals.filter(s => s.signal_type === 'BUY').length, icon: '🟢', color: 'text-emerald-700' },
     { label: 'Sell Signals', value: signals.filter(s => s.signal_type === 'SELL').length, icon: '🔴', color: 'text-red-700' },
   ];
+  const pendingOrders = orders.filter((o) => o.status === 'PENDING');
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -69,6 +76,63 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="market-panel rounded-md p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">System Status</p>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Broker Readiness</h2>
+          </div>
+          <span className={`text-xs font-semibold px-2 py-1 rounded ${
+            startupHealth?.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+          }`}>
+            {startupHealth?.status === 'ok' ? 'READY' : 'CHECK REQUIRED'}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 text-sm">
+          <div className="market-panel-soft rounded-md p-3">
+            <p className="text-zinc-500 text-xs uppercase">Provider</p>
+            <p className="font-semibold text-zinc-900">{startupHealth?.trading?.broker_provider || 'unavailable'}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-3">
+            <p className="text-zinc-500 text-xs uppercase">Mode</p>
+            <p className="font-semibold text-zinc-900">{startupHealth?.trading?.trading_mode || 'unavailable'}</p>
+          </div>
+          <div className="market-panel-soft rounded-md p-3">
+            <p className="text-zinc-500 text-xs uppercase">Credentials</p>
+            <p className={`font-semibold ${startupHealth?.credentials?.alpaca_configured ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {startupHealth?.credentials?.alpaca_configured ? 'Configured' : 'Missing or not needed'}
+            </p>
+          </div>
+        </div>
+        {startupHealth?.trading?.reason && (
+          <p className="mt-3 text-xs text-zinc-600">{startupHealth.trading.reason}</p>
+        )}
+      </div>
+
+      <div className="market-panel rounded-md p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Execution</p>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Pending Orders</h2>
+          </div>
+          <span className="text-sm font-semibold text-zinc-900">{pendingOrders.length}</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {pendingOrders.length === 0 && (
+            <p className="text-sm text-zinc-500">No pending orders right now.</p>
+          )}
+          {pendingOrders.slice(0, 3).map((order) => (
+            <div key={order.id} className="market-panel-soft rounded-md p-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-zinc-900">{order.asset} {order.action.toUpperCase()} {order.order_type}</p>
+                <p className="text-xs text-zinc-500">Qty {Number(order.requested_quantity).toFixed(6)} | Broker {order.broker}</p>
+              </div>
+              <span className="text-xs font-semibold px-2 py-1 rounded bg-sky-100 text-sky-700">PENDING</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <MarketTicker items={marketData} />

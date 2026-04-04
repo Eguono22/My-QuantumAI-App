@@ -60,9 +60,13 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 | GET | `/market/{symbol}/prediction` | No | AI-based market prediction |
 | GET | `/trading/signals` | No | Latest AI signals |
 | POST | `/trading/signals/generate` | Yes | Generate new signals |
+| GET | `/trading/orders` | Yes | List order lifecycle records |
+| POST | `/trading/orders/poll` | Yes | Poll pending broker orders |
+| DELETE | `/trading/orders/{order_id}` | Yes | Cancel pending order |
 | GET | `/portfolio` | Yes | User portfolio |
 | POST | `/portfolio/trade` | Yes | Execute buy/sell |
 | GET | `/portfolio/performance` | Yes | Portfolio P&L |
+| GET | `/health/startup` | No | Startup diagnostics (broker/data readiness) |
 | WS | `/ws` | No | Real-time market data |
 
 ## 🏃 Quick Start
@@ -144,3 +148,32 @@ python -m pytest tests/backend/test_trading.py -v
 - JWT tokens expire in 30 minutes by default
 - Passwords are hashed with bcrypt
 - CORS origins are configurable via environment variables
+
+## 🧾 Paper Trading Controls
+
+The backend supports broker-backed paper execution with pre-trade risk checks.
+
+- `TRADING_MODE=paper`
+- `BROKER_PROVIDER=paper` (default simulator) or `BROKER_PROVIDER=alpaca`
+- `ALPACA_BASE_URL=https://paper-api.alpaca.markets`
+- `MARKET_DATA_PROVIDER=mock` or `MARKET_DATA_PROVIDER=alpaca`
+- `ALPACA_DATA_BASE_URL=https://data.alpaca.markets`
+- `ALPACA_API_KEY=...`
+- `ALPACA_API_SECRET=...`
+- `SIM_SLIPPAGE_BPS=1.5`
+- `SIM_FEE_BPS=2.0`
+- `SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD=15000`
+- `SIM_PARTIAL_FILL_RATIO=0.7`
+- `MAX_NOTIONAL_PER_TRADE=25000`
+- `MAX_DAILY_NOTIONAL=100000`
+- `MAX_DAILY_TRADES=50`
+- `MAX_RISK_PERCENT_PER_TRADE=2.0`
+
+When you call `POST /portfolio/trade`, the response includes:
+- `order.broker` and `order.mode` (paper execution metadata)
+- `order.status` lifecycle (`FILLED`, `PARTIAL_FILL`, `PENDING`, `REJECTED`)
+- `order.requested_quantity`, `order.filled_quantity`, `order.fee_paid`, `order.slippage_bps`
+- `risk` (limits snapshot + projected daily usage)
+
+Startup diagnostics endpoint:
+- `GET /health/startup` returns broker provider/mode readiness, Alpaca credential readiness, and active risk limits.

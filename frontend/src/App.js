@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import TradingSignals from './pages/TradingSignals';
 import Portfolio from './pages/Portfolio';
+import Orders from './pages/Orders';
 import Markets from './pages/Markets';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -77,6 +78,7 @@ function App() {
                   <Route path="/markets" element={<Markets />} />
                   <Route path="/signals" element={<TradingSignals />} />
                   <Route path="/portfolio" element={<Portfolio user={user} />} />
+                  <Route path="/orders" element={<Orders />} />
                   <Route path="/login" element={<Navigate to="/" />} />
                   <Route path="/register" element={<Navigate to="/" />} />
                 </Routes>

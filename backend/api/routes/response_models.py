@@ -85,9 +85,11 @@ class TradeDetail(BaseModel):
 
 class TradeResponse(BaseModel):
     success: bool
-    trade: TradeDetail
+    trade: Optional[TradeDetail] = None
     order: Optional[dict] = None
     protection: Optional[dict] = None
+    risk: Optional[dict] = None
+    message: Optional[str] = None
 
 
 class PerformanceResponse(BaseModel):
@@ -205,3 +207,25 @@ class StrategyBacktestResponse(BaseModel):
     max_drawdown_pct: float
     avg_trade_pnl: float
     trade_log: List[BacktestTradeResponse]
+
+
+class OrderResponse(BaseModel):
+    id: int
+    asset: str
+    action: str
+    order_type: str
+    status: str
+    requested_quantity: float
+    filled_quantity: float
+    fill_price: Optional[float] = None
+    requested_price: Optional[float] = None
+    trigger_price: Optional[float] = None
+    market_price: Optional[float] = None
+    fee_paid: float
+    slippage_bps: Optional[float] = None
+    broker: str
+    mode: str
+    broker_order_id: Optional[str] = None
+    reason: Optional[str] = None
+    created_at: str
+    updated_at: str

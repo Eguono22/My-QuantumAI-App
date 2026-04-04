@@ -21,6 +21,7 @@ class User(Base):
     trades = relationship("Trade", back_populates="user")
     watchlist_items = relationship("WatchlistItem", back_populates="user")
     price_alerts = relationship("PriceAlert", back_populates="user")
+    orders = relationship("Order", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -71,6 +72,31 @@ class PriceAlert(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     triggered_at = Column(DateTime, nullable=True)
     user = relationship("User", back_populates="price_alerts")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    asset = Column(String, nullable=False, index=True)
+    action = Column(String, nullable=False)
+    order_type = Column(String, nullable=False, default="MARKET")
+    status = Column(String, nullable=False, default="PENDING")
+    requested_quantity = Column(Float, nullable=False)
+    filled_quantity = Column(Float, nullable=False, default=0.0)
+    fill_price = Column(Float, nullable=True)
+    requested_price = Column(Float, nullable=True)
+    trigger_price = Column(Float, nullable=True)
+    market_price = Column(Float, nullable=True)
+    fee_paid = Column(Float, nullable=False, default=0.0)
+    slippage_bps = Column(Float, nullable=True)
+    broker = Column(String, nullable=False, default="paper-broker")
+    mode = Column(String, nullable=False, default="paper")
+    broker_order_id = Column(String, nullable=True, index=True)
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="orders")
 
 def get_db():
     db = SessionLocal()

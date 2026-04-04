@@ -11,6 +11,7 @@ from api.routes.response_models import (
     WatchlistItemResponse,
     PriceAlertResponse,
     StrategyBacktestResponse,
+    OrderResponse,
 )
 
 router = APIRouter(prefix="/trading", tags=["trading"])
@@ -37,6 +38,7 @@ class BacktestRequest(BaseModel):
     days: int = 30
     starting_capital: float = 10000.0
     risk_per_trade_pct: float = 1.0
+
 
 @router.get("/signals", response_model=List[SignalResponse])
 def get_signals(db: Session = Depends(get_db)):
@@ -129,5 +131,26 @@ def run_backtest(request: BacktestRequest, current_user: User = Depends(get_curr
             starting_capital=request.starting_capital,
             risk_per_trade_pct=request.risk_per_trade_pct,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/orders", response_model=List[OrderResponse])
+def get_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return trading_service.get_orders(db, current_user.id)
+
+
+@router.post("/orders/poll")
+def poll_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return trading_service.poll_pending_orders(db, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/orders/{order_id}", response_model=OrderResponse)
+def cancel_order(order_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return trading_service.cancel_order(db, current_user.id, order_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -22,6 +22,23 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
+    TRADING_MODE: str = "paper"
+    BROKER_PROVIDER: str = "paper"
+    BROKER_REQUEST_TIMEOUT_S: float = 8.0
+    MARKET_DATA_PROVIDER: str = "mock"
+    MARKET_DATA_TIMEOUT_S: float = 6.0
+    ALPACA_DATA_BASE_URL: str = "https://data.alpaca.markets"
+    ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"
+    ALPACA_API_KEY: Optional[str] = None
+    ALPACA_API_SECRET: Optional[str] = None
+    SIM_SLIPPAGE_BPS: float = 1.5
+    SIM_FEE_BPS: float = 2.0
+    SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD: float = 15000.0
+    SIM_PARTIAL_FILL_RATIO: float = 0.7
+    MAX_NOTIONAL_PER_TRADE: float = 25000.0
+    MAX_DAILY_NOTIONAL: float = 100000.0
+    MAX_DAILY_TRADES: int = 50
+    MAX_RISK_PERCENT_PER_TRADE: float = 2.0
     # Treat all hosted Vercel environments (production + preview) as production-like.
     APP_ENV: str = (
         os.getenv("APP_ENV")

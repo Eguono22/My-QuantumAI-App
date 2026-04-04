@@ -1,8 +1,10 @@
 import hashlib
 import numpy as np
+import httpx
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 from quantum_ai.algorithms import MarketPredictionModel
+from config.settings import settings
 
 MOCK_ASSETS = {
     # US equities
@@ -130,29 +132,76 @@ def generate_price_history(symbol: str, base_price: float, volatility: float, da
 class MarketService:
     def __init__(self):
         self.prediction_model = MarketPredictionModel()
+        self._alpaca_symbols = [s for s in MOCK_ASSETS.keys() if s.isalpha() and len(s) <= 5]
+
+    def _using_alpaca_data(self) -> bool:
+        return (
+            (settings.MARKET_DATA_PROVIDER or "mock").lower() == "alpaca"
+            and bool(settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET)
+        )
+
+    def _alpaca_headers(self) -> Dict[str, str]:
+        return {
+            "APCA-API-KEY-ID": settings.ALPACA_API_KEY or "",
+            "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET or "",
+        }
+
+    def _to_market_row(self, symbol: str, price: float, reference_price: float) -> Dict:
+        info = MOCK_ASSETS[symbol]
+        change_pct = ((price - reference_price) / reference_price) * 100 if reference_price else 0.0
+        rng = np.random.default_rng(
+            int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32)
+        )
+        return {
+            "symbol": symbol,
+            "name": info["name"],
+            "price": round(float(price), 2),
+            "change_24h": round(float(change_pct), 2),
+            "change_pct_24h": round(float(change_pct), 2),
+            "volume_24h": round(float(rng.uniform(1e7, 1e10)), 0),
+            "market_cap": round(float(price) * float(rng.uniform(1e8, 1e12)), 0),
+            "high_24h": round(float(price) * 1.02, 2),
+            "low_24h": round(float(price) * 0.98, 2),
+        }
+
+    def _get_alpaca_latest_prices(self, symbols: List[str]) -> Dict[str, float]:
+        if not symbols:
+            return {}
+        try:
+            with httpx.Client(
+                base_url=settings.ALPACA_DATA_BASE_URL,
+                timeout=settings.MARKET_DATA_TIMEOUT_S,
+                headers=self._alpaca_headers(),
+            ) as client:
+                resp = client.get("/v2/stocks/snapshots", params={"symbols": ",".join(symbols)})
+                if resp.status_code >= 400:
+                    return {}
+                data = resp.json() or {}
+                snapshots = data.get("snapshots") or {}
+        except Exception:
+            return {}
+
+        prices = {}
+        for symbol, snap in snapshots.items():
+            latest_trade = (snap or {}).get("latestTrade") or {}
+            daily_bar = (snap or {}).get("dailyBar") or {}
+            price = latest_trade.get("p") or daily_bar.get("c")
+            if price is not None:
+                prices[symbol] = float(price)
+        return prices
 
     def get_market_overview(self) -> List[Dict]:
         """Get overview of all tracked assets."""
+        alpaca_prices = {}
+        if self._using_alpaca_data():
+            alpaca_prices = self._get_alpaca_latest_prices(self._alpaca_symbols[:50])
+
         overview = []
         for symbol, info in MOCK_ASSETS.items():
-            current = get_current_price(symbol, info["base_price"], info["volatility"])
-            change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
-            
-            rng = np.random.default_rng(int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32))
-            volume_24h = float(rng.uniform(1e7, 1e10))
-            market_cap = current * float(rng.uniform(1e8, 1e12))
-            
-            overview.append({
-                "symbol": symbol,
-                "name": info["name"],
-                "price": round(current, 2),
-                "change_24h": round(change_pct, 2),
-                "change_pct_24h": round(change_pct, 2),
-                "volume_24h": round(volume_24h, 0),
-                "market_cap": round(market_cap, 0),
-                "high_24h": round(current * 1.02, 2),
-                "low_24h": round(current * 0.98, 2),
-            })
+            current = alpaca_prices.get(symbol)
+            if current is None:
+                current = get_current_price(symbol, info["base_price"], info["volatility"])
+            overview.append(self._to_market_row(symbol, current, info["base_price"]))
         return overview
     
     def get_asset(self, symbol: str) -> Dict:
@@ -161,28 +210,64 @@ class MarketService:
         if symbol not in MOCK_ASSETS:
             return None
         info = MOCK_ASSETS[symbol]
+
+        if self._using_alpaca_data() and symbol in self._alpaca_symbols:
+            prices = self._get_alpaca_latest_prices([symbol])
+            if symbol in prices:
+                return self._to_market_row(symbol, prices[symbol], info["base_price"])
+
         current = get_current_price(symbol, info["base_price"], info["volatility"])
-        change_pct = ((current - info["base_price"]) / info["base_price"]) * 100
-        rng = np.random.default_rng(int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32))
-        return {
-            "symbol": symbol,
-            "name": info["name"],
-            "price": round(current, 2),
-            "change_24h": round(change_pct, 2),
-            "change_pct_24h": round(change_pct, 2),
-            "volume_24h": round(float(rng.uniform(1e7, 1e10)), 0),
-            "market_cap": round(current * float(rng.uniform(1e8, 1e12)), 0),
-            "high_24h": round(current * 1.02, 2),
-            "low_24h": round(current * 0.98, 2),
-        }
+        return self._to_market_row(symbol, current, info["base_price"])
     
     def get_price_history(self, symbol: str, days: int = 30) -> List[Dict]:
         """Get historical price data for a symbol."""
         symbol = symbol.upper()
         if symbol not in MOCK_ASSETS:
             return []
+        if self._using_alpaca_data() and symbol in self._alpaca_symbols:
+            bars = self._get_alpaca_bars(symbol, days)
+            if bars:
+                return bars
         info = MOCK_ASSETS[symbol]
         return generate_price_history(symbol, info["base_price"], info["volatility"], days)
+
+    def _get_alpaca_bars(self, symbol: str, days: int) -> List[Dict]:
+        limit = max(24, min(days * 24, 10000))
+        start_time = (datetime.now(timezone.utc) - timedelta(days=days + 1)).isoformat()
+        try:
+            with httpx.Client(
+                base_url=settings.ALPACA_DATA_BASE_URL,
+                timeout=settings.MARKET_DATA_TIMEOUT_S,
+                headers=self._alpaca_headers(),
+            ) as client:
+                resp = client.get(
+                    f"/v2/stocks/{symbol}/bars",
+                    params={
+                        "timeframe": "1Hour",
+                        "start": start_time,
+                        "limit": limit,
+                        "adjustment": "raw",
+                        "feed": "iex",
+                    },
+                )
+                if resp.status_code >= 400:
+                    return []
+                data = resp.json() or {}
+                bars = data.get("bars") or []
+        except Exception:
+            return []
+
+        history = []
+        for bar in bars:
+            history.append({
+                "timestamp": bar.get("t"),
+                "open": float(bar.get("o", 0.0)),
+                "high": float(bar.get("h", 0.0)),
+                "low": float(bar.get("l", 0.0)),
+                "close": float(bar.get("c", 0.0)),
+                "volume": float(bar.get("v", 0.0)),
+            })
+        return history
     
     def get_prices_for_signal(self, symbol: str) -> List[float]:
         """Get recent prices for signal generation."""

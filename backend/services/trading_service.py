@@ -4,11 +4,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
 import hashlib
-from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert
+from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order
 from services.market_service import market_service, MOCK_ASSETS
+from services.broker_service import get_broker, BrokerExecutionError
+from services.risk_service import RiskEngine, RiskValidationError
 from quantum_ai.signals import SignalGenerator
 
 signal_generator = SignalGenerator()
+risk_engine = RiskEngine()
 
 class TradingService:
     def _fallback_signal(self, asset: str) -> Dict:
@@ -60,6 +63,75 @@ class TradingService:
                 "pnl_pct": round(pnl_pct, 2),
             })
         return result
+
+    def _format_order(self, order: Order) -> Dict:
+        return {
+            "id": order.id,
+            "asset": order.asset,
+            "action": order.action,
+            "order_type": order.order_type,
+            "status": order.status,
+            "requested_quantity": float(order.requested_quantity),
+            "filled_quantity": float(order.filled_quantity),
+            "fill_price": float(order.fill_price) if order.fill_price is not None else None,
+            "requested_price": float(order.requested_price) if order.requested_price is not None else None,
+            "trigger_price": float(order.trigger_price) if order.trigger_price is not None else None,
+            "market_price": float(order.market_price) if order.market_price is not None else None,
+            "fee_paid": float(order.fee_paid),
+            "slippage_bps": float(order.slippage_bps) if order.slippage_bps is not None else None,
+            "broker": order.broker,
+            "mode": order.mode,
+            "broker_order_id": order.broker_order_id,
+            "reason": order.reason,
+            "created_at": order.created_at.isoformat(),
+            "updated_at": order.updated_at.isoformat(),
+        }
+
+    def _apply_filled_trade(
+        self,
+        db: Session,
+        user_id: int,
+        asset: str,
+        action: str,
+        filled_quantity: float,
+        execution_price: float,
+    ) -> Trade:
+        trade = Trade(
+            user_id=user_id,
+            asset=asset,
+            action=action,
+            quantity=filled_quantity,
+            price=execution_price,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(trade)
+
+        portfolio = db.query(Portfolio).filter(
+            Portfolio.user_id == user_id,
+            Portfolio.asset == asset
+        ).first()
+
+        if action == "buy":
+            if portfolio:
+                total_cost = portfolio.quantity * portfolio.avg_price + filled_quantity * execution_price
+                total_qty = portfolio.quantity + filled_quantity
+                portfolio.avg_price = total_cost / total_qty
+                portfolio.quantity = total_qty
+            else:
+                portfolio = Portfolio(
+                    user_id=user_id,
+                    asset=asset,
+                    quantity=filled_quantity,
+                    avg_price=execution_price,
+                )
+                db.add(portfolio)
+        else:
+            if not portfolio or portfolio.quantity < filled_quantity:
+                raise ValueError("Insufficient holdings")
+            portfolio.quantity -= filled_quantity
+            if portfolio.quantity <= 0:
+                db.delete(portfolio)
+        return trade
     
     def execute_trade(
         self,
@@ -85,46 +157,28 @@ class TradingService:
             raise ValueError("Action must be BUY or SELL")
         if quantity <= 0:
             raise ValueError("Quantity must be greater than 0")
-        if order_type not in {"MARKET", "LIMIT", "STOP"}:
-            raise ValueError("Order type must be MARKET, LIMIT, or STOP")
 
         asset_data = market_service.get_asset(asset)
         market_price = asset_data["price"] if asset_data else None
         if market_price is None:
             raise ValueError("Market data unavailable")
 
-        executable = True
-        execution_price = market_price
-        trigger_price = None
-        reason = None
-        if order_type == "LIMIT":
-            if price is None or price <= 0:
-                raise ValueError("Limit orders require a positive limit price")
-            trigger_price = float(price)
-            if action == "buy":
-                executable = market_price <= trigger_price
-                execution_price = min(market_price, trigger_price)
-            else:
-                executable = market_price >= trigger_price
-                execution_price = max(market_price, trigger_price)
-            if not executable:
-                reason = f"Limit order not filled: market {market_price} has not reached {trigger_price}"
-        elif order_type == "STOP":
-            if price is None or price <= 0:
-                raise ValueError("Stop orders require a positive stop trigger")
-            trigger_price = float(price)
-            if action == "buy":
-                executable = market_price >= trigger_price
-            else:
-                executable = market_price <= trigger_price
-            execution_price = market_price
-            if not executable:
-                reason = f"Stop order not triggered: market {market_price} has not crossed {trigger_price}"
-        else:
-            execution_price = market_price
+        broker = get_broker()
+        try:
+            order_result = broker.execute_order(
+                symbol=asset,
+                action=action,
+                order_type=order_type,
+                quantity=quantity,
+                market_price=float(market_price),
+                requested_price=price,
+            )
+        except BrokerExecutionError as e:
+            raise ValueError(str(e))
 
-        if not executable:
-            raise ValueError(reason)
+        order_status = order_result.get("status", "REJECTED")
+        if order_status == "REJECTED":
+            raise ValueError(order_result.get("reason") or "Order was rejected by broker")
 
         if stop_loss is not None and stop_loss <= 0:
             raise ValueError("Stop loss must be greater than 0")
@@ -134,71 +188,90 @@ class TradingService:
             raise ValueError("Trailing stop % must be greater than 0")
         if risk_percent is not None and risk_percent <= 0:
             raise ValueError("Risk % must be greater than 0")
-        
-        trade = Trade(
+
+        now = datetime.now(timezone.utc)
+        order = Order(
             user_id=user_id,
             asset=asset,
             action=action,
-            quantity=quantity,
-            price=execution_price,
-            timestamp=datetime.now(timezone.utc)
+            order_type=order_type,
+            status=order_status,
+            requested_quantity=float(order_result.get("requested_quantity", quantity)),
+            filled_quantity=float(order_result.get("filled_quantity", 0.0)),
+            fill_price=float(order_result.get("fill_price")) if order_result.get("fill_price") is not None else None,
+            requested_price=float(price) if price is not None else None,
+            trigger_price=float(order_result.get("trigger_price")) if order_result.get("trigger_price") is not None else None,
+            market_price=float(order_result.get("market_price")) if order_result.get("market_price") is not None else None,
+            fee_paid=float(order_result.get("fee_paid", 0.0)),
+            slippage_bps=float(order_result.get("slippage_bps")) if order_result.get("slippage_bps") is not None else None,
+            broker=order_result.get("broker", "paper-broker"),
+            mode=order_result.get("mode", "paper"),
+            broker_order_id=order_result.get("broker_order_id"),
+            reason=order_result.get("reason"),
+            created_at=now,
+            updated_at=now,
         )
-        db.add(trade)
+        db.add(order)
 
-        portfolio = db.query(Portfolio).filter(
-            Portfolio.user_id == user_id,
-            Portfolio.asset == asset
-        ).first()
-        
-        if action == "buy":
-            if portfolio:
-                total_cost = portfolio.quantity * portfolio.avg_price + quantity * execution_price
-                total_qty = portfolio.quantity + quantity
-                portfolio.avg_price = total_cost / total_qty
-                portfolio.quantity = total_qty
-            else:
-                portfolio = Portfolio(
+        trade = None
+        risk_check = None
+        filled_quantity = float(order.filled_quantity or 0.0)
+        execution_price = float(order.fill_price) if order.fill_price is not None else None
+        if order_status in {"FILLED", "PARTIAL_FILL"} and filled_quantity > 0 and execution_price is not None:
+            try:
+                risk_check = risk_engine.validate_trade(
+                    db=db,
                     user_id=user_id,
-                    asset=asset,
-                    quantity=quantity,
-                    avg_price=execution_price
+                    quantity=filled_quantity,
+                    execution_price=execution_price,
+                    risk_percent=risk_percent,
                 )
-                db.add(portfolio)
-        elif action == "sell":
-            if not portfolio or portfolio.quantity < quantity:
-                raise ValueError("Insufficient holdings")
-            portfolio.quantity -= quantity
-            if portfolio.quantity <= 0:
-                db.delete(portfolio)
+            except RiskValidationError as e:
+                raise ValueError(str(e))
+            trade = self._apply_filled_trade(
+                db=db,
+                user_id=user_id,
+                asset=asset,
+                action=action,
+                filled_quantity=filled_quantity,
+                execution_price=execution_price,
+            )
 
         # Commit when executing standalone trades; allow batched/transactional
         # execution (e.g., HFT) to flush only and commit once after the batch.
         if commit:
             db.commit()
+            db.refresh(order)
         else:
             db.flush()
-        return {
-            "success": True,
-            "trade": {
+
+        trade_payload = None
+        if trade and execution_price is not None:
+            trade_payload = {
                 "asset": asset,
                 "action": action,
-                "quantity": quantity,
+                "quantity": round(filled_quantity, 8),
                 "price": round(execution_price, 6),
-                "total_value": round(quantity * execution_price, 2),
-                "timestamp": trade.timestamp.isoformat()
-            },
-            "order": {
-                "order_type": order_type,
-                "status": "FILLED",
-                "trigger_price": trigger_price,
-                "market_price": round(market_price, 6),
-            },
+                "total_value": round(filled_quantity * execution_price, 2),
+                "timestamp": trade.timestamp.isoformat(),
+            }
+
+        message = None
+        if order_status == "PENDING":
+            message = "Order accepted and pending trigger."
+
+        return {
+            "success": True,
+            "trade": trade_payload,
+            "order": self._format_order(order),
             "protection": {
                 "stop_loss": stop_loss,
                 "take_profit": take_profit,
                 "trailing_stop_pct": trailing_stop_pct,
                 "risk_percent": risk_percent,
             },
+            "risk": risk_check,
+            "message": message,
         }
     
     def get_performance(self, db: Session, user_id: int) -> Dict:
@@ -217,6 +290,142 @@ class TradingService:
             "holdings": portfolio,
             "trade_count": len(trades),
         }
+
+    def get_orders(self, db: Session, user_id: int, limit: int = 200) -> List[Dict]:
+        orders = (
+            db.query(Order)
+            .filter(Order.user_id == user_id)
+            .order_by(Order.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [self._format_order(order) for order in orders]
+
+    def poll_pending_orders(self, db: Session, user_id: int) -> Dict:
+        broker = get_broker()
+        pending_orders = (
+            db.query(Order)
+            .filter(Order.user_id == user_id, Order.status == "PENDING")
+            .order_by(Order.created_at.asc())
+            .all()
+        )
+        updated = 0
+        filled = 0
+        rejected = 0
+
+        for order in pending_orders:
+            market = market_service.get_asset(order.asset)
+            if not market:
+                continue
+            market_price = float(market["price"])
+            try:
+                poll_result = broker.poll_order(
+                    {
+                        "asset": order.asset,
+                        "action": order.action,
+                        "order_type": order.order_type,
+                        "status": order.status,
+                        "requested_quantity": order.requested_quantity,
+                        "requested_price": order.requested_price,
+                        "filled_quantity": order.filled_quantity,
+                        "fill_price": order.fill_price,
+                        "fee_paid": order.fee_paid,
+                        "slippage_bps": order.slippage_bps,
+                        "broker_order_id": order.broker_order_id,
+                        "reason": order.reason,
+                    },
+                    market_price=market_price,
+                )
+            except BrokerExecutionError:
+                continue
+
+            new_status = poll_result.get("status", order.status)
+            if new_status == order.status and new_status == "PENDING":
+                continue
+
+            order.status = new_status
+            order.market_price = float(poll_result.get("market_price", market_price))
+            order.filled_quantity = float(poll_result.get("filled_quantity", order.filled_quantity or 0.0))
+            if poll_result.get("fill_price") is not None:
+                order.fill_price = float(poll_result.get("fill_price"))
+            if poll_result.get("fee_paid") is not None:
+                order.fee_paid = float(poll_result.get("fee_paid"))
+            if poll_result.get("reason") is not None:
+                order.reason = poll_result.get("reason")
+            order.updated_at = datetime.now(timezone.utc)
+            updated += 1
+
+            if new_status in {"FILLED", "PARTIAL_FILL"} and order.filled_quantity > 0 and order.fill_price:
+                already_traded = (
+                    db.query(Trade)
+                    .filter(
+                        Trade.user_id == user_id,
+                        Trade.asset == order.asset,
+                        Trade.action == order.action,
+                        Trade.quantity == order.filled_quantity,
+                        Trade.price == order.fill_price,
+                        Trade.timestamp >= order.created_at,
+                    )
+                    .first()
+                )
+                if not already_traded:
+                    try:
+                        self._apply_filled_trade(
+                            db=db,
+                            user_id=user_id,
+                            asset=order.asset,
+                            action=order.action,
+                            filled_quantity=float(order.filled_quantity),
+                            execution_price=float(order.fill_price),
+                        )
+                    except ValueError as e:
+                        order.status = "REJECTED"
+                        order.reason = str(e)
+                        rejected += 1
+                        continue
+                filled += 1
+            elif new_status == "REJECTED":
+                rejected += 1
+
+        if updated > 0:
+            db.commit()
+
+        return {
+            "success": True,
+            "pending_checked": len(pending_orders),
+            "updated": updated,
+            "filled": filled,
+            "rejected": rejected,
+        }
+
+    def cancel_order(self, db: Session, user_id: int, order_id: int) -> Dict:
+        order = (
+            db.query(Order)
+            .filter(Order.user_id == user_id, Order.id == order_id)
+            .first()
+        )
+        if not order:
+            raise ValueError("Order not found")
+        if order.status in {"FILLED", "PARTIAL_FILL", "REJECTED", "CANCELED"}:
+            raise ValueError("Only non-terminal orders can be canceled")
+
+        broker = get_broker()
+        try:
+            cancel_result = broker.cancel_order(
+                {
+                    "broker_order_id": order.broker_order_id,
+                    "status": order.status,
+                }
+            )
+        except BrokerExecutionError as e:
+            raise ValueError(str(e))
+
+        order.status = cancel_result.get("status", "CANCELED")
+        order.reason = cancel_result.get("reason")
+        order.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(order)
+        return self._format_order(order)
     
     def generate_signals(self, db: Session) -> List[Dict]:
         signals = []

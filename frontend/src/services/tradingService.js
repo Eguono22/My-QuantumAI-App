@@ -1,6 +1,10 @@
 import api from './api';
 
 export const tradingService = {
+  getStartupHealth: async () => {
+    const response = await api.get('/health/startup');
+    return response.data;
+  },
   getSignals: async () => {
     const response = await api.get('/trading/signals');
     return response.data;
@@ -57,6 +61,18 @@ export const tradingService = {
       starting_capital: startingCapital,
       risk_per_trade_pct: riskPerTradePct,
     });
+    return response.data;
+  },
+  getOrders: async () => {
+    const response = await api.get('/trading/orders');
+    return response.data;
+  },
+  pollOrders: async () => {
+    const response = await api.post('/trading/orders/poll', {});
+    return response.data;
+  },
+  cancelOrder: async (orderId) => {
+    const response = await api.delete(`/trading/orders/${orderId}`);
     return response.data;
   },
 };

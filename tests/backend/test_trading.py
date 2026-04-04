@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
 from services.market_service import MarketService
+from config.settings import settings
 
 class TestTradingService:
     def setup_method(self):
@@ -96,7 +97,7 @@ class TestTradingService:
         
         db.close()
 
-    def test_limit_order_rejects_when_not_reached(self):
+    def test_limit_order_stays_pending_when_not_reached(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from models.database import Base, User
@@ -111,8 +112,52 @@ class TestTradingService:
         db.add(user)
         db.commit()
 
-        with pytest.raises(ValueError, match="Limit order not filled"):
-            self.service.execute_trade(db, user.id, "BTC", "buy", 0.1, 1.0, order_type="LIMIT")
+        result = self.service.execute_trade(db, user.id, "BTC", "buy", 0.1, 1.0, order_type="LIMIT")
+        assert result["success"] is True
+        assert result["trade"] is None
+        assert result["order"]["status"] == "PENDING"
+
+        db.close()
+
+    def test_poll_pending_orders_updates_status(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser7", email="test7@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        self.service.execute_trade(db, user.id, "BTC", "buy", 0.1, 1.0, order_type="LIMIT")
+        result = self.service.poll_pending_orders(db, user.id)
+        assert result["pending_checked"] >= 1
+
+        db.close()
+
+    def test_cancel_pending_order(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser8", email="test8@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        order_result = self.service.execute_trade(db, user.id, "BTC", "buy", 0.1, 1.0, order_type="LIMIT")
+        canceled = self.service.cancel_order(db, user.id, order_result["order"]["id"])
+        assert canceled["status"] == "CANCELED"
 
         db.close()
 
@@ -122,6 +167,82 @@ class TestTradingService:
         assert "win_rate" in result
         assert "max_drawdown_pct" in result
         assert "trade_log" in result
+
+    def test_trade_returns_broker_and_risk_metadata(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser4", email="test4@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        result = self.service.execute_trade(db, user.id, "BTC", "buy", 0.01)
+        assert result["order"]["broker"] == "paper-broker"
+        assert result["order"]["mode"] == "paper"
+        assert result["risk"]["risk_passed"] is True
+
+        db.close()
+
+    def test_partial_fill_when_notional_threshold_hit(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser6", email="test6@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        original_threshold = settings.SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD
+        original_ratio = settings.SIM_PARTIAL_FILL_RATIO
+        settings.SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD = 10.0
+        settings.SIM_PARTIAL_FILL_RATIO = 0.5
+        try:
+            result = self.service.execute_trade(db, user.id, "BTC", "buy", 0.02)
+            assert result["order"]["status"] == "PARTIAL_FILL"
+            assert result["order"]["filled_quantity"] == pytest.approx(0.01, rel=1e-3)
+        finally:
+            settings.SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD = original_threshold
+            settings.SIM_PARTIAL_FILL_RATIO = original_ratio
+
+        db.close()
+
+    def test_notional_risk_limit_blocks_trade(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser5", email="test5@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        original_limit = settings.MAX_NOTIONAL_PER_TRADE
+        settings.MAX_NOTIONAL_PER_TRADE = 10.0
+        try:
+            with pytest.raises(ValueError, match="MAX_NOTIONAL_PER_TRADE"):
+                self.service.execute_trade(db, user.id, "BTC", "buy", 1.0)
+        finally:
+            settings.MAX_NOTIONAL_PER_TRADE = original_limit
+
+        db.close()
 
     def test_get_signals_falls_back_when_db_unavailable(self):
         class BrokenDB:
