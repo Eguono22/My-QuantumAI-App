@@ -51,6 +51,7 @@
     </script>
     <style>
       :root {
+        color-scheme: light;
         --market-black: #151515;
         --market-dark: #262626;
         --market-yellow: #ffbf00;
@@ -58,14 +59,35 @@
         --market-line: #dedede;
         --market-text: #1f1f1f;
         --market-muted: #6a6a6a;
+        --panel-bg: #ffffff;
+        --panel-soft-bg: #fafafa;
+        --input-bg: #ffffff;
+        --page-bg:
+          radial-gradient(circle at 3% 4%, rgba(0, 0, 0, 0.03), transparent 16%),
+          linear-gradient(180deg, #f7f7f7 0%, #efefef 100%);
+      }
+
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --market-black: #0b1220;
+        --market-dark: #111827;
+        --market-yellow: #f9c74f;
+        --market-paper: #0f172a;
+        --market-line: #27354d;
+        --market-text: #e5e7eb;
+        --market-muted: #9ca3af;
+        --panel-bg: #0f172a;
+        --panel-soft-bg: #111827;
+        --input-bg: #0b1220;
+        --page-bg:
+          radial-gradient(circle at 3% 4%, rgba(34, 211, 238, 0.09), transparent 26%),
+          linear-gradient(180deg, #050a13 0%, #0b1220 100%);
       }
 
       body {
         margin: 0;
         color: var(--market-text);
-        background:
-          radial-gradient(circle at 3% 4%, rgba(0, 0, 0, 0.03), transparent 16%),
-          linear-gradient(180deg, #f7f7f7 0%, #efefef 100%);
+        background: var(--page-bg);
       }
 
       #root {
@@ -73,13 +95,13 @@
       }
 
       .market-panel {
-        background: #fff;
+        background: var(--panel-bg);
         border: 1px solid var(--market-line);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
       }
 
       .market-panel-soft {
-        background: #fafafa;
+        background: var(--panel-soft-bg);
         border: 1px solid var(--market-line);
       }
 
@@ -87,7 +109,7 @@
       .market-select {
         width: 100%;
         border: 1px solid #cfcfcf;
-        background: #fff;
+        background: var(--input-bg);
         color: var(--market-text);
       }
 
@@ -96,6 +118,11 @@
         outline: none;
         border-color: var(--market-yellow);
         box-shadow: 0 0 0 2px rgba(255, 191, 0, 0.25);
+      }
+
+      html[data-theme='dark'] .market-input,
+      html[data-theme='dark'] .market-select {
+        border-color: #334155;
       }
 
       .market-btn-primary {

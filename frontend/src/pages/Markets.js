@@ -69,19 +69,26 @@ export default function Markets() {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="space-y-6 animate-fadeRise">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-zinc-900 uppercase tracking-wide">Markets</h1>
-          <p className="text-zinc-600 mt-1">Live overview with spark charts and instant trade tickets</p>
+    <div className="space-y-8 animate-fadeRise">
+      <div
+        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
+        style={{ background: 'linear-gradient(135deg, #0a1426 0%, #0f2547 52%, #163b78 100%)' }}
+      >
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 12% 20%, #38bdf8 0, transparent 35%), radial-gradient(circle at 85% 75%, #22d3ee 0, transparent 32%)' }} />
+        <div className="relative p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="text-sky-200 text-xs tracking-[0.18em] uppercase">Market Center</p>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide mt-1">Markets</h1>
+            <p className="text-sky-100 mt-1">Live overview with spark charts and instant trade tickets</p>
+          </div>
+          <button
+            onClick={loadMarkets}
+            className="px-4 py-2 rounded-md font-semibold flex items-center space-x-2 bg-sky-400 text-zinc-950 hover:bg-sky-300 transition"
+          >
+            <span>⟳</span>
+            <span>Refresh</span>
+          </button>
         </div>
-        <button
-          onClick={loadMarkets}
-          className="market-btn-primary px-4 py-2 rounded-md font-semibold flex items-center space-x-2"
-        >
-          <span>⟳</span>
-          <span>Refresh</span>
-        </button>
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}

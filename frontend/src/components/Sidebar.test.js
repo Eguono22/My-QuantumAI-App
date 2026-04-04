@@ -38,7 +38,7 @@ describe('Sidebar', () => {
 
   it('highlights the active route', () => {
     render(
-      <MemoryRouter initialEntries={['/signals']}>
+      <MemoryRouter initialEntries={['/app/signals']}>
         <Sidebar isOpen={true} />
       </MemoryRouter>
     );
@@ -48,7 +48,7 @@ describe('Sidebar', () => {
 
   it('does not highlight inactive routes', () => {
     render(
-      <MemoryRouter initialEntries={['/signals']}>
+      <MemoryRouter initialEntries={['/app/signals']}>
         <Sidebar isOpen={true} />
       </MemoryRouter>
     );

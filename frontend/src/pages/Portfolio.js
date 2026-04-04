@@ -93,10 +93,17 @@ export default function Portfolio({ user }) {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="space-y-6 animate-fadeRise">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-display font-bold text-zinc-900 uppercase tracking-wide">Portfolio</h1>
-        <p className="text-zinc-600 mt-1">Execution panel and performance analytics</p>
+    <div className="space-y-8 animate-fadeRise">
+      <div
+        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
+        style={{ background: 'linear-gradient(135deg, #101827 0%, #0e223f 52%, #194172 100%)' }}
+      >
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 18%, #38bdf8 0, transparent 34%), radial-gradient(circle at 80% 70%, #34d399 0, transparent 28%)' }} />
+        <div className="relative p-6 md:p-8">
+          <p className="text-cyan-200 text-xs tracking-[0.18em] uppercase">Portfolio Command</p>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide mt-1">Portfolio</h1>
+          <p className="text-zinc-200 mt-1">Execution panel and performance analytics</p>
+        </div>
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}

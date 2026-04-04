@@ -2,11 +2,11 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: '📊' },
-  { path: '/markets', label: 'Markets', icon: '💹' },
-  { path: '/signals', label: 'AI Signals', icon: '🤖' },
-  { path: '/portfolio', label: 'Portfolio', icon: '💼' },
-  { path: '/orders', label: 'Orders', icon: '🧾' },
+  { path: '/app', label: 'Dashboard', icon: '📊' },
+  { path: '/app/markets', label: 'Markets', icon: '💹' },
+  { path: '/app/signals', label: 'AI Signals', icon: '🤖' },
+  { path: '/app/portfolio', label: 'Portfolio', icon: '💼' },
+  { path: '/app/orders', label: 'Orders', icon: '🧾' },
 ];
 
 export default function Sidebar({ isOpen }) {

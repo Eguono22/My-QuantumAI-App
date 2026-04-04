@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function Navbar({ user, onLogout, onToggleSidebar }) {
+export default function Navbar({ user, theme, onToggleTheme, onLogout, onToggleSidebar }) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-black/80 bg-market-black text-white">
       <div className="flex items-center justify-between h-full px-4 md:px-6">
@@ -15,7 +15,7 @@ export default function Navbar({ user, onLogout, onToggleSidebar }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Link to="/" className="flex items-center space-x-3">
+          <Link to="/app" className="flex items-center space-x-3">
             <span className="text-xl md:text-2xl text-market-yellow">▥</span>
             <span className="text-xl md:text-2xl font-display font-bold tracking-wide uppercase">
               QuantumAI Trader
@@ -24,6 +24,12 @@ export default function Navbar({ user, onLogout, onToggleSidebar }) {
         </div>
         <div className="flex items-center space-x-3 md:space-x-4">
           <span className="text-emerald-400 text-sm font-semibold">● Live</span>
+          <button
+            onClick={onToggleTheme}
+            className="px-2.5 py-1.5 rounded-md border border-zinc-600 text-xs font-semibold hover:bg-white/10 transition"
+          >
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
           {user && (
             <div className="flex items-center space-x-3">
               <span className="text-zinc-300 text-sm hidden sm:block">User: {user.username}</span>

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
+import Landing from './pages/Landing';
 import TradingSignals from './pages/TradingSignals';
 import Portfolio from './pages/Portfolio';
 import Orders from './pages/Orders';
@@ -12,10 +13,36 @@ import Register from './pages/Register';
 import LoadingSpinner from './components/LoadingSpinner';
 import { authService } from './services/authService';
 
+function ProtectedLayout({ user, theme, onToggleTheme, onLogout, sidebarOpen, onToggleSidebar, children }) {
+  return (
+    <>
+      <Navbar
+        user={user}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        onLogout={onLogout}
+        onToggleSidebar={onToggleSidebar}
+      />
+      <div className="flex pt-16">
+        <Sidebar isOpen={sidebarOpen} />
+        <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
+          {children}
+        </main>
+      </div>
+    </>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const validateSession = async () => {
@@ -56,6 +83,10 @@ function App() {
     setUser(null);
   };
 
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -67,32 +98,97 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen text-market-text font-sans">
-        {user && (
-          <>
-            <Navbar user={user} onLogout={handleLogout} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-            <div className="flex pt-16">
-              <Sidebar isOpen={sidebarOpen} />
-              <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/markets" element={<Markets />} />
-                  <Route path="/signals" element={<TradingSignals />} />
-                  <Route path="/portfolio" element={<Portfolio user={user} />} />
-                  <Route path="/orders" element={<Orders />} />
-                  <Route path="/login" element={<Navigate to="/" />} />
-                  <Route path="/register" element={<Navigate to="/" />} />
-                </Routes>
-              </main>
-            </div>
-          </>
-        )}
-        {!user && (
-          <Routes>
-            <Route path="/login" element={<Login onLogin={setUser} />} />
-            <Route path="/register" element={<Register onLogin={setUser} />} />
-            <Route path="*" element={<Navigate to="/login" />} />
-          </Routes>
-        )}
+        <Routes>
+          <Route path="/" element={<Landing user={user} theme={theme} onToggleTheme={toggleTheme} />} />
+          <Route path="/login" element={user ? <Navigate to="/app" /> : <Login onLogin={setUser} />} />
+          <Route path="/register" element={user ? <Navigate to="/app" /> : <Register onLogin={setUser} />} />
+          <Route
+            path="/app"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <Dashboard />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/markets"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <Markets />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/signals"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <TradingSignals />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/portfolio"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <Portfolio user={user} />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/orders"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <Orders />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route path="*" element={<Navigate to={user ? '/app' : '/'} />} />
+        </Routes>
       </div>
     </Router>
   );

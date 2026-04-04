@@ -56,25 +56,32 @@ export default function Orders() {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="space-y-6 animate-fadeRise">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-zinc-900 uppercase tracking-wide">Orders</h1>
-          <p className="text-zinc-600 mt-1">Track pending and filled paper orders in real time</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {lastPoll && <p className="text-xs text-zinc-500">Last poll: {new Date(lastPoll).toLocaleTimeString()}</p>}
-          <button
-            onClick={pollPending}
-            disabled={polling}
-            className="px-3 py-2 rounded-md bg-black text-white text-sm disabled:opacity-60"
-          >
-            {polling ? 'Polling...' : 'Poll Pending'}
-          </button>
+    <div className="space-y-8 animate-fadeRise">
+      <div
+        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
+        style={{ background: 'linear-gradient(135deg, #0b1424 0%, #122945 50%, #1d4675 100%)' }}
+      >
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 20%, #38bdf8 0, transparent 30%), radial-gradient(circle at 85% 75%, #f59e0b 0, transparent 26%)' }} />
+        <div className="relative p-6 md:p-8 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sky-200 text-xs tracking-[0.18em] uppercase">Execution Log</p>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide">Orders</h1>
+            <p className="text-zinc-200 mt-1">Track pending and filled paper orders in real time</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastPoll && <p className="text-xs text-zinc-300">Last poll: {new Date(lastPoll).toLocaleTimeString()}</p>}
+            <button
+              onClick={pollPending}
+              disabled={polling}
+              className="px-3 py-2 rounded-md bg-sky-400 text-zinc-950 text-sm font-semibold disabled:opacity-60"
+            >
+              {polling ? 'Polling...' : 'Poll Pending'}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="market-panel rounded-md overflow-hidden">
+      <div className="market-panel rounded-md overflow-hidden border border-zinc-700">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 border-b border-zinc-200">

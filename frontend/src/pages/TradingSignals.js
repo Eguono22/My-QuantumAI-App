@@ -480,20 +480,27 @@ export default function TradingSignals() {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="space-y-6 animate-fadeRise">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-zinc-900 uppercase tracking-wide">AI Trading Signals</h1>
-          <p className="text-zinc-600 mt-1">Machine-generated opportunities across tracked markets</p>
+    <div className="space-y-8 animate-fadeRise">
+      <div
+        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
+        style={{ background: 'linear-gradient(135deg, #0b1527 0%, #12294a 50%, #234a78 100%)' }}
+      >
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 22%, #22d3ee 0, transparent 34%), radial-gradient(circle at 82% 72%, #38bdf8 0, transparent 28%)' }} />
+        <div className="relative p-6 md:p-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div>
+            <p className="text-cyan-200 text-xs tracking-[0.18em] uppercase">Signal Center</p>
+            <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide">AI Trading Signals</h1>
+            <p className="text-zinc-200 mt-1">Machine-generated opportunities across tracked markets</p>
+          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="disabled:opacity-50 px-4 py-2 rounded-md transition flex items-center justify-center space-x-2 font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300"
+          >
+            <span>{generating ? '⟳' : '↺'}</span>
+            <span>{generating ? 'Generating...' : 'Generate New Signals'}</span>
+          </button>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="market-btn-primary disabled:opacity-50 px-4 py-2 rounded-md transition flex items-center justify-center space-x-2 font-semibold"
-        >
-          <span>{generating ? '⟳' : '↺'}</span>
-          <span>{generating ? 'Generating...' : 'Generate New Signals'}</span>
-        </button>
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
