@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import Alert from '../components/Alert';
 
 export default function Register({ onLogin }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ export default function Register({ onLogin }) {
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('username', data.username);
       onLogin({ username: data.username, token: data.access_token });
+      navigate('/app', { replace: true });
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed. API unavailable or misconfigured.');
     } finally {

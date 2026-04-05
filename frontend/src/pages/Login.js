@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import Alert from '../components/Alert';
 
 export default function Login({ onLogin }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,6 +18,7 @@ export default function Login({ onLogin }) {
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('username', data.username);
       onLogin({ username: data.username, token: data.access_token });
+      navigate('/app', { replace: true });
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. API unavailable or misconfigured.');
     } finally {
