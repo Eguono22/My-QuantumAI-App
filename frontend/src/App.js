@@ -10,6 +10,7 @@ import Orders from './pages/Orders';
 import Markets from './pages/Markets';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Settings from './pages/Settings';
 import LoadingSpinner from './components/LoadingSpinner';
 import { authService } from './services/authService';
 
@@ -37,10 +38,18 @@ function App() {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  const [theme, setTheme] = useState(localStorage.getItem('app_pref_theme') || localStorage.getItem('theme') || 'dark');
+  const [preferences, setPreferences] = useState({
+    language: localStorage.getItem('app_pref_language') || 'en',
+    layout: localStorage.getItem('app_pref_layout') || 'trader-pro',
+    aiModel: localStorage.getItem('app_pref_ai_model') || 'quantum-core-v1',
+    portfolioView: localStorage.getItem('app_pref_portfolio_view') || 'overview',
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark-mode', theme === 'dark');
+    localStorage.setItem('app_pref_theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
@@ -87,6 +96,19 @@ function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const updatePreference = (key, value) => {
+    const storageMap = {
+      language: 'app_pref_language',
+      layout: 'app_pref_layout',
+      aiModel: 'app_pref_ai_model',
+      portfolioView: 'app_pref_portfolio_view',
+    };
+    if (storageMap[key]) {
+      localStorage.setItem(storageMap[key], value);
+    }
+    setPreferences((prev) => ({ ...prev, [key]: value }));
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -114,7 +136,7 @@ function App() {
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 >
-                  <Dashboard />
+                  <Dashboard preferences={preferences} />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }
@@ -148,7 +170,7 @@ function App() {
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 >
-                  <TradingSignals />
+                  <TradingSignals preferences={preferences} />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }
@@ -165,7 +187,7 @@ function App() {
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 >
-                  <Portfolio user={user} />
+                  <Portfolio user={user} preferences={preferences} />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }
@@ -183,6 +205,27 @@ function App() {
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 >
                   <Orders />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/settings"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                >
+                  <Settings
+                    preferences={{ ...preferences, theme }}
+                    onUpdatePreference={updatePreference}
+                    onToggleTheme={toggleTheme}
+                  />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }

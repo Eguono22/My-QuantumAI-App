@@ -7,6 +7,7 @@ const navItems = [
   { path: '/app/signals', label: 'AI Signals', icon: '🤖' },
   { path: '/app/portfolio', label: 'Portfolio', icon: '💼' },
   { path: '/app/orders', label: 'Orders', icon: '🧾' },
+  { path: '/app/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function Sidebar({ isOpen }) {

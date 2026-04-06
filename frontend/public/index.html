@@ -11,6 +11,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      (function bootstrapQuantumAppShell() {
+        var root = document.documentElement;
+        var storage = window.localStorage;
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        var defaults = {
+          apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000'
+            : '/api',
+          appVersion: '1.0.0',
+          environment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'development'
+            : 'production',
+          supportedLanguages: ['en', 'nl', 'fr'],
+        };
+
+        var existing = window.globalConfig || {};
+        window.globalConfig = Object.assign({}, defaults, existing);
+
+        var theme = storage.getItem('app_pref_theme') || storage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+        storage.setItem('app_pref_theme', theme);
+        storage.setItem('theme', theme);
+        root.setAttribute('data-theme', theme);
+        root.classList.toggle('dark-mode', theme === 'dark');
+
+        if (!storage.getItem('app_pref_language')) storage.setItem('app_pref_language', 'en');
+        if (!storage.getItem('app_pref_layout')) storage.setItem('app_pref_layout', 'trader-pro');
+        if (!storage.getItem('app_pref_ai_model')) storage.setItem('app_pref_ai_model', 'quantum-core-v1');
+        if (!storage.getItem('app_pref_portfolio_view')) storage.setItem('app_pref_portfolio_view', 'overview');
+      })();
+    </script>
+    <script>
       tailwind.config = {
         theme: {
           extend: {
@@ -148,6 +180,13 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <div id="app-shell" data-layout="web-app">
+      <header id="shell-header" hidden></header>
+      <aside id="shell-sidebar" hidden></aside>
+      <main id="shell-main">
+        <div id="root"></div>
+      </main>
+      <section id="shell-notifications" hidden></section>
+    </div>
   </body>
 </html>

@@ -7,7 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent, getChangeColor } from '../utils/formatters';
 
-export default function Portfolio({ user }) {
+export default function Portfolio({ user, preferences }) {
   const [portfolio, setPortfolio] = useState([]);
   const [performance, setPerformance] = useState(null);
   const [priceHistory, setPriceHistory] = useState([]);
@@ -16,6 +16,11 @@ export default function Portfolio({ user }) {
   const [loading, setLoading] = useState(true);
   const [tradeForm, setTradeForm] = useState({ asset: 'BTC', action: 'buy', quantity: '' });
   const [alert, setAlert] = useState(null);
+  const [activeView, setActiveView] = useState(preferences?.portfolioView || 'overview');
+
+  useEffect(() => {
+    setActiveView(preferences?.portfolioView || 'overview');
+  }, [preferences?.portfolioView]);
 
   const fetchData = useCallback(async () => {
     const [portRes, perfRes, histRes, overviewRes] = await Promise.allSettled([
@@ -92,6 +97,11 @@ export default function Portfolio({ user }) {
 
   if (loading) return <LoadingSpinner size="lg" />;
 
+  const showTradePanel = activeView !== 'performance';
+  const showHoldingsPanel = activeView !== 'performance';
+  const showAllocationPanel = true;
+  const showPriceChart = activeView !== 'risk';
+
   return (
     <div className="space-y-8 animate-fadeRise">
       <div
@@ -104,6 +114,26 @@ export default function Portfolio({ user }) {
           <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide mt-1">Portfolio</h1>
           <p className="text-zinc-200 mt-1">Execution panel and performance analytics</p>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'overview', label: 'Overview' },
+          { key: 'risk', label: 'Risk First' },
+          { key: 'performance', label: 'Performance' },
+        ].map((view) => (
+          <button
+            key={view.key}
+            onClick={() => setActiveView(view.key)}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+              activeView === view.key
+                ? 'bg-market-yellow text-black border border-amber-600'
+                : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+            }`}
+          >
+            {view.label}
+          </button>
+        ))}
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
@@ -125,104 +155,112 @@ export default function Portfolio({ user }) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="market-panel rounded-md p-6">
-          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Execute Trade</h2>
-          <form onSubmit={handleTrade} className="space-y-4">
-            <div>
-              <label className="block text-sm text-zinc-600 mb-1">Asset</label>
-              <select
-                value={tradeForm.asset}
-                onChange={e => setTradeForm({...tradeForm, asset: e.target.value})}
-                className="market-select rounded-md px-3 py-2"
-              >
-                {assetOptions.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {['buy', 'sell'].map(action => (
-                <button
-                  key={action}
-                  type="button"
-                  onClick={() => setTradeForm({...tradeForm, action})}
-                  className={`py-2 rounded-md text-sm font-semibold transition ${
-                    tradeForm.action === action
-                      ? action === 'buy' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-                      : 'bg-white text-zinc-600 border border-zinc-300'
-                  }`}
+        {showTradePanel && (
+          <div className="market-panel rounded-md p-6">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Execute Trade</h2>
+            <form onSubmit={handleTrade} className="space-y-4">
+              <div>
+                <label className="block text-sm text-zinc-600 mb-1">Asset</label>
+                <select
+                  value={tradeForm.asset}
+                  onChange={e => setTradeForm({...tradeForm, asset: e.target.value})}
+                  className="market-select rounded-md px-3 py-2"
                 >
-                  {action.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            <div>
-              <label className="block text-sm text-zinc-600 mb-1">Quantity</label>
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                value={tradeForm.quantity}
-                onChange={e => setTradeForm({...tradeForm, quantity: e.target.value})}
-                className="market-input rounded-md px-3 py-2"
-                placeholder="0.00"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className={`w-full py-3 rounded-md font-semibold transition ${
-                tradeForm.action === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-              } text-white`}
+                  {assetOptions.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {['buy', 'sell'].map(action => (
+                  <button
+                    key={action}
+                    type="button"
+                    onClick={() => setTradeForm({...tradeForm, action})}
+                    className={`py-2 rounded-md text-sm font-semibold transition ${
+                      tradeForm.action === action
+                        ? action === 'buy' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                        : 'bg-white text-zinc-600 border border-zinc-300'
+                    }`}
+                  >
+                    {action.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-600 mb-1">Quantity</label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={tradeForm.quantity}
+                  onChange={e => setTradeForm({...tradeForm, quantity: e.target.value})}
+                  className="market-input rounded-md px-3 py-2"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className={`w-full py-3 rounded-md font-semibold transition ${
+                  tradeForm.action === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                } text-white`}
+              >
+                {tradeForm.action === 'buy' ? 'Buy' : 'Sell'} {tradeForm.asset}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {showAllocationPanel && (
+          <div className="market-panel rounded-md p-6">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Allocation</h2>
+            <PortfolioChart holdings={portfolio} />
+          </div>
+        )}
+
+        {showHoldingsPanel && (
+          <div className="market-panel rounded-md p-6">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Holdings</h2>
+            {portfolio.length === 0 ? (
+              <p className="text-zinc-500 text-center py-8">No holdings yet. Execute a trade to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                {portfolio.map(h => (
+                  <div key={h.asset} className="flex justify-between items-center p-3 bg-zinc-50 rounded-md border border-zinc-200">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{h.asset}</p>
+                      <p className="text-xs text-zinc-500">{h.quantity} @ {formatCurrency(h.avg_price)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-zinc-900 font-semibold">{formatCurrency(h.current_value)}</p>
+                      <p className={`text-xs ${getChangeColor(h.pnl)}`}>{formatPercent(h.pnl_pct)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showPriceChart && (
+        <div className="market-panel rounded-md p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Price Chart</h2>
+            <select
+              value={selectedAsset}
+              onChange={e => setSelectedAsset(e.target.value)}
+              className="market-select rounded-md px-3 py-1 text-sm"
             >
-              {tradeForm.action === 'buy' ? 'Buy' : 'Sell'} {tradeForm.asset}
-            </button>
-          </form>
-        </div>
-
-        <div className="market-panel rounded-md p-6">
-          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Allocation</h2>
-          <PortfolioChart holdings={portfolio} />
-        </div>
-
-        <div className="market-panel rounded-md p-6">
-          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Holdings</h2>
-          {portfolio.length === 0 ? (
-            <p className="text-zinc-500 text-center py-8">No holdings yet. Execute a trade to get started.</p>
-          ) : (
-            <div className="space-y-3">
-              {portfolio.map(h => (
-                <div key={h.asset} className="flex justify-between items-center p-3 bg-zinc-50 rounded-md border border-zinc-200">
-                  <div>
-                    <p className="font-semibold text-zinc-900">{h.asset}</p>
-                    <p className="text-xs text-zinc-500">{h.quantity} @ {formatCurrency(h.avg_price)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-zinc-900 font-semibold">{formatCurrency(h.current_value)}</p>
-                    <p className={`text-xs ${getChangeColor(h.pnl)}`}>{formatPercent(h.pnl_pct)}</p>
-                  </div>
-                </div>
+              {assetOptions.map(s => (
+                <option key={s} value={s}>{s}</option>
               ))}
-            </div>
-          )}
+            </select>
+          </div>
+          <PriceChart history={priceHistory} symbol={selectedAsset} />
         </div>
-      </div>
-
-      <div className="market-panel rounded-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Price Chart</h2>
-          <select
-            value={selectedAsset}
-            onChange={e => setSelectedAsset(e.target.value)}
-            className="market-select rounded-md px-3 py-1 text-sm"
-          >
-            {assetOptions.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <PriceChart history={priceHistory} symbol={selectedAsset} />
-      </div>
+      )}
     </div>
   );
 }

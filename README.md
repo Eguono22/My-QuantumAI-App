@@ -76,6 +76,13 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 - Node.js 18+
 - Docker & docker-compose (optional)
 
+### Environment Setup
+```powershell
+# from project root (Windows PowerShell)
+$secret = & openssl rand -hex 32
+(Get-Content .env.example) -replace '^SECRET_KEY=.*$', "SECRET_KEY=$secret" | Set-Content .env
+```
+
 ### Backend Setup
 ```bash
 cd backend

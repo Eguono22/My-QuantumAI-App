@@ -5,7 +5,7 @@ import { tradingService } from '../services/tradingService';
 import TradingSignalCard from '../components/TradingSignalCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
-export default function Dashboard() {
+export default function Dashboard({ preferences }) {
   const [marketData, setMarketData] = useState([]);
   const [signals, setSignals] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -49,14 +49,19 @@ export default function Dashboard() {
   }, [sentimentAsset]);
 
   const pendingOrders = orders.filter((o) => o.status === 'PENDING');
+  const layoutMode = preferences?.layout || 'trader-pro';
+  const aiModel = preferences?.aiModel || 'quantum-core-v1';
+  const isCompact = layoutMode === 'compact';
+  const isFocus = layoutMode === 'focus';
+  const showAdvancedSections = layoutMode === 'trader-pro';
   const stats = [
     { label: 'Markets Covered', value: marketData.length, color: 'text-white' },
     { label: 'Live Signals', value: signals.filter((s) => s.signal_type !== 'HOLD').length, color: 'text-sky-300' },
     { label: 'Pending Orders', value: pendingOrders.length, color: 'text-amber-300' },
     { label: 'Broker Mode', value: startupHealth?.trading?.trading_mode || 'paper', color: 'text-emerald-300' },
   ];
-  const topMarkets = [...marketData].slice(0, 8);
-  const featuredSignals = [...signals].slice(0, 4);
+  const topMarkets = [...marketData].slice(0, isFocus ? 4 : 8);
+  const featuredSignals = [...signals].slice(0, isCompact ? 2 : 4);
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -79,6 +84,12 @@ export default function Dashboard() {
             Unified signal intelligence, portfolio execution, and broker-readiness monitoring in one high-performance trading cockpit.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
+            <span className="px-3 py-1 rounded-md bg-cyan-900/60 text-cyan-200 text-xs font-semibold uppercase tracking-wide">
+              Model: {aiModel}
+            </span>
+            <span className="px-3 py-1 rounded-md bg-zinc-900/50 text-zinc-200 text-xs font-semibold uppercase tracking-wide">
+              Layout: {layoutMode}
+            </span>
             <Link to="/app/markets" className="px-5 py-2.5 rounded-md bg-sky-400 text-zinc-950 font-semibold hover:bg-sky-300 transition">
               Explore Markets
             </Link>
@@ -92,7 +103,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 ${isCompact ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-4`}>
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-xl p-4 border border-zinc-700" style={{ background: 'linear-gradient(180deg, #121a2c 0%, #0f172a 100%)' }}>
             <p className="text-zinc-400 text-xs uppercase tracking-wide">{stat.label}</p>
@@ -101,57 +112,59 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0b1324 0%, #0f172a 100%)' }}>
-          <p className="text-xs uppercase tracking-wide text-zinc-400">Platform Edge</p>
-          <h2 className="text-2xl font-display font-bold text-white uppercase">Why Trade With QuantumAI</h2>
-          <div className="grid md:grid-cols-3 gap-3 mt-4">
-            <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-              <p className="text-sky-300 text-xs uppercase">Execution Safety</p>
-              <p className="text-zinc-200 text-sm mt-2">Pre-trade risk validation with notional, daily volume, and risk-per-trade controls.</p>
-            </div>
-            <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-              <p className="text-cyan-300 text-xs uppercase">Adaptive Signals</p>
-              <p className="text-zinc-200 text-sm mt-2">Quantum-inspired signal engine combining volatility, momentum, and regime context.</p>
-            </div>
-            <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-              <p className="text-emerald-300 text-xs uppercase">Broker-Ready Ops</p>
-              <p className="text-zinc-200 text-sm mt-2">Order lifecycle tracking, pending polling, and cancellation controls in one place.</p>
+      {!isFocus && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+          <div className="xl:col-span-2 rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0b1324 0%, #0f172a 100%)' }}>
+            <p className="text-xs uppercase tracking-wide text-zinc-400">Platform Edge</p>
+            <h2 className="text-2xl font-display font-bold text-white uppercase">Why Trade With QuantumAI</h2>
+            <div className="grid md:grid-cols-3 gap-3 mt-4">
+              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
+                <p className="text-sky-300 text-xs uppercase">Execution Safety</p>
+                <p className="text-zinc-200 text-sm mt-2">Pre-trade risk validation with notional, daily volume, and risk-per-trade controls.</p>
+              </div>
+              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
+                <p className="text-cyan-300 text-xs uppercase">Adaptive Signals</p>
+                <p className="text-zinc-200 text-sm mt-2">Quantum-inspired signal engine combining volatility, momentum, and regime context.</p>
+              </div>
+              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
+                <p className="text-emerald-300 text-xs uppercase">Broker-Ready Ops</p>
+                <p className="text-zinc-200 text-sm mt-2">Order lifecycle tracking, pending polling, and cancellation controls in one place.</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-zinc-400">System Status</p>
-              <h3 className="text-lg font-display font-bold text-white uppercase">Broker Readiness</h3>
-            </div>
-            <span className={`text-xs font-semibold px-2 py-1 rounded ${
-              startupHealth?.status === 'ok' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'
-            }`}>
-              {startupHealth?.status === 'ok' ? 'READY' : 'CHECK'}
-            </span>
-          </div>
-          <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Provider</span>
-              <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.broker_provider || 'unavailable'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Mode</span>
-              <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.trading_mode || 'unavailable'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Credentials</span>
-              <span className={`font-semibold ${startupHealth?.credentials?.alpaca_configured ? 'text-emerald-300' : 'text-amber-300'}`}>
-                {startupHealth?.credentials?.alpaca_configured ? 'Configured' : 'Missing or N/A'}
+          <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-zinc-400">System Status</p>
+                <h3 className="text-lg font-display font-bold text-white uppercase">Broker Readiness</h3>
+              </div>
+              <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                startupHealth?.status === 'ok' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'
+              }`}>
+                {startupHealth?.status === 'ok' ? 'READY' : 'CHECK'}
               </span>
             </div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Provider</span>
+                <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.broker_provider || 'unavailable'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Mode</span>
+                <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.trading_mode || 'unavailable'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Credentials</span>
+                <span className={`font-semibold ${startupHealth?.credentials?.alpaca_configured ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {startupHealth?.credentials?.alpaca_configured ? 'Configured' : 'Missing or N/A'}
+                </span>
+              </div>
+            </div>
+            {startupHealth?.trading?.reason && <p className="mt-3 text-xs text-zinc-400">{startupHealth.trading.reason}</p>}
           </div>
-          {startupHealth?.trading?.reason && <p className="mt-3 text-xs text-zinc-400">{startupHealth.trading.reason}</p>}
         </div>
-      </div>
+      )}
 
       <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0b1324 0%, #0f172a 100%)' }}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -177,7 +190,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+      <div className={`grid grid-cols-1 ${isCompact ? 'xl:grid-cols-2' : 'xl:grid-cols-3'} gap-5`}>
         <div className="xl:col-span-2 rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-xl font-display font-bold text-white uppercase">Signal Snapshot</h2>
@@ -188,7 +201,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #101827 0%, #0f172a 100%)' }}>
+        {!isCompact && (
+          <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #101827 0%, #0f172a 100%)' }}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-display font-bold text-white uppercase">Pending Orders</h2>
             <span className="text-sm font-semibold text-zinc-200">{pendingOrders.length}</span>
@@ -208,10 +222,12 @@ export default function Dashboard() {
           <Link to="/app/orders" className="inline-block mt-4 px-3 py-2 rounded-md bg-zinc-800 text-zinc-100 text-sm font-semibold hover:bg-zinc-700 transition">
             Manage Orders
           </Link>
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0a0f1a 0%, #0f172a 100%)' }}>
+      {showAdvancedSections && (
+        <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0a0f1a 0%, #0f172a 100%)' }}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-xl font-display font-bold text-white uppercase">Sentiment Monitor</h2>
@@ -263,9 +279,11 @@ export default function Dashboard() {
             </div>
           </>
         )}
-      </div>
+        </div>
+      )}
 
-      <div className="rounded-xl p-5 border border-zinc-700" style={{ background: 'linear-gradient(135deg, #091322 0%, #11253f 45%, #0d1b2f 100%)' }}>
+      {showAdvancedSections && (
+        <div className="rounded-xl p-5 border border-zinc-700" style={{ background: 'linear-gradient(135deg, #091322 0%, #11253f 45%, #0d1b2f 100%)' }}>
         <h2 className="text-xl font-display font-bold text-white uppercase">Risk Disclaimer</h2>
         <p className="text-zinc-300 text-sm mt-2">
           Trading leveraged instruments and crypto assets carries high risk. Past performance does not guarantee future results.
@@ -279,7 +297,8 @@ export default function Dashboard() {
             Review Signal Risk
           </Link>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

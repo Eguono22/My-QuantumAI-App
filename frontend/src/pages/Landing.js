@@ -71,25 +71,25 @@ export default function Landing({ user, theme, onToggleTheme }) {
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="market-panel rounded-xl p-5">
-            <p className="text-xs uppercase text-zinc-500 tracking-wide">Broker Readiness</p>
-            <p className="text-2xl font-bold mt-1">{health?.status === 'ok' ? 'Ready' : 'Check Config'}</p>
-            <p className="text-sm text-zinc-500 mt-2">{health?.trading?.reason || 'Startup diagnostics online.'}</p>
+            <p className="text-xs uppercase text-zinc-400 tracking-wide">Broker Readiness</p>
+            <p className="text-2xl font-bold mt-1 text-zinc-100">{health?.status === 'ok' ? 'Ready' : 'Check Config'}</p>
+            <p className="text-sm text-zinc-300 mt-2">{health?.trading?.reason || 'Startup diagnostics online.'}</p>
           </div>
           <div className="market-panel rounded-xl p-5">
-            <p className="text-xs uppercase text-zinc-500 tracking-wide">Data Provider</p>
-            <p className="text-2xl font-bold mt-1">{health?.market_data?.provider || 'mock'}</p>
-            <p className="text-sm text-zinc-500 mt-2">Switch to live feeds with Alpaca when credentials are configured.</p>
+            <p className="text-xs uppercase text-zinc-400 tracking-wide">Data Provider</p>
+            <p className="text-2xl font-bold mt-1 text-zinc-100">{health?.market_data?.provider || 'mock'}</p>
+            <p className="text-sm text-zinc-300 mt-2">Switch to live feeds with Alpaca when credentials are configured.</p>
           </div>
           <div className="market-panel rounded-xl p-5">
-            <p className="text-xs uppercase text-zinc-500 tracking-wide">Markets Tracked</p>
-            <p className="text-2xl font-bold mt-1">{marketSample.length ? `${marketSample.length}+` : '--'}</p>
-            <p className="text-sm text-zinc-500 mt-2">Cross-asset coverage for equities, indices, forex, commodities, and crypto.</p>
+            <p className="text-xs uppercase text-zinc-400 tracking-wide">Markets Tracked</p>
+            <p className="text-2xl font-bold mt-1 text-zinc-100">{marketSample.length ? `${marketSample.length}+` : '--'}</p>
+            <p className="text-sm text-zinc-300 mt-2">Cross-asset coverage for equities, indices, forex, commodities, and crypto.</p>
           </div>
         </section>
 
         <section className="market-panel rounded-xl p-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-bold uppercase">Live Snapshot</h2>
+            <h2 className="text-xl font-display font-bold uppercase text-zinc-100">Live Snapshot</h2>
             <Link to={user ? '/app/markets' : '/login'} className="text-sm font-semibold text-sky-700">View full market board</Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
@@ -98,13 +98,13 @@ export default function Landing({ user, theme, onToggleTheme }) {
               return (
                 <div key={item.symbol} className="market-panel-soft rounded-md p-3">
                   <div className="flex items-center justify-between">
-                    <p className="font-display font-bold text-lg">{item.symbol}</p>
+                    <p className="font-display font-bold text-lg text-zinc-100">{item.symbol}</p>
                     <span className={`text-xs font-semibold ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
                       {positive ? '+' : ''}{Number(item.change_pct_24h).toFixed(2)}%
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-500">{item.name}</p>
-                  <p className="mt-1 font-semibold">{Number(item.price).toLocaleString()}</p>
+                  <p className="text-xs text-zinc-300">{item.name}</p>
+                  <p className="mt-1 font-semibold text-zinc-100">{Number(item.price).toLocaleString()}</p>
                 </div>
               );
             })}

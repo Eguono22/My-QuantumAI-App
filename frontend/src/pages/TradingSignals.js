@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
-export default function TradingSignals() {
+export default function TradingSignals({ preferences }) {
   const RISK_PRESETS = {
     CONSERVATIVE: { riskPerTradePct: 0.5, maxPortfolioHeatPct: 3 },
     BALANCED: { riskPerTradePct: 1.0, maxPortfolioHeatPct: 6 },
@@ -491,6 +491,14 @@ export default function TradingSignals() {
             <p className="text-cyan-200 text-xs tracking-[0.18em] uppercase">Signal Center</p>
             <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide">AI Trading Signals</h1>
             <p className="text-zinc-200 mt-1">Machine-generated opportunities across tracked markets</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="px-2.5 py-1 rounded-md bg-cyan-900/60 text-cyan-100 text-xs font-semibold uppercase tracking-wide">
+                Model: {preferences?.aiModel || 'quantum-core-v1'}
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-zinc-900/60 text-zinc-100 text-xs font-semibold uppercase tracking-wide">
+                Layout: {preferences?.layout || 'trader-pro'}
+              </span>
+            </div>
           </div>
           <button
             onClick={handleGenerate}

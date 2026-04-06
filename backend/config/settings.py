@@ -2,6 +2,7 @@ import secrets
 import warnings
 import os
 import hashlib
+from pathlib import Path
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List, Optional
@@ -45,7 +46,10 @@ class Settings(BaseSettings):
         or ("production" if os.getenv("VERCEL") == "1" else "development")
     )
 
-    model_config = ConfigDict(env_file=".env")
+    # Resolve project-root .env regardless of process working directory
+    # (e.g. running from repo root vs backend/).
+    _ROOT_DIR = Path(__file__).resolve().parents[2]
+    model_config = ConfigDict(env_file=str(_ROOT_DIR / ".env"))
 
 
 settings = Settings()
@@ -64,11 +68,15 @@ if settings.DATABASE_URL is None:
     )
 
 if settings.SECRET_KEY is None:
+    # Use a deterministic fallback key so tokens remain valid across process
+    # restarts while still warning that explicit SECRET_KEY is strongly preferred.
+    fallback_seed = (
+        f"{os.getenv('VERCEL_PROJECT_ID','')}|"
+        f"{os.getenv('COMPUTERNAME','')}|"
+        f"{settings.DATABASE_URL or ''}|quantumai"
+    )
+    settings.SECRET_KEY = hashlib.sha256(fallback_seed.encode()).hexdigest()
     if settings.APP_ENV != "development":
-        # Vercel serverless instances can restart frequently; random keys would
-        # invalidate active sessions and force users to log in repeatedly.
-        fallback_seed = f"{os.getenv('VERCEL_PROJECT_ID','')}|{settings.DATABASE_URL or ''}|quantumai"
-        settings.SECRET_KEY = hashlib.sha256(fallback_seed.encode()).hexdigest()
         warnings.warn(
             "SECRET_KEY not set in hosted environment — using deterministic fallback key. "
             "Set SECRET_KEY in deployment settings for stronger security.",
@@ -76,13 +84,9 @@ if settings.SECRET_KEY is None:
             stacklevel=2,
         )
     else:
-        # Development only: auto-generate a random key.  Tokens are invalidated on
-        # every restart, which is acceptable during local development.
-        settings.SECRET_KEY = _generate_dev_secret()
         warnings.warn(
-            "SECRET_KEY not set — using a randomly generated key for this process. "
-            "Tokens will be invalidated on restart. "
-            "Set SECRET_KEY (e.g. `openssl rand -hex 32`) before deploying to production.",
+            "SECRET_KEY not set — using deterministic development fallback key. "
+            "Set SECRET_KEY (e.g. `openssl rand -hex 32`) for production security.",
             UserWarning,
             stacklevel=2,
         )
