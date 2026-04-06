@@ -67,6 +67,7 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 | POST | `/portfolio/trade` | Yes | Execute buy/sell |
 | GET | `/portfolio/performance` | Yes | Portfolio P&L |
 | GET | `/health/startup` | No | Startup diagnostics (broker/data readiness) |
+| POST | `/monitoring/frontend-error` | No | Ingest frontend runtime error events |
 | WS | `/ws` | No | Real-time market data |
 
 ## 🏃 Quick Start
@@ -184,3 +185,48 @@ When you call `POST /portfolio/trade`, the response includes:
 
 Startup diagnostics endpoint:
 - `GET /health/startup` returns broker provider/mode readiness, Alpaca credential readiness, and active risk limits.
+
+## 🚢 Production Setup (1-4)
+
+### 1) Enable real paper broker/data (Alpaca)
+- Set in backend env:
+  - `TRADING_MODE=paper`
+  - `BROKER_PROVIDER=alpaca`
+  - `MARKET_DATA_PROVIDER=alpaca`
+  - `ALPACA_API_KEY=...`
+  - `ALPACA_API_SECRET=...`
+- Optional connectivity probe:
+  - `ALPACA_STARTUP_PROBE=true`
+  - `GET /health/startup?include_probe=true`
+
+### 2) Deployment env split (frontend vs backend secrets)
+- Frontend/public config only:
+  - `REACT_APP_API_URL`
+  - theme/layout/model preference defaults
+- Backend secrets only:
+  - `SECRET_KEY`
+  - `DATABASE_URL`
+  - `ALPACA_API_KEY`
+  - `ALPACA_API_SECRET`
+- Never expose broker keys, JWT secrets, or DB credentials in frontend bundles.
+
+### 3) Pre-launch automated check
+Run this before going live:
+```bash
+python scripts/prelaunch_check.py
+```
+This validates:
+- health + startup diagnostics
+- register/login/me auth flow
+- signals fetch
+- paper trade execution
+- orders + portfolio retrieval
+
+### 4) Monitoring baseline
+- Frontend:
+  - Global error/rejection handlers now report to `POST /monitoring/frontend-error`
+- Backend:
+  - `/health` includes uptime/version/timestamp
+  - trade/order events are logged with structured context
+- Optional control:
+  - `ENABLE_FRONTEND_ERROR_INGEST=true|false`

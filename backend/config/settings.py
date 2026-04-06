@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"
     ALPACA_API_KEY: Optional[str] = None
     ALPACA_API_SECRET: Optional[str] = None
+    ALPACA_STARTUP_PROBE: bool = False
+    ENABLE_FRONTEND_ERROR_INGEST: bool = True
+    APP_VERSION: str = "1.0.0"
     SIM_SLIPPAGE_BPS: float = 1.5
     SIM_FEE_BPS: float = 2.0
     SIM_PARTIAL_FILL_NOTIONAL_THRESHOLD: float = 15000.0

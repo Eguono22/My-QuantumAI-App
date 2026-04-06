@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
@@ -12,6 +13,7 @@ from quantum_ai.signals import SignalGenerator
 
 signal_generator = SignalGenerator()
 risk_engine = RiskEngine()
+logger = logging.getLogger("quantumai.trading")
 
 class TradingService:
     def _fallback_signal(self, asset: str) -> Dict:
@@ -174,10 +176,21 @@ class TradingService:
                 requested_price=price,
             )
         except BrokerExecutionError as e:
+            logger.exception(
+                "trade_broker_error user_id=%s asset=%s action=%s order_type=%s",
+                user_id, asset, action, order_type
+            )
             raise ValueError(str(e))
 
         order_status = order_result.get("status", "REJECTED")
         if order_status == "REJECTED":
+            logger.warning(
+                "trade_rejected user_id=%s asset=%s action=%s reason=%s",
+                user_id,
+                asset,
+                action,
+                order_result.get("reason"),
+            )
             raise ValueError(order_result.get("reason") or "Order was rejected by broker")
 
         if stop_loss is not None and stop_loss <= 0:
@@ -259,6 +272,18 @@ class TradingService:
         message = None
         if order_status == "PENDING":
             message = "Order accepted and pending trigger."
+
+        logger.info(
+            "trade_submitted user_id=%s asset=%s action=%s order_type=%s status=%s qty=%s filled_qty=%s broker=%s",
+            user_id,
+            asset,
+            action,
+            order_type,
+            order_status,
+            quantity,
+            order.filled_quantity,
+            order.broker,
+        )
 
         return {
             "success": True,
@@ -389,6 +414,10 @@ class TradingService:
 
         if updated > 0:
             db.commit()
+            logger.info(
+                "order_poll_update user_id=%s pending_checked=%s updated=%s filled=%s rejected=%s",
+                user_id, len(pending_orders), updated, filled, rejected
+            )
 
         return {
             "success": True,
@@ -425,6 +454,13 @@ class TradingService:
         order.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(order)
+        logger.info(
+            "order_canceled user_id=%s order_id=%s broker_order_id=%s status=%s",
+            user_id,
+            order_id,
+            order.broker_order_id,
+            order.status,
+        )
         return self._format_order(order)
     
     def generate_signals(self, db: Session) -> List[Dict]:
