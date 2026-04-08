@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     MAX_DAILY_NOTIONAL: float = 100000.0
     MAX_DAILY_TRADES: int = 50
     MAX_RISK_PERCENT_PER_TRADE: float = 2.0
+    MQL5_BRIDGE_ENABLED: bool = True
+    MQL5_SHARED_SECRET: Optional[str] = None
+    MQL5_TERMINAL_ACTIVE_WINDOW_S: int = 180
+    MQL5_DEFAULT_CONFIDENCE_THRESHOLD: float = 0.72
+    MQL5_DEFAULT_RISK_PERCENT: float = 1.0
+    MQL5_DEFAULT_ORDER_QUANTITY: float = 0.1
+    MQL5_MAX_AUTO_NOTIONAL: float = 10000.0
     # Treat all hosted Vercel environments (production + preview) as production-like.
     APP_ENV: str = (
         os.getenv("APP_ENV")

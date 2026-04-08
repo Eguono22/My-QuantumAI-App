@@ -63,6 +63,13 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 | GET | `/trading/orders` | Yes | List order lifecycle records |
 | POST | `/trading/orders/poll` | Yes | Poll pending broker orders |
 | DELETE | `/trading/orders/{order_id}` | Yes | Cancel pending order |
+| GET | `/trading/mql5/status` | Yes | MQL5 bridge health for current user |
+| POST | `/trading/mql5/automation/analyze` | Yes | Generate AI decision for MQL5 automation |
+| POST | `/trading/mql5/automation/execute` | Yes | Run AI-based automated trade execution |
+| POST | `/trading/mql5/bridge/register` | Shared secret | Register an MQL5 terminal |
+| POST | `/trading/mql5/bridge/heartbeat` | Shared secret | Keep MQL5 terminal status alive |
+| POST | `/trading/mql5/bridge/analyze` | Shared secret | Ask QuantumAI for an AI trading decision |
+| POST | `/trading/mql5/bridge/execute-ai` | Shared secret | Analyze and execute a trade for a user |
 | GET | `/portfolio` | Yes | User portfolio |
 | POST | `/portfolio/trade` | Yes | Execute buy/sell |
 | GET | `/portfolio/performance` | Yes | Portfolio P&L |
@@ -91,6 +98,11 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
+Windows local launcher with the MT5-friendly port used in this repo:
+```powershell
+.\scripts\start_backend_local.ps1 -Port 8011
+```
+
 ### Frontend Setup
 ```bash
 cd frontend
@@ -105,6 +117,8 @@ docker-compose up --build
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+
+For this local workspace, MT5 bridge examples use `http://127.0.0.1:8011`.
 
 ## 🧪 Testing
 
@@ -176,6 +190,13 @@ The backend supports broker-backed paper execution with pre-trade risk checks.
 - `MAX_DAILY_NOTIONAL=100000`
 - `MAX_DAILY_TRADES=50`
 - `MAX_RISK_PERCENT_PER_TRADE=2.0`
+- `MQL5_BRIDGE_ENABLED=true`
+- `MQL5_SHARED_SECRET=...`
+- `MQL5_TERMINAL_ACTIVE_WINDOW_S=180`
+- `MQL5_DEFAULT_CONFIDENCE_THRESHOLD=0.72`
+- `MQL5_DEFAULT_RISK_PERCENT=1.0`
+- `MQL5_DEFAULT_ORDER_QUANTITY=0.1`
+- `MQL5_MAX_AUTO_NOTIONAL=10000`
 
 When you call `POST /portfolio/trade`, the response includes:
 - `order.broker` and `order.mode` (paper execution metadata)
@@ -185,6 +206,57 @@ When you call `POST /portfolio/trade`, the response includes:
 
 Startup diagnostics endpoint:
 - `GET /health/startup` returns broker provider/mode readiness, Alpaca credential readiness, and active risk limits.
+
+## MQL5 / MetaTrader 5 Bridge
+
+QuantumAI now includes an authenticated MQL5 bridge so a MetaTrader 5 Expert Advisor can:
+- register a terminal with `/trading/mql5/bridge/register`
+- send keepalive heartbeats to `/trading/mql5/bridge/heartbeat`
+- request AI trade analysis from `/trading/mql5/bridge/analyze`
+- trigger protected automated execution with `/trading/mql5/bridge/execute-ai`
+
+The included EA template at `scripts/mql5/QuantumAI_Bridge_EA.mq5` now supports:
+- broker symbol mapping with `BrokerSymbolOverride`, `QuantumApiAsset`, and optional prefix/suffix stripping
+- sending real MT5 close-price history to QuantumAI via `price_series`
+- `ExecutionMode=ANALYZE_ONLY`, `LOCAL_MT5`, or `QUANTUM_BACKEND`
+- local MT5 guardrails: max spread, session window, new-bar-only execution, cooldowns, and max open positions per symbol
+- local order placement with broker-normalized volume plus AI-derived stop-loss and take-profit
+
+Expanded symbol coverage now includes:
+- Forex: `EURUSD`, `GBPUSD`, `USDJPY`, `USDCHF`, `USDCAD`, `AUDUSD`, `NZDUSD`, `EURGBP`, `EURJPY`, `GBPJPY`, `EURAUD`, `AUDJPY`, `AUDCAD`, `AUDCHF`, `USDTRY`, `USDMXN`, `USDZAR`, `USDCNH`, `EURPLN`
+- Metals / commodities: `XAUUSD`, `XAGUSD`, `XPTUSD`, `XPDUSD`, `WTI`, `BRENT`, `NATGAS`, `COPPER`, `WHEAT`
+- Indices: `SPX`, `NDX`, `DJI`, `RUT`, `VIX`, `DAX`, `FTSE`, `NIKKEI`, `FRA40`, `AUS200`, `HK50`, `EUSTX50`, `CHINA50`
+- Crypto: `BTC`, `ETH`, `BNB`, `SOL`, `XRP`, `ADA`, `DOGE`, `AVAX`, `LTC`, `BCH`
+- Stocks / ETFs / bonds already present in the original platform
+
+MT5 alias resolution also works for common broker naming such as:
+- `BTCUSD`, `ETHUSD`, `ADAUSD`, `SOLUSD`, `XRPUSD`, `LTCUSD`, `BCHUSD`
+- `XTIUSD`, `XBRUSD`, `XNGUSD`
+- `US30`, `SPX500`, `NDX100`, `USTEC`, `GER40`, `UK100`, `JP225`, `STOXX50`
+- broker-decorated variants like `EURUSDm`, `EURUSD.a`, `BTCUSD.r`, `US30.cash`
+
+Recommended setup:
+- set `MQL5_SHARED_SECRET` in backend `.env`
+- add your backend base URL to MetaTrader 5 `WebRequest` allowlist
+- configure the same shared secret in the EA inputs
+- keep `TRADING_MODE=paper` until you validate the full loop
+- start from `/trading/mql5/automation/analyze` in the web app to confirm thresholds before enabling auto execution
+- for this local workspace, use `http://127.0.0.1:8011`
+- if your broker uses symbols like `EURUSDm` or `BTCUSD.a`, set `BrokerSymbolOverride` and either `QuantumApiAsset=EURUSD` or strip the broker suffix/prefix
+- use `ExecutionMode=LOCAL_MT5` if you want MT5 itself to place the order after AI approval
+- use `ExecutionMode=QUANTUM_BACKEND` if you want the QuantumAI backend to submit the order through its broker adapter
+
+The automation response includes:
+- AI signal direction and confidence
+- stop-loss and take-profit levels derived from QuantumAI analysis
+- blocked reasons when the confidence filter or direction guard rejects a trade
+- the resulting broker execution payload when a trade is auto-submitted
+
+Quick local loop:
+```powershell
+.\scripts\start_backend_local.ps1 -Port 8011
+.\scripts\verify_mql5_bridge.ps1 -Port 8011 -BridgeSecret "<your MQL5_SHARED_SECRET>"
+```
 
 ## 🚢 Production Setup (1-4)
 

@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
 import hashlib
 from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order
-from services.market_service import market_service, MOCK_ASSETS
+from services.market_service import market_service, MOCK_ASSETS, resolve_symbol
 from services.broker_service import get_broker, BrokerExecutionError
 from services.risk_service import RiskEngine, RiskValidationError
 from quantum_ai.signals import SignalGenerator
@@ -150,7 +150,7 @@ class TradingService:
         trailing_stop_pct: Optional[float] = None,
         risk_percent: Optional[float] = None,
     ) -> Dict:
-        asset = asset.upper()
+        asset = resolve_symbol(asset)
         action = action.lower()
         order_type = (order_type or "MARKET").upper()
         if asset not in MOCK_ASSETS:
@@ -534,7 +534,7 @@ class TradingService:
         return enriched
 
     def execute_hft(self, db: Session, user_id: int, asset: str, cycles: int, quantity: float, spread_bps: float) -> Dict:
-        asset = asset.upper()
+        asset = resolve_symbol(asset)
         if asset not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {asset}")
         if cycles < 1 or cycles > 500:
@@ -607,7 +607,7 @@ class TradingService:
         ]
 
     def add_watchlist_item(self, db: Session, user_id: int, symbol: str) -> Dict:
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {symbol}")
 
@@ -685,7 +685,7 @@ class TradingService:
         ]
 
     def add_price_alert(self, db: Session, user_id: int, symbol: str, condition: str, target_price: float) -> Dict:
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         condition = condition.upper()
         if symbol not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {symbol}")
@@ -736,7 +736,7 @@ class TradingService:
         starting_capital: float = 10000.0,
         risk_per_trade_pct: float = 1.0,
     ) -> Dict:
-        asset = asset.upper()
+        asset = resolve_symbol(asset)
         if asset not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {asset}")
         if days < 5 or days > 365:

@@ -5,7 +5,7 @@ import logging
 import httpx
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import auth, market, trading, portfolio, monitoring
+from api.routes import auth, market, trading, portfolio, monitoring, mql5
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
 from config.settings import settings
@@ -31,6 +31,7 @@ app.include_router(market.router)
 app.include_router(trading.router)
 app.include_router(portfolio.router)
 app.include_router(monitoring.router)
+app.include_router(mql5.router)
 
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
@@ -129,5 +130,13 @@ def startup_health(include_probe: bool = False):
             "max_daily_notional": settings.MAX_DAILY_NOTIONAL,
             "max_daily_trades": settings.MAX_DAILY_TRADES,
             "max_risk_percent_per_trade": settings.MAX_RISK_PERCENT_PER_TRADE,
+        },
+        "mql5_bridge": {
+            "enabled": settings.MQL5_BRIDGE_ENABLED,
+            "shared_secret_configured": bool(settings.MQL5_SHARED_SECRET),
+            "default_confidence_threshold": settings.MQL5_DEFAULT_CONFIDENCE_THRESHOLD,
+            "default_risk_percent": settings.MQL5_DEFAULT_RISK_PERCENT,
+            "default_order_quantity": settings.MQL5_DEFAULT_ORDER_QUANTITY,
+            "max_auto_notional": settings.MQL5_MAX_AUTO_NOTIONAL,
         },
     }

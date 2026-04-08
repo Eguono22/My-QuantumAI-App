@@ -4,7 +4,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from services.market_service import market_service, MOCK_ASSETS
+from services.market_service import market_service, MOCK_ASSETS, resolve_symbol
 
 
 POSITIVE_HEADLINES = [
@@ -52,7 +52,7 @@ class SentimentService:
         return [template.format(name=name) for template in picks]
 
     def analyze(self, symbol: str) -> Dict:
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return {}
 

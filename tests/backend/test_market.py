@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
-from services.market_service import MarketService, generate_price_history, MOCK_ASSETS
+from services.market_service import MarketService, generate_price_history, MOCK_ASSETS, resolve_symbol
 
 class TestMarketService:
     def setup_method(self):
@@ -30,6 +30,16 @@ class TestMarketService:
         asset = self.service.get_asset("btc")
         assert asset is not None
         assert asset["symbol"] == "BTC"
+
+    def test_get_asset_supports_mt5_alias_symbol(self):
+        asset = self.service.get_asset("BTCUSD")
+        assert asset is not None
+        assert asset["symbol"] == "BTC"
+
+    def test_get_asset_supports_broker_suffix_symbol(self):
+        asset = self.service.get_asset("EURUSDm")
+        assert asset is not None
+        assert asset["symbol"] == "EURUSD"
     
     def test_get_asset_unknown_returns_none(self):
         asset = self.service.get_asset("UNKNOWN_XYZ")
@@ -61,6 +71,11 @@ class TestMarketService:
     def test_get_market_prediction_unknown_returns_none(self):
         prediction = self.service.get_market_prediction("UNKNOWN_XYZ")
         assert prediction is None
+
+    def test_resolve_symbol_supports_index_and_commodity_aliases(self):
+        assert resolve_symbol("USTEC") == "NDX"
+        assert resolve_symbol("XNGUSD") == "NATGAS"
+        assert resolve_symbol("US30.cash") == "DJI"
     
     def test_price_history_has_ohlcv(self):
         history = self.service.get_price_history("ETH", days=5)

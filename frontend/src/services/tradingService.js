@@ -75,4 +75,16 @@ export const tradingService = {
     const response = await api.delete(`/trading/orders/${orderId}`);
     return response.data;
   },
+  getMql5Status: async () => {
+    const response = await api.get('/trading/mql5/status');
+    return response.data;
+  },
+  analyzeMql5Automation: async (payload) => {
+    const response = await api.post('/trading/mql5/automation/analyze', payload);
+    return response.data;
+  },
+  executeMql5Automation: async (payload) => {
+    const response = await api.post('/trading/mql5/automation/execute', payload);
+    return response.data;
+  },
 };

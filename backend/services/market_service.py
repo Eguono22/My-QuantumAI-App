@@ -48,6 +48,11 @@ MOCK_ASSETS = {
     "DAX": {"name": "DAX Performance Index", "base_price": 17800.0, "volatility": 0.011},
     "FTSE": {"name": "FTSE 100 Index", "base_price": 7720.0, "volatility": 0.009},
     "NIKKEI": {"name": "Nikkei 225 Index", "base_price": 38500.0, "volatility": 0.012},
+    "FRA40": {"name": "CAC 40 Index", "base_price": 8150.0, "volatility": 0.011},
+    "AUS200": {"name": "Australia 200 Index", "base_price": 7800.0, "volatility": 0.010},
+    "HK50": {"name": "Hong Kong 50 Index", "base_price": 17100.0, "volatility": 0.015},
+    "EUSTX50": {"name": "Euro Stoxx 50 Index", "base_price": 5030.0, "volatility": 0.010},
+    "CHINA50": {"name": "China A50 Index", "base_price": 12350.0, "volatility": 0.017},
 
     # Forex (synthetic pair quotes)
     "EURUSD": {"name": "Euro / US Dollar", "base_price": 1.09, "volatility": 0.006},
@@ -57,10 +62,24 @@ MOCK_ASSETS = {
     "USDCAD": {"name": "US Dollar / Canadian Dollar", "base_price": 1.35, "volatility": 0.006},
     "AUDUSD": {"name": "Australian Dollar / US Dollar", "base_price": 0.66, "volatility": 0.008},
     "NZDUSD": {"name": "New Zealand Dollar / US Dollar", "base_price": 0.61, "volatility": 0.009},
+    "EURGBP": {"name": "Euro / British Pound", "base_price": 0.854, "volatility": 0.006},
+    "EURJPY": {"name": "Euro / Japanese Yen", "base_price": 163.20, "volatility": 0.007},
+    "GBPJPY": {"name": "British Pound / Japanese Yen", "base_price": 189.90, "volatility": 0.008},
+    "EURAUD": {"name": "Euro / Australian Dollar", "base_price": 1.65, "volatility": 0.008},
+    "AUDJPY": {"name": "Australian Dollar / Japanese Yen", "base_price": 98.80, "volatility": 0.008},
+    "AUDCAD": {"name": "Australian Dollar / Canadian Dollar", "base_price": 0.89, "volatility": 0.007},
+    "AUDCHF": {"name": "Australian Dollar / Swiss Franc", "base_price": 0.58, "volatility": 0.007},
+    "USDTRY": {"name": "US Dollar / Turkish Lira", "base_price": 32.10, "volatility": 0.018},
+    "USDMXN": {"name": "US Dollar / Mexican Peso", "base_price": 16.80, "volatility": 0.012},
+    "USDZAR": {"name": "US Dollar / South African Rand", "base_price": 18.40, "volatility": 0.014},
+    "USDCNH": {"name": "US Dollar / Offshore Chinese Yuan", "base_price": 7.22, "volatility": 0.008},
+    "EURPLN": {"name": "Euro / Polish Zloty", "base_price": 4.31, "volatility": 0.010},
 
     # Commodities
     "XAUUSD": {"name": "Gold Spot", "base_price": 2168.0, "volatility": 0.012},
     "XAGUSD": {"name": "Silver Spot", "base_price": 24.8, "volatility": 0.022},
+    "XPTUSD": {"name": "Platinum Spot", "base_price": 920.0, "volatility": 0.018},
+    "XPDUSD": {"name": "Palladium Spot", "base_price": 1015.0, "volatility": 0.028},
     "WTI": {"name": "Crude Oil WTI", "base_price": 79.4, "volatility": 0.028},
     "BRENT": {"name": "Crude Oil Brent", "base_price": 83.2, "volatility": 0.025},
     "NATGAS": {"name": "Natural Gas", "base_price": 2.1, "volatility": 0.050},
@@ -83,9 +102,59 @@ MOCK_ASSETS = {
     "ADA": {"name": "Cardano", "base_price": 0.62, "volatility": 0.058},
     "DOGE": {"name": "Dogecoin", "base_price": 0.14, "volatility": 0.075},
     "AVAX": {"name": "Avalanche", "base_price": 36.2, "volatility": 0.055},
+    "LTC": {"name": "Litecoin", "base_price": 92.5, "volatility": 0.042},
+    "BCH": {"name": "Bitcoin Cash", "base_price": 486.0, "volatility": 0.048},
 }
 
 _price_cache = {}
+ASSET_ALIASES = {
+    "BTCUSD": "BTC",
+    "ETHUSD": "ETH",
+    "ADAUSD": "ADA",
+    "SOLUSD": "SOL",
+    "XRPUSD": "XRP",
+    "LTCUSD": "LTC",
+    "BCHUSD": "BCH",
+    "XTIUSD": "WTI",
+    "XBRUSD": "BRENT",
+    "XNGUSD": "NATGAS",
+    "US30": "DJI",
+    "SPX500": "SPX",
+    "NDX100": "NDX",
+    "USTEC": "NDX",
+    "GER40": "DAX",
+    "UK100": "FTSE",
+    "JP225": "NIKKEI",
+    "STOXX50": "EUSTX50",
+}
+
+
+def resolve_symbol(symbol: str) -> str:
+    raw = (symbol or "").strip().upper()
+    if not raw:
+        return raw
+    if raw in MOCK_ASSETS:
+        return raw
+    if raw in ASSET_ALIASES:
+        return ASSET_ALIASES[raw]
+
+    sanitized = raw.replace("/", "").replace("-", "").replace("_", "")
+    if sanitized in MOCK_ASSETS:
+        return sanitized
+    if sanitized in ASSET_ALIASES:
+        return ASSET_ALIASES[sanitized]
+
+    candidates = sorted(set(MOCK_ASSETS.keys()) | set(ASSET_ALIASES.keys()), key=len, reverse=True)
+    for candidate in candidates:
+        if raw.startswith(candidate) or raw.endswith(candidate) or sanitized.startswith(candidate) or sanitized.endswith(candidate):
+            return ASSET_ALIASES.get(candidate, candidate)
+    return raw
+
+
+def get_supported_symbols(include_aliases: bool = False) -> List[str]:
+    if not include_aliases:
+        return sorted(MOCK_ASSETS.keys())
+    return sorted(set(MOCK_ASSETS.keys()) | set(ASSET_ALIASES.keys()))
 
 def get_current_price(symbol: str, base_price: float, volatility: float) -> float:
     """Get current mock price with small random variation."""
@@ -206,7 +275,7 @@ class MarketService:
     
     def get_asset(self, symbol: str) -> Dict:
         """Get data for a specific asset."""
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return None
         info = MOCK_ASSETS[symbol]
@@ -221,7 +290,7 @@ class MarketService:
     
     def get_price_history(self, symbol: str, days: int = 30) -> List[Dict]:
         """Get historical price data for a symbol."""
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return []
         if self._using_alpaca_data() and symbol in self._alpaca_symbols:
@@ -271,7 +340,7 @@ class MarketService:
     
     def get_prices_for_signal(self, symbol: str) -> List[float]:
         """Get recent prices for signal generation."""
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return []
         info = MOCK_ASSETS[symbol]
@@ -280,7 +349,7 @@ class MarketService:
 
     def get_market_prediction(self, symbol: str, days: int = 60, horizon_hours: int = 24) -> Dict:
         """Predict future price movement for a symbol."""
-        symbol = symbol.upper()
+        symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return None
 

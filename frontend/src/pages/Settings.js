@@ -1,5 +1,6 @@
 import React from 'react';
 import { SUPPORTED_LANGUAGES } from '../utils/constants';
+import Mql5BridgePanel from '../components/Mql5BridgePanel';
 
 const LAYOUT_OPTIONS = [
   { value: 'trader-pro', label: 'Trader Pro' },
@@ -90,6 +91,8 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
           </select>
         </div>
       </div>
+
+      <Mql5BridgePanel />
     </div>
   );
 }

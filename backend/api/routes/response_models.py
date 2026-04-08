@@ -229,3 +229,54 @@ class OrderResponse(BaseModel):
     reason: Optional[str] = None
     created_at: str
     updated_at: str
+
+
+class MQL5TerminalResponse(BaseModel):
+    terminal_id: str
+    user_id: Optional[int] = None
+    account_login: Optional[str] = None
+    broker_server: Optional[str] = None
+    status: str
+    symbols: List[str]
+    timeframe: str
+    last_heartbeat: Optional[str] = None
+    last_signal_at: Optional[str] = None
+    last_execution_at: Optional[str] = None
+    last_error: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class MQL5BridgeStatusResponse(BaseModel):
+    enabled: bool
+    bridge_ready: bool
+    shared_secret_configured: bool
+    default_confidence_threshold: float
+    default_risk_percent: float
+    default_order_quantity: float
+    max_auto_notional: float
+    terminal_count: int
+    active_terminals: int
+    supported_assets: List[str]
+    terminals: List[MQL5TerminalResponse]
+
+
+class MQL5AutomationResponse(BaseModel):
+    success: bool
+    executed: bool
+    asset: str
+    terminal_id: Optional[str] = None
+    timeframe: str
+    action: str
+    should_execute: bool
+    confidence: float
+    min_confidence: float
+    order_type: str
+    quantity: float
+    risk_percent: float
+    blocked_reasons: List[str]
+    rationale: List[str]
+    analysis: SignalResponse
+    market_prediction: Optional[MarketPredictionResponse] = None
+    execution: Optional[TradeResponse] = None
+    message: Optional[str] = None

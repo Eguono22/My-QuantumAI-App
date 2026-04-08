@@ -6,12 +6,14 @@ from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
+from services.mql5_service import MQL5BridgeService
 from services.market_service import MarketService
 from config.settings import settings
 
 class TestTradingService:
     def setup_method(self):
         self.service = TradingService()
+        self.mql5 = MQL5BridgeService()
         self.market = MarketService()
     
     def test_generate_signals_returns_list(self):
@@ -70,6 +72,27 @@ class TestTradingService:
         assert result["trade"]["asset"] == "BTC"
         assert result["trade"]["action"] == "buy"
         
+        db.close()
+
+    def test_execute_trade_accepts_mt5_alias_symbol(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuseralias", email="alias@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        result = self.service.execute_trade(db, user.id, "BTCUSD", "buy", 0.01)
+        assert result["success"] is True
+        assert result["trade"]["asset"] == "BTC"
+
         db.close()
     
     def test_portfolio_after_buy(self):
@@ -253,3 +276,90 @@ class TestTradingService:
         assert isinstance(signals, list)
         assert len(signals) > 0
         assert all("asset" in s for s in signals)
+
+    def test_mql5_register_and_status(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser9", email="test9@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        terminal = self.mql5.register_terminal(
+            db=db,
+            terminal_id="mt5-terminal-001",
+            user_id=user.id,
+            broker_server="MetaQuotes-Demo",
+            symbols=["EURUSD", "BTC"],
+            timeframe="M15",
+        )
+        assert terminal["terminal_id"] == "mt5-terminal-001"
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        assert status["terminal_count"] == 1
+        assert status["terminals"][0]["symbols"] == ["EURUSD", "BTC"]
+
+        db.close()
+
+    def test_mql5_analyze_blocks_low_confidence(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        result = self.mql5.analyze_trade(
+            db=db,
+            asset="EURUSD",
+            timeframe="M15",
+            quantity=0.1,
+            min_confidence=0.99,
+        )
+        assert result["success"] is True
+        assert result["should_execute"] is False
+        assert any("below threshold" in reason for reason in result["blocked_reasons"])
+
+        db.close()
+
+    def test_mql5_execute_ai_trade_submits_order(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser10", email="test10@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        result = self.mql5.execute_ai_trade(
+            db=db,
+            user_id=user.id,
+            asset="BTC",
+            timeframe="M15",
+            quantity=0.01,
+            min_confidence=0.0,
+        )
+
+        assert result["success"] is True
+        if result["should_execute"]:
+            assert result["executed"] is True
+            assert result["execution"] is not None
+            assert result["execution"]["order"]["broker"] == "paper-broker"
+        else:
+            assert result["executed"] is False
+
+        db.close()

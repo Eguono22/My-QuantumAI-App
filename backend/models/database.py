@@ -22,6 +22,7 @@ class User(Base):
     watchlist_items = relationship("WatchlistItem", back_populates="user")
     price_alerts = relationship("PriceAlert", back_populates="user")
     orders = relationship("Order", back_populates="user")
+    mql5_terminals = relationship("MQL5Terminal", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -97,6 +98,25 @@ class Order(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="orders")
+
+
+class MQL5Terminal(Base):
+    __tablename__ = "mql5_terminals"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    terminal_id = Column(String, unique=True, index=True, nullable=False)
+    account_login = Column(String, nullable=True)
+    broker_server = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="REGISTERED")
+    symbols = Column(String, nullable=True)
+    timeframe = Column(String, nullable=False, default="M15")
+    last_heartbeat = Column(DateTime, nullable=True)
+    last_signal_at = Column(DateTime, nullable=True)
+    last_execution_at = Column(DateTime, nullable=True)
+    last_error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="mql5_terminals")
 
 def get_db():
     db = SessionLocal()
