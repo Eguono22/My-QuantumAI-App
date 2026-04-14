@@ -12,7 +12,12 @@ from api.routes.response_models import (
     PriceAlertResponse,
     StrategyBacktestResponse,
     OrderResponse,
+    NotificationDeliveryLogResponse,
+    TelegramNotificationPreferenceResponse,
+    TelegramNotificationDeliveryResponse,
 )
+from services.notification_service import notification_service, NotificationServiceError
+from services.mql5_service import mql5_bridge_service
 
 router = APIRouter(prefix="/trading", tags=["trading"])
 
@@ -38,6 +43,13 @@ class BacktestRequest(BaseModel):
     days: int = 30
     starting_capital: float = 10000.0
     risk_per_trade_pct: float = 1.0
+
+
+class TelegramNotificationPreferenceRequest(BaseModel):
+    telegram_enabled: bool = False
+    telegram_chat_id: str | None = None
+    telegram_alert_severities: List[str] = ["ERROR", "WARN"]
+    telegram_cooldown_seconds: int = 900
 
 
 @router.get("/signals", response_model=List[SignalResponse])
@@ -119,6 +131,58 @@ def remove_alert(alert_id: int, db: Session = Depends(get_db), current_user: Use
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/notifications/preferences", response_model=TelegramNotificationPreferenceResponse)
+def get_notification_preferences(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return notification_service.get_preferences(db, current_user.id)
+
+
+@router.get("/notifications/history", response_model=List[NotificationDeliveryLogResponse])
+def get_notification_history(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return notification_service.get_delivery_history(db, current_user.id, limit=limit)
+
+
+@router.put("/notifications/preferences", response_model=TelegramNotificationPreferenceResponse)
+def update_notification_preferences(
+    request: TelegramNotificationPreferenceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return notification_service.upsert_preferences(
+            db=db,
+            user_id=current_user.id,
+            telegram_enabled=request.telegram_enabled,
+            telegram_chat_id=request.telegram_chat_id,
+            telegram_alert_severities=request.telegram_alert_severities,
+            telegram_cooldown_seconds=request.telegram_cooldown_seconds,
+        )
+    except NotificationServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/notifications/telegram/test", response_model=TelegramNotificationDeliveryResponse)
+def send_test_telegram_notification(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return notification_service.send_test_message(db, current_user.id)
+    except NotificationServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/notifications/scan", response_model=TelegramNotificationDeliveryResponse)
+def run_notification_scan(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    status = mql5_bridge_service.get_bridge_status(
+        db=db,
+        user_id=current_user.id,
+        dispatch_notifications=True,
+        notification_source="manual_scan",
+    )
+    return status["telegram_delivery"]
 
 
 @router.post("/backtest", response_model=StrategyBacktestResponse)

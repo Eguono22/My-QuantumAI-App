@@ -21,6 +21,12 @@ describe('Navbar', () => {
     expect(screen.getByText('● Live')).toBeInTheDocument();
   });
 
+  it('shows the alerts badge when unread notifications exist', () => {
+    renderNavbar({ user: null, onLogout: jest.fn(), onToggleSidebar: jest.fn(), unreadNotifications: 3 });
+    expect(screen.getByText('Alerts')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
   it('shows the username when a user is logged in', () => {
     renderNavbar({
       user: { username: 'alice' },

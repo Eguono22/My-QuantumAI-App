@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
   { path: '/app', label: 'Dashboard', icon: '📊' },
+  { path: '/app/connect', label: 'Connection Center', icon: '🛰️' },
+  { path: '/app/notifications', label: 'Notifications', icon: '🔔' },
   { path: '/app/markets', label: 'Markets', icon: '💹' },
   { path: '/app/signals', label: 'AI Signals', icon: '🤖' },
   { path: '/app/portfolio', label: 'Portfolio', icon: '💼' },
@@ -10,7 +12,7 @@ const navItems = [
   { path: '/app/settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export default function Sidebar({ isOpen }) {
+export default function Sidebar({ isOpen, unreadNotifications = 0 }) {
   const location = useLocation();
   return (
     <aside className={`fixed left-0 top-16 h-full bg-white border-r border-market-line transition-all duration-300 z-40 ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
@@ -28,6 +30,11 @@ export default function Sidebar({ isOpen }) {
             >
               <span className="text-xl">{item.icon}</span>
               <span className="font-medium">{item.label}</span>
+              {item.path === '/app/notifications' && unreadNotifications > 0 && (
+                <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-zinc-950">
+                  {unreadNotifications}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

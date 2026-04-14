@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 from services.trading_service import TradingService
 from services.mql5_service import MQL5BridgeService
 from services.market_service import MarketService
+from services.notification_service import notification_service
 from config.settings import settings
 
 class TestTradingService:
@@ -304,6 +305,8 @@ class TestTradingService:
         status = self.mql5.get_bridge_status(db, user_id=user.id)
         assert status["terminal_count"] == 1
         assert status["terminals"][0]["symbols"] == ["EURUSD", "BTC"]
+        assert len(status["recent_events"]) >= 1
+        assert status["recent_events"][0]["event_type"] == "TERMINAL_REGISTERED"
 
         db.close()
 
@@ -361,5 +364,322 @@ class TestTradingService:
             assert result["execution"]["order"]["broker"] == "paper-broker"
         else:
             assert result["executed"] is False
+
+        db.close()
+
+    def test_mql5_history_tracks_decision_and_execution(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser11", email="test11@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        self.mql5.register_terminal(
+            db=db,
+            terminal_id="mt5-terminal-history",
+            user_id=user.id,
+            symbols=["BTCUSD"],
+            timeframe="M15",
+        )
+        result = self.mql5.execute_ai_trade(
+            db=db,
+            user_id=user.id,
+            asset="BTCUSD",
+            timeframe="M15",
+            quantity=0.01,
+            min_confidence=0.0,
+            terminal_id="mt5-terminal-history",
+        )
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        event_types = [event["event_type"] for event in status["recent_events"]]
+        assert "AI_DECISION" in event_types
+        if result["executed"]:
+            assert "AUTO_EXECUTION" in event_types
+
+        db.close()
+
+    def test_mql5_status_analytics_summarizes_history(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, MQL5BridgeEvent
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser12", email="test12@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        db.add_all([
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-alpha",
+                event_type="TERMINAL_REGISTERED",
+                severity="INFO",
+                summary="Terminal alpha registered.",
+                created_at=now - datetime.timedelta(hours=2),
+            ),
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-alpha",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Allowed EURUSD decision.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.82,
+                should_execute=1,
+                executed=0,
+                created_at=now - datetime.timedelta(hours=1),
+            ),
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-alpha",
+                event_type="AUTO_EXECUTION",
+                severity="INFO",
+                summary="Executed EURUSD trade.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.82,
+                should_execute=1,
+                executed=1,
+                created_at=now - datetime.timedelta(minutes=50),
+            ),
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-beta",
+                event_type="AI_DECISION",
+                severity="WARN",
+                summary="Blocked BTCUSD decision.",
+                asset="BTC",
+                action="SELL",
+                confidence=0.46,
+                should_execute=0,
+                executed=0,
+                created_at=now - datetime.timedelta(days=2),
+            ),
+        ])
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        analytics = status["analytics"]
+
+        assert analytics["overview"]["total_events"] == 4
+        assert analytics["overview"]["registrations"] == 1
+        assert analytics["overview"]["decisions"] == 2
+        assert analytics["overview"]["allowed_decisions"] == 1
+        assert analytics["overview"]["blocked_decisions"] == 1
+        assert analytics["overview"]["executions"] == 1
+        assert analytics["overview"]["execution_rate_pct"] == 100.0
+        assert analytics["overview"]["avg_confidence"] == pytest.approx(0.64, rel=1e-3)
+        assert analytics["time_windows"]["events_24h"] == 3
+        assert analytics["time_windows"]["events_7d"] == 4
+        assert analytics["top_assets"][0]["asset"] == "EURUSD"
+        assert analytics["top_assets"][0]["executions"] == 1
+        assert analytics["top_terminals"][0]["terminal_id"] == "terminal-alpha"
+        assert analytics["top_terminals"][0]["events"] == 3
+
+        db.close()
+
+    def test_mql5_status_alerts_flag_stale_and_low_conversion(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, MQL5BridgeEvent, MQL5Terminal
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser13", email="test13@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        stale_terminal = MQL5Terminal(
+            user_id=user.id,
+            terminal_id="terminal-stale",
+            status="ACTIVE",
+            timeframe="M15",
+            last_heartbeat=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+            created_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2),
+            updated_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+        )
+        db.add(stale_terminal)
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        db.add_all([
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-stale",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Allowed EURUSD decision.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.71,
+                should_execute=1,
+                executed=0,
+                created_at=now - datetime.timedelta(hours=3),
+            ),
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-stale",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Allowed GBPUSD decision.",
+                asset="GBPUSD",
+                action="BUY",
+                confidence=0.69,
+                should_execute=1,
+                executed=0,
+                created_at=now - datetime.timedelta(hours=2),
+            ),
+        ])
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        alert_codes = [alert["code"] for alert in status["alerts"]]
+
+        assert "NO_ACTIVE_TERMINALS" in alert_codes
+        assert "STALE_TERMINALS" in alert_codes
+        assert "LOW_EXECUTION_CONVERSION" in alert_codes
+
+        db.close()
+
+    def test_telegram_preferences_and_preview_dispatch(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, MQL5BridgeEvent, MQL5Terminal
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser14", email="test14@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        prefs = notification_service.upsert_preferences(
+            db=db,
+            user_id=user.id,
+            telegram_enabled=True,
+            telegram_chat_id="123456789",
+            telegram_alert_severities=["ERROR", "WARN"],
+            telegram_cooldown_seconds=300,
+        )
+        assert prefs["telegram_enabled"] is True
+        assert prefs["telegram_chat_id"] == "123456789"
+        assert prefs["telegram_cooldown_seconds"] == 300
+
+        stale_terminal = MQL5Terminal(
+            user_id=user.id,
+            terminal_id="terminal-telegram",
+            status="ACTIVE",
+            timeframe="M15",
+            last_heartbeat=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+            created_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2),
+            updated_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+        )
+        db.add(stale_terminal)
+        db.add(
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-telegram",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Allowed EURUSD decision.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.81,
+                should_execute=1,
+                executed=0,
+                created_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2),
+            )
+        )
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id, dispatch_notifications=True, notification_source="test")
+        assert status["telegram_delivery"]["delivery_mode"] == "preview"
+        assert status["telegram_delivery"]["sent_count"] >= 1
+        assert status["telegram_delivery"]["preview_count"] >= 1
+        assert "QuantumAI MT5 Alert" in status["telegram_delivery"]["preview_text"]
+
+        history = notification_service.get_delivery_history(db, user.id, limit=10)
+        assert len(history) >= 1
+        assert history[0]["source"] == "test"
+        assert history[0]["preview"] is True
+
+        db.close()
+
+    def test_mql5_status_read_does_not_dispatch_notifications(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, MQL5BridgeEvent, MQL5Terminal
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser15", email="test15@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        notification_service.upsert_preferences(
+            db=db,
+            user_id=user.id,
+            telegram_enabled=True,
+            telegram_chat_id="999",
+            telegram_alert_severities=["ERROR", "WARN"],
+            telegram_cooldown_seconds=300,
+        )
+        db.add(
+            MQL5Terminal(
+                user_id=user.id,
+                terminal_id="terminal-read-only",
+                status="ACTIVE",
+                timeframe="M15",
+                last_heartbeat=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+                created_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2),
+                updated_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1),
+            )
+        )
+        db.add(
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-read-only",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Allowed EURUSD decision.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.75,
+                should_execute=1,
+                executed=0,
+                created_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1),
+            )
+        )
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        assert status["telegram_delivery"]["delivery_mode"] == "scheduled"
+        assert notification_service.get_delivery_history(db, user.id, limit=10) == []
 
         db.close()

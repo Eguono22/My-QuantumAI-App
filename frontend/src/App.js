@@ -11,10 +11,22 @@ import Markets from './pages/Markets';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
+import ConnectionCenter from './pages/ConnectionCenter';
+import NotificationsCenter from './pages/NotificationsCenter';
 import LoadingSpinner from './components/LoadingSpinner';
 import { authService } from './services/authService';
+import { tradingService } from './services/tradingService';
 
-function ProtectedLayout({ user, theme, onToggleTheme, onLogout, sidebarOpen, onToggleSidebar, children }) {
+function ProtectedLayout({
+  user,
+  theme,
+  onToggleTheme,
+  onLogout,
+  sidebarOpen,
+  onToggleSidebar,
+  unreadNotifications,
+  children,
+}) {
   return (
     <>
       <Navbar
@@ -23,9 +35,10 @@ function ProtectedLayout({ user, theme, onToggleTheme, onLogout, sidebarOpen, on
         onToggleTheme={onToggleTheme}
         onLogout={onLogout}
         onToggleSidebar={onToggleSidebar}
+        unreadNotifications={unreadNotifications}
       />
       <div className="flex pt-16">
-        <Sidebar isOpen={sidebarOpen} />
+        <Sidebar isOpen={sidebarOpen} unreadNotifications={unreadNotifications} />
         <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
           {children}
         </main>
@@ -38,6 +51,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
+  const [notificationAcks, setNotificationAcks] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [theme, setTheme] = useState(localStorage.getItem('app_pref_theme') || localStorage.getItem('theme') || 'dark');
   const [preferences, setPreferences] = useState({
     language: localStorage.getItem('app_pref_language') || 'en',
@@ -45,6 +60,9 @@ function App() {
     aiModel: localStorage.getItem('app_pref_ai_model') || 'quantum-core-v1',
     portfolioView: localStorage.getItem('app_pref_portfolio_view') || 'overview',
   });
+
+  const notificationAckKey = user ? `quantumai_notification_acks_${user.username}` : null;
+  const unreadNotifications = notifications.filter((item) => !item.read && item.severity !== 'INFO').length;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -86,6 +104,66 @@ function App() {
     validateSession();
   }, []);
 
+  useEffect(() => {
+    if (!notificationAckKey) {
+      setNotificationAcks([]);
+      setNotifications([]);
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(notificationAckKey) || '[]');
+      setNotificationAcks(Array.isArray(saved) ? saved : []);
+    } catch (_err) {
+      setNotificationAcks([]);
+    }
+  }, [notificationAckKey]);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const status = await tradingService.getMql5Status();
+        if (!isMounted) return;
+
+        const now = new Date().toISOString();
+        const activeAlerts = Array.isArray(status?.alerts) ? status.alerts : [];
+
+        setNotifications((current) => {
+          const currentMap = new Map(current.map((item) => [item.id, item]));
+          return activeAlerts.map((alert) => {
+            const id = `${alert.code}:${alert.message}`;
+            const existing = currentMap.get(id);
+            return {
+              id,
+              code: alert.code,
+              severity: alert.severity,
+              title: alert.title,
+              message: alert.message,
+              source: 'MQL5 Bridge',
+              detectedAt: existing?.detectedAt || now,
+              read: alert.severity === 'INFO' || notificationAcks.includes(id),
+            };
+          });
+        });
+      } catch (_err) {
+        if (!isMounted) return;
+      }
+    };
+
+    loadNotifications();
+    const timer = setInterval(loadNotifications, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [user, notificationAcks]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
@@ -107,6 +185,25 @@ function App() {
       localStorage.setItem(storageMap[key], value);
     }
     setPreferences((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const acknowledgeNotification = (id) => {
+    if (!notificationAckKey) return;
+    setNotificationAcks((prev) => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem(notificationAckKey, JSON.stringify(next));
+      return next;
+    });
+    setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)));
+  };
+
+  const acknowledgeAllNotifications = () => {
+    if (!notificationAckKey) return;
+    const unreadIds = notifications.filter((item) => item.severity !== 'INFO').map((item) => item.id);
+    const next = Array.from(new Set([...notificationAcks, ...unreadIds]));
+    localStorage.setItem(notificationAckKey, JSON.stringify(next));
+    setNotificationAcks(next);
+    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
   };
 
   if (authLoading) {
@@ -135,6 +232,7 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <Dashboard preferences={preferences} />
                 </ProtectedLayout>
@@ -152,6 +250,7 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <Markets />
                 </ProtectedLayout>
@@ -169,6 +268,7 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <TradingSignals preferences={preferences} />
                 </ProtectedLayout>
@@ -186,6 +286,7 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <Portfolio user={user} preferences={preferences} />
                 </ProtectedLayout>
@@ -203,8 +304,50 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <Orders />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/connect"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
+                >
+                  <ConnectionCenter />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/notifications"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
+                >
+                  <NotificationsCenter
+                    notifications={notifications}
+                    unreadCount={unreadNotifications}
+                    onAcknowledge={acknowledgeNotification}
+                    onAcknowledgeAll={acknowledgeAllNotifications}
+                  />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }
@@ -220,6 +363,7 @@ function App() {
                   onLogout={handleLogout}
                   sidebarOpen={sidebarOpen}
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
                 >
                   <Settings
                     preferences={{ ...preferences, theme }}

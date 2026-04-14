@@ -23,6 +23,9 @@ class User(Base):
     price_alerts = relationship("PriceAlert", back_populates="user")
     orders = relationship("Order", back_populates="user")
     mql5_terminals = relationship("MQL5Terminal", back_populates="user")
+    mql5_bridge_events = relationship("MQL5BridgeEvent", back_populates="user")
+    notification_preferences = relationship("UserNotificationPreference", back_populates="user", uselist=False)
+    notification_deliveries = relationship("NotificationDeliveryLog", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -117,6 +120,56 @@ class MQL5Terminal(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="mql5_terminals")
+
+
+class MQL5BridgeEvent(Base):
+    __tablename__ = "mql5_bridge_events"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    terminal_id = Column(String, nullable=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    severity = Column(String, nullable=False, default="INFO")
+    summary = Column(String, nullable=False)
+    asset = Column(String, nullable=True, index=True)
+    action = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)
+    should_execute = Column(Integer, nullable=True)
+    executed = Column(Integer, nullable=True)
+    metadata_json = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    user = relationship("User", back_populates="mql5_bridge_events")
+
+
+class UserNotificationPreference(Base):
+    __tablename__ = "user_notification_preferences"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    telegram_enabled = Column(Integer, nullable=False, default=0)
+    telegram_chat_id = Column(String, nullable=True)
+    telegram_alert_severities = Column(String, nullable=False, default="ERROR,WARN")
+    telegram_cooldown_seconds = Column(Integer, nullable=False, default=900)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="notification_preferences")
+
+
+class NotificationDeliveryLog(Base):
+    __tablename__ = "notification_delivery_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    channel = Column(String, nullable=False, default="telegram")
+    source = Column(String, nullable=False, default="scheduler")
+    delivery_mode = Column(String, nullable=False, default="disabled")
+    alert_code = Column(String, nullable=True, index=True)
+    severity = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    message = Column(String, nullable=False)
+    delivered = Column(Integer, nullable=False, default=0)
+    preview = Column(Integer, nullable=False, default=0)
+    skipped = Column(Integer, nullable=False, default=0)
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    user = relationship("User", back_populates="notification_deliveries")
 
 def get_db():
     db = SessionLocal()

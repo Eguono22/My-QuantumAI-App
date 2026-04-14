@@ -99,6 +99,9 @@ export default function Dashboard({ preferences }) {
             <Link to="/app/orders" className="px-5 py-2.5 rounded-md border border-zinc-500 text-zinc-200 font-semibold hover:bg-zinc-800/40 transition">
               Open Orders
             </Link>
+            <Link to="/app/connect" className="px-5 py-2.5 rounded-md border border-cyan-300 text-cyan-100 font-semibold hover:bg-cyan-900/30 transition">
+              Connection Center
+            </Link>
           </div>
         </div>
       </div>
@@ -162,6 +165,9 @@ export default function Dashboard({ preferences }) {
               </div>
             </div>
             {startupHealth?.trading?.reason && <p className="mt-3 text-xs text-zinc-400">{startupHealth.trading.reason}</p>}
+            <Link to="/app/connect" className="inline-block mt-4 text-sm font-semibold text-cyan-300 hover:text-cyan-200">
+              Open setup checklist
+            </Link>
           </div>
         </div>
       )}

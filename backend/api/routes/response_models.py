@@ -247,6 +247,105 @@ class MQL5TerminalResponse(BaseModel):
     updated_at: str
 
 
+class MQL5BridgeEventResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    terminal_id: Optional[str] = None
+    event_type: str
+    severity: str
+    summary: str
+    asset: Optional[str] = None
+    action: Optional[str] = None
+    confidence: Optional[float] = None
+    should_execute: Optional[bool] = None
+    executed: Optional[bool] = None
+    metadata_json: Optional[str] = None
+    created_at: str
+
+
+class MQL5BridgeAnalyticsOverviewResponse(BaseModel):
+    total_events: int
+    registrations: int
+    decisions: int
+    allowed_decisions: int
+    blocked_decisions: int
+    executions: int
+    avg_confidence: float
+    execution_rate_pct: float
+
+
+class MQL5BridgeAnalyticsWindowResponse(BaseModel):
+    events_24h: int
+    decisions_24h: int
+    executions_24h: int
+    events_7d: int
+    decisions_7d: int
+    executions_7d: int
+
+
+class MQL5BridgeAssetAnalyticsResponse(BaseModel):
+    asset: str
+    decisions: int
+    executions: int
+    avg_confidence: float
+
+
+class MQL5BridgeTerminalAnalyticsResponse(BaseModel):
+    terminal_id: str
+    events: int
+    decisions: int
+    executions: int
+    last_event_at: str
+
+
+class MQL5BridgeAnalyticsResponse(BaseModel):
+    overview: MQL5BridgeAnalyticsOverviewResponse
+    time_windows: MQL5BridgeAnalyticsWindowResponse
+    top_assets: List[MQL5BridgeAssetAnalyticsResponse]
+    top_terminals: List[MQL5BridgeTerminalAnalyticsResponse]
+
+
+class MQL5BridgeAlertResponse(BaseModel):
+    code: str
+    severity: str
+    title: str
+    message: str
+
+
+class TelegramNotificationPreferenceResponse(BaseModel):
+    telegram_enabled: bool
+    telegram_chat_id: Optional[str] = None
+    telegram_alert_severities: List[str]
+    telegram_cooldown_seconds: int
+    telegram_bot_configured: bool
+
+
+class TelegramNotificationDeliveryResponse(BaseModel):
+    ok: bool
+    delivery_mode: str
+    message: str
+    sent_count: int
+    preview_count: int
+    skipped_count: int
+    preview_text: Optional[str] = None
+
+
+class NotificationDeliveryLogResponse(BaseModel):
+    id: int
+    channel: str
+    source: str
+    delivery_mode: str
+    alert_code: Optional[str] = None
+    severity: Optional[str] = None
+    title: Optional[str] = None
+    message: str
+    delivered: bool
+    preview: bool
+    skipped: bool
+    reason: Optional[str] = None
+    created_at: str
+
+
 class MQL5BridgeStatusResponse(BaseModel):
     enabled: bool
     bridge_ready: bool
@@ -259,6 +358,10 @@ class MQL5BridgeStatusResponse(BaseModel):
     active_terminals: int
     supported_assets: List[str]
     terminals: List[MQL5TerminalResponse]
+    analytics: MQL5BridgeAnalyticsResponse
+    alerts: List[MQL5BridgeAlertResponse]
+    telegram_delivery: TelegramNotificationDeliveryResponse
+    recent_events: List[MQL5BridgeEventResponse]
 
 
 class MQL5AutomationResponse(BaseModel):

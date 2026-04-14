@@ -54,6 +54,26 @@ export const tradingService = {
     const response = await api.delete(`/trading/alerts/${alertId}`);
     return response.data;
   },
+  getNotificationPreferences: async () => {
+    const response = await api.get('/trading/notifications/preferences');
+    return response.data;
+  },
+  getNotificationHistory: async (limit = 50) => {
+    const response = await api.get(`/trading/notifications/history?limit=${limit}`);
+    return response.data;
+  },
+  updateNotificationPreferences: async (payload) => {
+    const response = await api.put('/trading/notifications/preferences', payload);
+    return response.data;
+  },
+  sendTelegramTestNotification: async () => {
+    const response = await api.post('/trading/notifications/telegram/test', {});
+    return response.data;
+  },
+  runNotificationScan: async () => {
+    const response = await api.post('/trading/notifications/scan', {});
+    return response.data;
+  },
   runSignalBacktest: async (asset, days, startingCapital, riskPerTradePct) => {
     const response = await api.post('/trading/backtest', {
       asset,

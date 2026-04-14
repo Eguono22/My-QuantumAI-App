@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     MQL5_DEFAULT_RISK_PERCENT: float = 1.0
     MQL5_DEFAULT_ORDER_QUANTITY: float = 0.1
     MQL5_MAX_AUTO_NOTIONAL: float = 10000.0
+    TELEGRAM_ENABLED: bool = True
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_TIMEOUT_S: float = 8.0
+    TELEGRAM_DEFAULT_ALERT_SEVERITIES: List[str] = ["ERROR", "WARN"]
+    TELEGRAM_DEFAULT_COOLDOWN_S: int = 900
+    NOTIFICATION_SCHEDULER_ENABLED: bool = True
+    NOTIFICATION_SCHEDULER_INTERVAL_S: int = 60
     # Treat all hosted Vercel environments (production + preview) as production-like.
     APP_ENV: str = (
         os.getenv("APP_ENV")

@@ -9,6 +9,7 @@ from api.routes import auth, market, trading, portfolio, monitoring, mql5
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
 from config.settings import settings
+from services.notification_scheduler import notification_scheduler
 
 app = FastAPI(
     title="Quantum AI Trading Platform",
@@ -40,6 +41,12 @@ async def websocket_route(websocket: WebSocket):
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    notification_scheduler.start()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    notification_scheduler.stop()
 
 @app.get("/")
 def root():
@@ -138,5 +145,15 @@ def startup_health(include_probe: bool = False):
             "default_risk_percent": settings.MQL5_DEFAULT_RISK_PERCENT,
             "default_order_quantity": settings.MQL5_DEFAULT_ORDER_QUANTITY,
             "max_auto_notional": settings.MQL5_MAX_AUTO_NOTIONAL,
+        },
+        "telegram": {
+            "enabled": settings.TELEGRAM_ENABLED,
+            "bot_configured": bool(settings.TELEGRAM_BOT_TOKEN),
+            "default_alert_severities": settings.TELEGRAM_DEFAULT_ALERT_SEVERITIES,
+            "default_cooldown_seconds": settings.TELEGRAM_DEFAULT_COOLDOWN_S,
+        },
+        "notification_scheduler": {
+            "enabled": settings.NOTIFICATION_SCHEDULER_ENABLED,
+            "interval_seconds": settings.NOTIFICATION_SCHEDULER_INTERVAL_S,
         },
     }

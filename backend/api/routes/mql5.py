@@ -72,6 +72,7 @@ def analyze_automation(
         return mql5_bridge_service.analyze_trade(
             db=db,
             asset=request.asset,
+            user_id=current_user.id,
             timeframe=request.timeframe,
             quantity=request.quantity,
             min_confidence=request.min_confidence,

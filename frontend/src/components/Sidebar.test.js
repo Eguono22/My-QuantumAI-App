@@ -14,6 +14,7 @@ describe('Sidebar', () => {
   it('renders all navigation items when open', () => {
     renderSidebar({ isOpen: true });
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('AI Signals')).toBeInTheDocument();
     expect(screen.getByText('Portfolio')).toBeInTheDocument();
   });
@@ -54,5 +55,10 @@ describe('Sidebar', () => {
     );
     const dashboardLink = screen.getByText('Dashboard').closest('a');
     expect(dashboardLink).not.toHaveClass('bg-market-yellow');
+  });
+
+  it('shows the unread notifications badge when provided', () => {
+    renderSidebar({ isOpen: true, unreadNotifications: 2 });
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 });

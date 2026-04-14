@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function Navbar({ user, theme, onToggleTheme, onLogout, onToggleSidebar }) {
+export default function Navbar({ user, theme, onToggleTheme, onLogout, onToggleSidebar, unreadNotifications = 0 }) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-black/80 bg-market-black text-white">
       <div className="flex items-center justify-between h-full px-4 md:px-6">
@@ -24,6 +24,17 @@ export default function Navbar({ user, theme, onToggleTheme, onLogout, onToggleS
         </div>
         <div className="flex items-center space-x-3 md:space-x-4">
           <span className="text-emerald-400 text-sm font-semibold">● Live</span>
+          <Link
+            to="/app/notifications"
+            className="relative px-2.5 py-1.5 rounded-md border border-zinc-600 text-xs font-semibold hover:bg-white/10 transition"
+          >
+            Alerts
+            {unreadNotifications > 0 && (
+              <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-zinc-950">
+                {unreadNotifications}
+              </span>
+            )}
+          </Link>
           <button
             onClick={onToggleTheme}
             className="px-2.5 py-1.5 rounded-md border border-zinc-600 text-xs font-semibold hover:bg-white/10 transition"
