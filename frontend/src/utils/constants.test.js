@@ -29,13 +29,13 @@ describe('SIGNAL_BG_COLORS', () => {
 });
 
 describe('API_BASE_URL', () => {
-  it('falls back to localhost:8002', () => {
+  it('uses the configured API base URL', () => {
     expect(API_BASE_URL).toBe('http://localhost:8002');
   });
 });
 
 describe('WS_BASE_URL', () => {
-  it('falls back to ws://localhost:8002', () => {
-    expect(WS_BASE_URL).toBe('ws://localhost:8002');
+  it('uses the configured websocket base URL', () => {
+    expect(WS_BASE_URL).toBe('ws://localhost:8002/ws');
   });
 });

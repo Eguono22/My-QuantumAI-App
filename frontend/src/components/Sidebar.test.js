@@ -3,9 +3,14 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Sidebar from './Sidebar';
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
+
 const renderSidebar = (props) =>
   render(
-    <MemoryRouter initialEntries={[props.path || '/']}>
+    <MemoryRouter future={routerFuture} initialEntries={[props.path || '/']}>
       <Sidebar {...props} />
     </MemoryRouter>
   );
@@ -39,7 +44,7 @@ describe('Sidebar', () => {
 
   it('highlights the active route', () => {
     render(
-      <MemoryRouter initialEntries={['/app/signals']}>
+      <MemoryRouter future={routerFuture} initialEntries={['/app/signals']}>
         <Sidebar isOpen={true} />
       </MemoryRouter>
     );
@@ -49,7 +54,7 @@ describe('Sidebar', () => {
 
   it('does not highlight inactive routes', () => {
     render(
-      <MemoryRouter initialEntries={['/app/signals']}>
+      <MemoryRouter future={routerFuture} initialEntries={['/app/signals']}>
         <Sidebar isOpen={true} />
       </MemoryRouter>
     );

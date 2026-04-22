@@ -103,6 +103,16 @@ Windows local launcher with the MT5-friendly port used in this repo:
 .\scripts\start_backend_local.ps1 -Port 8011
 ```
 
+Windows one-command launcher for backend and frontend together:
+```powershell
+.\scripts\start_local_stack.ps1
+```
+
+Optional smoke test for the combined launcher:
+```powershell
+.\scripts\start_local_stack.ps1 -SmokeTest
+```
+
 ### Frontend Setup
 ```bash
 cd frontend

@@ -3,9 +3,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Navbar from './Navbar';
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
+
 const renderNavbar = (props) =>
   render(
-    <MemoryRouter>
+    <MemoryRouter future={routerFuture}>
       <Navbar {...props} />
     </MemoryRouter>
   );

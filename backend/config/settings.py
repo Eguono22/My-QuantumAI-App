@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     # In production set SECRET_KEY explicitly (e.g. `openssl rand -hex 32`).
     SECRET_KEY: Optional[str] = None
     REDIS_URL: str = "redis://redis:6379"
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
     TRADING_MODE: str = "paper"
