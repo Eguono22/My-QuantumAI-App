@@ -560,6 +560,29 @@ class TestTradingService:
 
         db.close()
 
+    def test_mql5_status_alerts_flag_missing_terminal_registration(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser13b", email="test13b@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        alert_codes = [alert["code"] for alert in status["alerts"]]
+
+        assert "NO_REGISTERED_TERMINALS" in alert_codes
+        assert "SYSTEM_HEALTHY" not in alert_codes
+
+        db.close()
+
     def test_telegram_preferences_and_preview_dispatch(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

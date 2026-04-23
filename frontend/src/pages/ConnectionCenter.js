@@ -68,6 +68,10 @@ function BridgeAlertCard({ alert }) {
   );
 }
 
+function isHealthyStartup(status) {
+  return status === 'ok' || status === 'healthy';
+}
+
 export default function ConnectionCenter() {
   const [startupHealth, setStartupHealth] = useState(null);
   const [mql5Status, setMql5Status] = useState(null);
@@ -111,7 +115,7 @@ export default function ConnectionCenter() {
   const terminalCount = mql5Status?.terminal_count ?? 0;
   const activeTerminals = mql5Status?.active_terminals ?? 0;
   const checks = {
-    backendHealthy: startupHealth?.status === 'healthy',
+    backendHealthy: isHealthyStartup(startupHealth?.status),
     brokerReady: startupHealth?.trading?.broker_ready === true,
     bridgeEnabled: mql5Status?.enabled === true,
     bridgeSecretConfigured: mql5Status?.shared_secret_configured === true,

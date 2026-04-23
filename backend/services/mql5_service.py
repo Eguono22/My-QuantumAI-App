@@ -267,6 +267,16 @@ class MQL5BridgeService:
         stale_terminals = [terminal["terminal_id"] for terminal in terminals if terminal.get("status") == "STALE"]
         active_terminals = [terminal["terminal_id"] for terminal in terminals if terminal.get("status") == "ACTIVE"]
 
+        if not terminals:
+            alerts.append(
+                {
+                    "code": "NO_REGISTERED_TERMINALS",
+                    "severity": "WARN",
+                    "title": "No MT5 terminal registered yet",
+                    "message": "Attach the QuantumAI bridge EA in MetaTrader 5 and confirm the first registration heartbeat reaches the backend.",
+                }
+            )
+
         if terminals and not active_terminals:
             alerts.append(
                 {
