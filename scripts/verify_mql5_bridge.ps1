@@ -23,9 +23,11 @@ $authHeaders = @{ Authorization = "Bearer $($register.access_token)" }
 $bridgeHeaders = @{ "X-MQL5-Secret" = $BridgeSecret }
 
 $status = Invoke-RestMethod -Uri "$baseUrl/trading/mql5/status" -Headers $authHeaders
+$me = Invoke-RestMethod -Uri "$baseUrl/auth/me" -Headers $authHeaders
+$terminalId = "mt5-verify-terminal-$suffix"
 $terminalPayload = @{
-    terminal_id = "mt5-verify-terminal"
-    user_id = 1
+    terminal_id = $terminalId
+    user_id = $me.id
     account_login = "123456"
     broker_server = "MetaQuotes-Demo"
     symbols = @("EURUSDm")
@@ -33,9 +35,10 @@ $terminalPayload = @{
 } | ConvertTo-Json
 
 $terminal = Invoke-RestMethod -Uri "$baseUrl/trading/mql5/bridge/register" -Method Post -Headers $bridgeHeaders -ContentType "application/json" -Body $terminalPayload
+$heartbeat = Invoke-RestMethod -Uri "$baseUrl/trading/mql5/bridge/heartbeat" -Method Post -Headers $bridgeHeaders -ContentType "application/json" -Body $terminalPayload
 $analysisPayload = @{
-    terminal_id = "mt5-verify-terminal"
-    user_id = 1
+    terminal_id = $terminalId
+    user_id = $me.id
     asset = "EURUSD"
     timeframe = "M15"
     quantity = 0.1
@@ -49,8 +52,11 @@ $analysis = Invoke-RestMethod -Uri "$baseUrl/trading/mql5/bridge/analyze" -Metho
 
 [pscustomobject]@{
     registered_user = $register.username
+    registered_user_id = $me.id
+    terminal_id = $terminalId
     bridge_ready = $status.bridge_ready
     terminal_status = $terminal.status
+    heartbeat_status = $heartbeat.status
     analysis_action = $analysis.action
     analysis_confidence = $analysis.confidence
     should_execute = $analysis.should_execute

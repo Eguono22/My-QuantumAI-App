@@ -267,6 +267,7 @@ Quick local loop:
 .\scripts\start_backend_local.ps1 -Port 8011
 .\scripts\verify_mql5_bridge.ps1 -Port 8011 -BridgeSecret "<your MQL5_SHARED_SECRET>"
 ```
+The verification helper creates a temporary user, resolves that user's real `id`, then checks terminal registration, heartbeat, and AI analysis against the local bridge.
 
 ## 🚢 Production Setup (1-4)
 
