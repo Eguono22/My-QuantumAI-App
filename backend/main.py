@@ -5,7 +5,7 @@ import logging
 import httpx
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import auth, market, trading, portfolio, monitoring, mql5
+from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
 from config.settings import settings
@@ -33,6 +33,7 @@ app.include_router(trading.router)
 app.include_router(portfolio.router)
 app.include_router(monitoring.router)
 app.include_router(mql5.router)
+app.include_router(billing.router)
 
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
@@ -155,5 +156,10 @@ def startup_health(include_probe: bool = False):
         "notification_scheduler": {
             "enabled": settings.NOTIFICATION_SCHEDULER_ENABLED,
             "interval_seconds": settings.NOTIFICATION_SCHEDULER_INTERVAL_S,
+        },
+        "billing": {
+            "provider": "stripe",
+            "configured": bool(settings.STRIPE_SECRET_KEY),
+            "pro_price_configured": bool(settings.STRIPE_PRICE_ID_PRO),
         },
     }

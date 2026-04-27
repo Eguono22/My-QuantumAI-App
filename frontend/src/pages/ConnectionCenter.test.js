@@ -30,12 +30,20 @@ describe('ConnectionCenter', () => {
         trading_mode: 'paper',
         broker_provider: 'paper',
       },
+      risk_limits: {
+        max_notional_per_trade: 25000,
+        max_daily_notional: 100000,
+        max_daily_trades: 50,
+        max_risk_percent_per_trade: 2,
+      },
     });
     tradingService.getMql5Status.mockResolvedValue({
       enabled: true,
+      bridge_ready: true,
       shared_secret_configured: true,
       terminal_count: 0,
       active_terminals: 0,
+      max_auto_notional: 10000,
       supported_assets: [],
       alerts: [],
       recent_events: [],
@@ -57,7 +65,38 @@ describe('ConnectionCenter', () => {
 
     expect(await screen.findByText('Connection Center')).toBeInTheDocument();
     expect(screen.getByText('Healthy')).toBeInTheDocument();
+    expect(screen.getAllByText('Analyze Only').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bridge is configured, terminal heartbeat pending')).toBeInTheDocument();
     expect(screen.getAllByText('Ready').length).toBeGreaterThan(0);
     expect(screen.getByText('MQL5 Bridge Panel')).toBeInTheDocument();
+  });
+
+  it('shows paper execution readiness when a terminal heartbeat is active', async () => {
+    tradingService.getMql5Status.mockResolvedValue({
+      enabled: true,
+      bridge_ready: true,
+      shared_secret_configured: true,
+      terminal_count: 1,
+      active_terminals: 1,
+      max_auto_notional: 10000,
+      supported_assets: ['EURUSD'],
+      alerts: [],
+      recent_events: [],
+      analytics: {
+        overview: {},
+        time_windows: {},
+        top_assets: [],
+        top_terminals: [],
+      },
+    });
+
+    render(
+      <MemoryRouter future={routerFuture}>
+        <ConnectionCenter />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Paper Execution Ready')).toBeInTheDocument();
+    expect(screen.getByText('Safe paper-trading loop is ready')).toBeInTheDocument();
   });
 });

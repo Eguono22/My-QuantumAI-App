@@ -26,6 +26,7 @@ class User(Base):
     mql5_bridge_events = relationship("MQL5BridgeEvent", back_populates="user")
     notification_preferences = relationship("UserNotificationPreference", back_populates="user", uselist=False)
     notification_deliveries = relationship("NotificationDeliveryLog", back_populates="user")
+    billing_customer = relationship("BillingCustomer", back_populates="user", uselist=False)
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -170,6 +171,20 @@ class NotificationDeliveryLog(Base):
     reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     user = relationship("User", back_populates="notification_deliveries")
+
+
+class BillingCustomer(Base):
+    __tablename__ = "billing_customers"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    stripe_customer_id = Column(String, nullable=False, unique=True, index=True)
+    stripe_subscription_id = Column(String, nullable=True, index=True)
+    subscription_status = Column(String, nullable=False, default="none")
+    price_id = Column(String, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="billing_customer")
 
 def get_db():
     db = SessionLocal()

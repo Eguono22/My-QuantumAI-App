@@ -72,6 +72,109 @@ function isHealthyStartup(status) {
   return status === 'ok' || status === 'healthy';
 }
 
+function formatLimit(value, suffix = '') {
+  if (value === null || value === undefined || value === '') return 'N/A';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return String(value);
+  return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })}${suffix}`;
+}
+
+function getOperatorReadiness({ checks, startupHealth, mql5Status, bridgeAlerts }) {
+  const errorAlerts = (bridgeAlerts || []).filter((alert) => alert.severity === 'ERROR');
+  const bridgeReady = mql5Status?.bridge_ready || (checks.bridgeEnabled && checks.bridgeSecretConfigured);
+  const startupReady = checks.backendHealthy && startupHealth?.trading?.broker_ready === true;
+
+  if (!checks.backendHealthy) {
+    return {
+      tone: 'red',
+      label: 'Setup Blocked',
+      title: 'Backend is not reachable',
+      message: 'Restore the API before reviewing signals or starting any automation.',
+      action: 'Check backend logs',
+    };
+  }
+
+  if (!startupReady || !bridgeReady || errorAlerts.length > 0) {
+    return {
+      tone: 'amber',
+      label: 'Analyze Only',
+      title: 'Use analysis mode until setup is clean',
+      message: startupHealth?.trading?.reason || errorAlerts[0]?.message || 'Complete broker and bridge readiness checks before enabling execution.',
+      action: 'Resolve readiness alerts',
+    };
+  }
+
+  if (checks.terminalActive) {
+    return {
+      tone: 'emerald',
+      label: 'Paper Execution Ready',
+      title: 'Safe paper-trading loop is ready',
+      message: 'Keep execution on demo/paper, watch the bridge history, and review every blocked decision before scaling.',
+      action: 'Run a tiny paper trade',
+    };
+  }
+
+  return {
+    tone: 'cyan',
+    label: 'Analyze Only',
+    title: 'Bridge is configured, terminal heartbeat pending',
+    message: 'Attach the MT5 EA and confirm a live heartbeat before switching from analysis to execution.',
+    action: 'Connect MT5 terminal',
+  };
+}
+
+function OperatorReadiness({ readiness, startupHealth, mql5Status }) {
+  const toneClasses = {
+    red: 'border-red-200 bg-red-50 text-red-900',
+    amber: 'border-amber-200 bg-amber-50 text-amber-900',
+    cyan: 'border-cyan-200 bg-cyan-50 text-cyan-900',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  };
+  const badgeClasses = {
+    red: 'bg-red-700 text-white',
+    amber: 'bg-amber-700 text-white',
+    cyan: 'bg-cyan-700 text-white',
+    emerald: 'bg-emerald-700 text-white',
+  };
+  const riskLimits = startupHealth?.risk_limits || {};
+
+  return (
+    <div className={`rounded-md border px-4 py-4 ${toneClasses[readiness.tone]}`}>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="max-w-3xl">
+          <span className={`inline-flex rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${badgeClasses[readiness.tone]}`}>
+            {readiness.label}
+          </span>
+          <h2 className="mt-3 text-xl font-display font-bold uppercase">{readiness.title}</h2>
+          <p className="mt-2 text-sm opacity-90">{readiness.message}</p>
+        </div>
+        <div className="rounded-md bg-white/70 border border-white px-3 py-2 text-sm font-semibold">
+          {readiness.action}
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div className="rounded-md bg-white/70 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide opacity-70">Per Trade</p>
+          <p className="mt-1 font-semibold">{formatLimit(riskLimits.max_notional_per_trade)}</p>
+        </div>
+        <div className="rounded-md bg-white/70 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide opacity-70">Daily Notional</p>
+          <p className="mt-1 font-semibold">{formatLimit(riskLimits.max_daily_notional)}</p>
+        </div>
+        <div className="rounded-md bg-white/70 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide opacity-70">Daily Trades</p>
+          <p className="mt-1 font-semibold">{formatLimit(riskLimits.max_daily_trades)}</p>
+        </div>
+        <div className="rounded-md bg-white/70 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide opacity-70">MT5 Auto Cap</p>
+          <p className="mt-1 font-semibold">{formatLimit(mql5Status?.max_auto_notional)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ConnectionCenter() {
   const [startupHealth, setStartupHealth] = useState(null);
   const [mql5Status, setMql5Status] = useState(null);
@@ -131,6 +234,12 @@ export default function ConnectionCenter() {
   const topAssets = analytics?.top_assets || [];
   const topTerminals = analytics?.top_terminals || [];
   const bridgeAlerts = mql5Status?.alerts || [];
+  const operatorReadiness = getOperatorReadiness({
+    checks,
+    startupHealth,
+    mql5Status,
+    bridgeAlerts,
+  });
 
   return (
     <div className="space-y-6 animate-fadeRise">
@@ -159,6 +268,12 @@ export default function ConnectionCenter() {
       {!!error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
+
+      <OperatorReadiness
+        readiness={operatorReadiness}
+        startupHealth={startupHealth}
+        mql5Status={mql5Status}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="market-panel rounded-md p-4">

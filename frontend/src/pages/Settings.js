@@ -23,6 +23,10 @@ const PORTFOLIO_VIEW_OPTIONS = [
 ];
 
 export default function Settings({ preferences, onUpdatePreference, onToggleTheme }) {
+  const [billingStatus, setBillingStatus] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingAction, setBillingAction] = useState('');
+  const [billingMessage, setBillingMessage] = useState(null);
   const [telegramPrefs, setTelegramPrefs] = useState({
     telegram_enabled: false,
     telegram_chat_id: '',
@@ -35,6 +39,22 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
 
   useEffect(() => {
     let isMounted = true;
+
+    const loadBillingStatus = async () => {
+      try {
+        const status = await tradingService.getBillingStatus();
+        if (!isMounted) return;
+        setBillingStatus(status);
+      } catch (err) {
+        if (!isMounted) return;
+        setBillingMessage({
+          type: 'error',
+          message: err.response?.data?.detail || 'Could not load billing status.',
+        });
+      } finally {
+        if (isMounted) setBillingLoading(false);
+      }
+    };
 
     const loadTelegramPreferences = async () => {
       try {
@@ -58,6 +78,7 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
       }
     };
 
+    loadBillingStatus();
     loadTelegramPreferences();
     return () => {
       isMounted = false;
@@ -119,6 +140,36 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
     }
   };
 
+  const redirectToBillingSession = async (sessionFactory, actionLabel) => {
+    setBillingAction(actionLabel);
+    try {
+      const session = await sessionFactory();
+      window.location.href = session.url;
+    } catch (err) {
+      setBillingMessage({
+        type: 'error',
+        message: err.response?.data?.detail || 'Could not start Stripe billing session.',
+      });
+      setBillingAction('');
+    }
+  };
+
+  const refreshBillingStatus = async () => {
+    setBillingLoading(true);
+    try {
+      const status = await tradingService.getBillingStatus();
+      setBillingStatus(status);
+      setBillingMessage({ type: 'success', message: 'Billing status refreshed.' });
+    } catch (err) {
+      setBillingMessage({
+        type: 'error',
+        message: err.response?.data?.detail || 'Could not refresh billing status.',
+      });
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fadeRise">
       <div>
@@ -127,6 +178,7 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
       </div>
 
       {telegramStatus && <Alert type={telegramStatus.type} message={telegramStatus.message} onClose={() => setTelegramStatus(null)} />}
+      {billingMessage && <Alert type={billingMessage.type} message={billingMessage.message} onClose={() => setBillingMessage(null)} />}
 
       <div className="market-panel rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -190,6 +242,80 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold uppercase text-zinc-900">Billing</h2>
+            <p className="text-sm text-zinc-600">Use Stripe-hosted billing to add payment methods and manage subscription access.</p>
+          </div>
+          <span className={`px-3 py-1 rounded-md text-xs font-semibold ${billingStatus?.configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+            {billingStatus?.configured ? 'Stripe Ready' : 'Stripe Not Configured'}
+          </span>
+        </div>
+
+        {billingLoading ? (
+          <div className="text-sm text-zinc-500">Loading billing status...</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+              <div className="market-panel-soft rounded-md p-3">
+                <p className="text-zinc-500 text-xs uppercase">Provider</p>
+                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.provider || 'stripe'}</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-3">
+                <p className="text-zinc-500 text-xs uppercase">Customer</p>
+                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.has_customer ? 'Created' : 'Not Created'}</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-3">
+                <p className="text-zinc-500 text-xs uppercase">Subscription</p>
+                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.subscription_status || 'none'}</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-3">
+                <p className="text-zinc-500 text-xs uppercase">Pro Price</p>
+                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.pro_price_configured ? 'Configured' : 'Missing'}</p>
+              </div>
+            </div>
+
+            {!billingStatus?.configured && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Add Stripe environment variables on the backend before collecting payment methods: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, and optionally STRIPE_PRICE_ID_PRO.
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => redirectToBillingSession(tradingService.createPaymentMethodSession, 'payment-method')}
+                disabled={!billingStatus?.configured || !!billingAction}
+                className="market-btn-primary rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                {billingAction === 'payment-method' ? 'Opening Stripe...' : 'Add Payment Method'}
+              </button>
+              <button
+                onClick={() => redirectToBillingSession(tradingService.createSubscriptionSession, 'subscription')}
+                disabled={!billingStatus?.configured || !billingStatus?.pro_price_configured || !!billingAction}
+                className="market-btn-dark rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                {billingAction === 'subscription' ? 'Opening Stripe...' : 'Start Pro Subscription'}
+              </button>
+              <button
+                onClick={() => redirectToBillingSession(tradingService.createBillingPortalSession, 'portal')}
+                disabled={!billingStatus?.configured || !billingStatus?.has_customer || !!billingAction}
+                className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+              >
+                {billingAction === 'portal' ? 'Opening Stripe...' : 'Manage Billing'}
+              </button>
+              <button
+                onClick={refreshBillingStatus}
+                disabled={billingLoading}
+                className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+              >
+                Refresh Billing
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="market-panel rounded-md p-4 space-y-4">

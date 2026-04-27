@@ -6,7 +6,7 @@ input string QuantumApiBaseUrl = "http://127.0.0.1:8011";
 input string QuantumBridgeSecret = "replace-me";
 input string QuantumTerminalId = "mt5-demo-terminal";
 input int QuantumUserId = 1;
-input string ExecutionMode = "LOCAL_MT5"; // ANALYZE_ONLY, LOCAL_MT5, QUANTUM_BACKEND
+input string ExecutionMode = "ANALYZE_ONLY"; // ANALYZE_ONLY, LOCAL_MT5, QUANTUM_BACKEND
 input bool UseChartSymbol = true;
 input string BrokerSymbolOverride = "";
 input string QuantumApiAsset = "";
@@ -56,6 +56,24 @@ string EscapeJson(string value)
 string ExecutionModeNormalized()
 {
    return ToUpperValue(ExecutionMode);
+}
+
+bool HasConfiguredBridgeSecret()
+{
+   string secret = QuantumBridgeSecret;
+   StringTrimLeft(secret);
+   StringTrimRight(secret);
+   return (StringLen(secret) > 0 && secret != "replace-me");
+}
+
+string NormalizedApiBaseUrl()
+{
+   string baseUrl = QuantumApiBaseUrl;
+   StringTrimLeft(baseUrl);
+   StringTrimRight(baseUrl);
+   while(StringLen(baseUrl) > 0 && StringSubstr(baseUrl, StringLen(baseUrl) - 1, 1) == "/")
+      baseUrl = StringSubstr(baseUrl, 0, StringLen(baseUrl) - 1);
+   return baseUrl;
 }
 
 ENUM_TIMEFRAMES ResolveTimeframeEnum(string timeframeValue)
@@ -327,7 +345,13 @@ string BuildPriceSeriesJson(string symbol, ENUM_TIMEFRAMES timeframeEnum)
 
 string HttpPost(string path, string payload)
 {
-   string url = QuantumApiBaseUrl + path;
+   if(!HasConfiguredBridgeSecret())
+   {
+      Print("QuantumAI bridge secret is not configured. Load QuantumAI_Bridge_Local_8011.set or set QuantumBridgeSecret to MQL5_SHARED_SECRET.");
+      return "";
+   }
+
+   string url = NormalizedApiBaseUrl() + path;
    string headers = "Content-Type: application/json\r\nX-MQL5-Secret: " + QuantumBridgeSecret + "\r\n";
    char data[];
    char result[];
@@ -344,7 +368,12 @@ string HttpPost(string path, string payload)
 
    string response = CharArrayToString(result);
    if(responseCode >= 400)
+   {
       Print("QuantumAI HTTP error ", responseCode, ": ", response);
+      if(responseCode == 401)
+         Print("QuantumAI auth failed. The live EA input QuantumBridgeSecret does not match backend MQL5_SHARED_SECRET.");
+      return "";
+   }
 
    return response;
 }
@@ -482,6 +511,21 @@ void RequestQuantumTrade()
 
 int OnInit()
 {
+   if(!HasConfiguredBridgeSecret())
+   {
+      Print("QuantumAI EA stopped: QuantumBridgeSecret is still empty or replace-me. Load scripts/mql5/QuantumAI_Bridge_Local_8011.set.");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+
+   string mode = ExecutionModeNormalized();
+   if(mode != "ANALYZE_ONLY" && mode != "LOCAL_MT5" && mode != "QUANTUM_BACKEND")
+   {
+      Print("QuantumAI EA stopped: invalid ExecutionMode. Use ANALYZE_ONLY, LOCAL_MT5, or QUANTUM_BACKEND.");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+
+   Print("QuantumAI EA starting in ", mode, " mode against ", NormalizedApiBaseUrl(), ".");
+
    string payload = StringFormat(
       "{\"terminal_id\":\"%s\",\"user_id\":%d,\"symbols\":[\"%s\"],\"timeframe\":\"%s\"}",
       EscapeJson(QuantumTerminalId),

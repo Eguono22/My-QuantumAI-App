@@ -107,4 +107,20 @@ export const tradingService = {
     const response = await api.post('/trading/mql5/automation/execute', payload);
     return response.data;
   },
+  getBillingStatus: async () => {
+    const response = await api.get('/billing/status');
+    return response.data;
+  },
+  createPaymentMethodSession: async () => {
+    const response = await api.post('/billing/payment-method-session', {});
+    return response.data;
+  },
+  createSubscriptionSession: async () => {
+    const response = await api.post('/billing/subscription-session', {});
+    return response.data;
+  },
+  createBillingPortalSession: async () => {
+    const response = await api.post('/billing/portal-session', {});
+    return response.data;
+  },
 };

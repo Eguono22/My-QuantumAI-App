@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     TELEGRAM_DEFAULT_COOLDOWN_S: int = 900
     NOTIFICATION_SCHEDULER_ENABLED: bool = True
     NOTIFICATION_SCHEDULER_INTERVAL_S: int = 60
+    APP_PUBLIC_URL: str = "http://localhost:3000"
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICE_ID_PRO: Optional[str] = None
+    STRIPE_API_BASE_URL: str = "https://api.stripe.com/v1"
+    STRIPE_REQUEST_TIMEOUT_S: float = 12.0
     # Treat all hosted Vercel environments (production + preview) as production-like.
     APP_ENV: str = (
         os.getenv("APP_ENV")
