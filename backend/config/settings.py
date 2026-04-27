@@ -74,10 +74,14 @@ class Settings(BaseSettings):
         or ("production" if os.getenv("VERCEL") == "1" else "development")
     )
 
-    # Resolve project-root .env regardless of process working directory
-    # (e.g. running from repo root vs backend/).
+    # Resolve project-root .env files regardless of process working directory
+    # (e.g. running from repo root vs backend/). .env.local is intentionally
+    # ignored by Git and can hold Vercel/Stripe development secrets.
     _ROOT_DIR = Path(__file__).resolve().parents[2]
-    model_config = ConfigDict(env_file=str(_ROOT_DIR / ".env"))
+    model_config = ConfigDict(
+        env_file=(str(_ROOT_DIR / ".env"), str(_ROOT_DIR / ".env.local")),
+        extra="ignore",
+    )
 
 
 settings = Settings()
