@@ -81,7 +81,7 @@ export default function Dashboard({ preferences }) {
             Trade Smarter With Quantum-Inspired AI
           </h1>
           <p className="mt-4 text-sky-100 max-w-2xl text-sm md:text-base">
-            Unified signal intelligence, portfolio execution, and broker-readiness monitoring in one high-performance trading cockpit.
+            Prove a trustworthy paper-trading loop before scaling: connect, review AI rationale, enforce risk, execute tiny paper trades, and learn from the record.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <span className="px-3 py-1 rounded-md bg-cyan-900/60 text-cyan-200 text-xs font-semibold uppercase tracking-wide">
@@ -90,8 +90,8 @@ export default function Dashboard({ preferences }) {
             <span className="px-3 py-1 rounded-md bg-zinc-900/50 text-zinc-200 text-xs font-semibold uppercase tracking-wide">
               Layout: {layoutMode}
             </span>
-            <Link to="/app/markets" className="px-5 py-2.5 rounded-md bg-sky-400 text-zinc-950 font-semibold hover:bg-sky-300 transition">
-              Explore Markets
+            <Link to="/app/pilot" className="px-5 py-2.5 rounded-md bg-emerald-300 text-zinc-950 font-semibold hover:bg-emerald-200 transition">
+              Start 14-Day Pilot
             </Link>
             <Link to="/app/signals" className="px-5 py-2.5 rounded-md border border-sky-300 text-sky-100 font-semibold hover:bg-sky-900/40 transition">
               View AI Signals
@@ -167,6 +167,23 @@ export default function Dashboard({ preferences }) {
             {startupHealth?.trading?.reason && <p className="mt-3 text-xs text-zinc-400">{startupHealth.trading.reason}</p>}
             <Link to="/app/connect" className="inline-block mt-4 text-sm font-semibold text-cyan-300 hover:text-cyan-200">
               Open setup checklist
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {!isFocus && (
+        <div className="rounded-xl border border-emerald-700 p-5" style={{ background: 'linear-gradient(135deg, #071a12 0%, #0f2d24 52%, #10284a 100%)' }}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="max-w-3xl">
+              <p className="text-emerald-200 text-xs uppercase tracking-wide">Next Best Step</p>
+              <h2 className="mt-2 text-xl font-display font-bold text-white uppercase">Run the 14-day paper-trading trust pilot</h2>
+              <p className="mt-2 text-sm text-emerald-50">
+                Keep the product focused on one proof: real users can understand, trust, and repeat the AI-assisted paper trading workflow.
+              </p>
+            </div>
+            <Link to="/app/pilot" className="px-4 py-2 rounded-md bg-emerald-300 text-zinc-950 text-sm font-semibold hover:bg-emerald-200 transition">
+              Open Pilot
             </Link>
           </div>
         </div>

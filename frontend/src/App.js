@@ -8,6 +8,7 @@ import TradingSignals from './pages/TradingSignals';
 import Portfolio from './pages/Portfolio';
 import Orders from './pages/Orders';
 import Markets from './pages/Markets';
+import Pilot from './pages/Pilot';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
@@ -253,6 +254,24 @@ function App() {
                   unreadNotifications={unreadNotifications}
                 >
                   <Markets />
+                </ProtectedLayout>
+              ) : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/app/pilot"
+            element={
+              user ? (
+                <ProtectedLayout
+                  user={user}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  unreadNotifications={unreadNotifications}
+                >
+                  <Pilot />
                 </ProtectedLayout>
               ) : <Navigate to="/login" />
             }

@@ -1,0 +1,610 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { tradingService } from '../services/tradingService';
+
+const PILOT_LENGTH_DAYS = 14;
+const PILOT_START_KEY = 'quantumai_pilot_started_at';
+const PILOT_FEEDBACK_KEY = 'quantumai_pilot_feedback';
+
+const initialFeedbackForm = {
+  participant: '',
+  segment: 'MT5 trader',
+  trustScore: '3',
+  valueScore: '3',
+  wouldPay: 'Maybe',
+  friction: '',
+  notes: '',
+};
+
+const betaQuestions = [
+  'Can a trader connect their paper setup without help?',
+  'Can they understand why a signal exists before placing a trade?',
+  'Do the risk controls prevent unsafe or unclear trades?',
+  'Does the order and portfolio record make the AI decision auditable?',
+  'Would this save enough time or discipline to justify a paid plan?',
+];
+
+const weeklyPlan = [
+  {
+    label: 'Days 1-2',
+    title: 'Connect and observe',
+    detail: 'Confirm backend health, broker mode, data provider, MQL5 bridge status, and first signal review.',
+  },
+  {
+    label: 'Days 3-5',
+    title: 'Paper-trade tiny size',
+    detail: 'Place low-notional paper trades only after reviewing entry, stop, target, confidence, and risk budget.',
+  },
+  {
+    label: 'Days 6-10',
+    title: 'Track behavior',
+    detail: 'Review orders, blocked decisions, fills, and portfolio movement daily. Look for confusion and repeat value.',
+  },
+  {
+    label: 'Days 11-14',
+    title: 'Decide what to double down on',
+    detail: 'Interview pilot users and convert the clearest trust gaps into the next product milestone.',
+  },
+];
+
+function daysBetween(startDate, nowDate) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.floor((nowDate.getTime() - startDate.getTime()) / msPerDay));
+}
+
+function formatDate(value) {
+  if (!value) return 'Not started';
+  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatPercent(value) {
+  return `${Math.round(value)}%`;
+}
+
+function getOrderStats(orders) {
+  const filled = orders.filter((order) => order.status === 'FILLED' || order.status === 'PARTIAL_FILL');
+  const rejected = orders.filter((order) => order.status === 'REJECTED');
+  const pending = orders.filter((order) => order.status === 'PENDING');
+  const totalFilledNotional = filled.reduce((sum, order) => {
+    const quantity = Number(order.filled_quantity || 0);
+    const price = Number(order.fill_price || order.market_price || 0);
+    return sum + quantity * price;
+  }, 0);
+
+  return {
+    filled: filled.length,
+    rejected: rejected.length,
+    pending: pending.length,
+    totalFilledNotional,
+  };
+}
+
+function loadStoredFeedback() {
+  try {
+    const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function getFeedbackStats(entries) {
+  if (!entries.length) {
+    return {
+      avgTrust: 0,
+      avgValue: 0,
+      payYes: 0,
+      payMaybe: 0,
+      payNo: 0,
+    };
+  }
+
+  const totals = entries.reduce((acc, entry) => {
+    const wouldPay = entry.wouldPay || 'Maybe';
+    return {
+      trust: acc.trust + Number(entry.trustScore || 0),
+      value: acc.value + Number(entry.valueScore || 0),
+      payYes: acc.payYes + (wouldPay === 'Yes' ? 1 : 0),
+      payMaybe: acc.payMaybe + (wouldPay === 'Maybe' ? 1 : 0),
+      payNo: acc.payNo + (wouldPay === 'No' ? 1 : 0),
+    };
+  }, { trust: 0, value: 0, payYes: 0, payMaybe: 0, payNo: 0 });
+
+  return {
+    avgTrust: totals.trust / entries.length,
+    avgValue: totals.value / entries.length,
+    payYes: totals.payYes,
+    payMaybe: totals.payMaybe,
+    payNo: totals.payNo,
+  };
+}
+
+function Pill({ tone = 'zinc', children }) {
+  const tones = {
+    emerald: 'bg-emerald-100 text-emerald-800',
+    amber: 'bg-amber-100 text-amber-800',
+    sky: 'bg-sky-100 text-sky-800',
+    zinc: 'bg-zinc-100 text-zinc-700',
+    red: 'bg-red-100 text-red-700',
+  };
+  return (
+    <span className={`inline-flex rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+function MetricCard({ label, value, hint, tone = 'zinc' }) {
+  const valueTone = {
+    emerald: 'text-emerald-700',
+    amber: 'text-amber-700',
+    sky: 'text-sky-700',
+    zinc: 'text-zinc-900',
+    red: 'text-red-700',
+  };
+  return (
+    <div className="market-panel rounded-md p-4">
+      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className={`mt-2 text-2xl font-display font-bold ${valueTone[tone]}`}>{value}</p>
+      <p className="mt-2 text-xs text-zinc-500">{hint}</p>
+    </div>
+  );
+}
+
+function PilotGate({ label, complete, detail, action, to }) {
+  return (
+    <div className={`rounded-md border px-4 py-3 ${complete ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className={`font-semibold ${complete ? 'text-emerald-900' : 'text-amber-900'}`}>{label}</p>
+          <p className={`mt-1 text-sm ${complete ? 'text-emerald-800' : 'text-amber-800'}`}>{detail}</p>
+        </div>
+        <Pill tone={complete ? 'emerald' : 'amber'}>{complete ? 'Ready' : 'Needs work'}</Pill>
+      </div>
+      {to && (
+        <Link to={to} className="mt-3 inline-flex text-sm font-semibold text-zinc-900 hover:text-sky-700">
+          {action}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export default function Pilot() {
+  const [startupHealth, setStartupHealth] = useState(null);
+  const [mql5Status, setMql5Status] = useState(null);
+  const [signals, setSignals] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [portfolio, setPortfolio] = useState([]);
+  const [pilotStart, setPilotStart] = useState(localStorage.getItem(PILOT_START_KEY));
+  const [feedbackEntries, setFeedbackEntries] = useState(loadStoredFeedback);
+  const [feedbackForm, setFeedbackForm] = useState(initialFeedbackForm);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async () => {
+      try {
+        const [health, bridge, signalData, orderData, portfolioData] = await Promise.all([
+          tradingService.getStartupHealth().catch(() => null),
+          tradingService.getMql5Status().catch(() => null),
+          tradingService.getSignals().catch(() => []),
+          tradingService.getOrders().catch(() => []),
+          tradingService.getPortfolio().catch(() => []),
+        ]);
+
+        if (!isMounted) return;
+        setStartupHealth(health);
+        setMql5Status(bridge);
+        setSignals(Array.isArray(signalData) ? signalData : []);
+        setOrders(Array.isArray(orderData) ? orderData : []);
+        setPortfolio(Array.isArray(portfolioData) ? portfolioData : []);
+        setError('');
+      } catch (err) {
+        if (!isMounted) return;
+        setError(err.response?.data?.detail || 'Failed to load pilot status');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    load();
+    const timer = setInterval(load, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const startPilot = () => {
+    const now = new Date().toISOString();
+    localStorage.setItem(PILOT_START_KEY, now);
+    setPilotStart(now);
+  };
+
+  const resetPilot = () => {
+    localStorage.removeItem(PILOT_START_KEY);
+    setPilotStart(null);
+  };
+
+  const updateFeedbackForm = (key, value) => {
+    setFeedbackForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const saveFeedback = (event) => {
+    event.preventDefault();
+    const participant = feedbackForm.participant.trim() || `Pilot user ${feedbackEntries.length + 1}`;
+    const entry = {
+      id: `feedback-${Date.now()}`,
+      participant,
+      segment: feedbackForm.segment,
+      trustScore: Number(feedbackForm.trustScore),
+      valueScore: Number(feedbackForm.valueScore),
+      wouldPay: feedbackForm.wouldPay,
+      friction: feedbackForm.friction.trim(),
+      notes: feedbackForm.notes.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const next = [entry, ...feedbackEntries].slice(0, 25);
+    localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
+    setFeedbackEntries(next);
+    setFeedbackForm(initialFeedbackForm);
+  };
+
+  const deleteFeedback = (id) => {
+    const next = feedbackEntries.filter((entry) => entry.id !== id);
+    localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
+    setFeedbackEntries(next);
+  };
+
+  const orderStats = useMemo(() => getOrderStats(orders), [orders]);
+  const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
+  const actionableSignals = signals.filter((signal) => signal.signal_type && signal.signal_type !== 'HOLD');
+  const bridgeAlerts = mql5Status?.alerts || [];
+  const bridgeErrors = bridgeAlerts.filter((alert) => alert.severity === 'ERROR').length;
+  const analytics = mql5Status?.analytics?.overview || {};
+  const startedAt = pilotStart ? new Date(pilotStart) : null;
+  const elapsedDays = startedAt ? daysBetween(startedAt, new Date()) : 0;
+  const currentDay = startedAt ? Math.min(PILOT_LENGTH_DAYS, elapsedDays + 1) : 0;
+  const timeProgress = startedAt ? Math.min(100, (currentDay / PILOT_LENGTH_DAYS) * 100) : 0;
+
+  const gates = [
+    {
+      key: 'backend',
+      label: 'Backend and broker readiness',
+      complete: startupHealth?.status === 'ok' && startupHealth?.trading?.broker_ready === true,
+      detail: startupHealth?.trading?.reason || 'Startup diagnostics confirm the paper-trading backend is reachable.',
+      action: 'Open Connection Center',
+      to: '/app/connect',
+    },
+    {
+      key: 'signals',
+      label: 'Actionable signal review',
+      complete: actionableSignals.length > 0,
+      detail: `${actionableSignals.length} non-HOLD signal${actionableSignals.length === 1 ? '' : 's'} available for review.`,
+      action: 'Review AI Signals',
+      to: '/app/signals',
+    },
+    {
+      key: 'risk',
+      label: 'Risk limits visible before execution',
+      complete: Boolean(startupHealth?.risk_limits?.max_notional_per_trade && startupHealth?.risk_limits?.max_risk_percent_per_trade),
+      detail: 'Pilot users should see max notional, daily trade count, and risk-per-trade before any order.',
+      action: 'Review limits',
+      to: '/app/connect',
+    },
+    {
+      key: 'paperOrders',
+      label: 'Paper order evidence',
+      complete: orders.length > 0,
+      detail: `${orders.length} order${orders.length === 1 ? '' : 's'} recorded. Filled, pending, and rejected states all help prove trust.`,
+      action: 'Open Orders',
+      to: '/app/orders',
+    },
+    {
+      key: 'audit',
+      label: 'Decision audit trail',
+      complete: Boolean((analytics.decisions || 0) > 0 || orders.length > 0),
+      detail: `${analytics.decisions || 0} bridge decision${analytics.decisions === 1 ? '' : 's'} and ${orders.length} order record${orders.length === 1 ? '' : 's'} available.`,
+      action: 'Inspect activity',
+      to: '/app/connect',
+    },
+  ];
+  const gateProgress = Math.round((gates.filter((gate) => gate.complete).length / gates.length) * 100);
+
+  if (loading) return <LoadingSpinner size="lg" />;
+
+  return (
+    <div className="space-y-8 animate-fadeRise">
+      <div className="rounded-2xl overflow-hidden border border-zinc-700 relative" style={{ background: 'linear-gradient(135deg, #102016 0%, #17412f 48%, #24436f 100%)' }}>
+        <div className="relative px-6 py-8 md:px-10 md:py-10">
+          <p className="text-emerald-100 text-xs tracking-[0.18em] uppercase">Private Beta Milestone</p>
+          <h1 className="mt-2 text-3xl md:text-4xl font-display font-bold text-white uppercase">
+            14-Day Trust Pilot
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm md:text-base text-emerald-50">
+            Prove one complete paper-trading loop: connect, review AI rationale, enforce risk, execute tiny paper trades, and learn whether traders come back.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={pilotStart ? resetPilot : startPilot}
+              className="px-4 py-2 rounded-md bg-emerald-300 text-zinc-950 text-sm font-semibold hover:bg-emerald-200 transition"
+            >
+              {pilotStart ? 'Reset Pilot Clock' : 'Start Pilot Clock'}
+            </button>
+            <Link to="/app/connect" className="px-4 py-2 rounded-md border border-emerald-100 text-emerald-50 text-sm font-semibold hover:bg-white/10 transition">
+              Check Setup
+            </Link>
+            <Link to="/app/signals" className="px-4 py-2 rounded-md border border-sky-100 text-sky-50 text-sm font-semibold hover:bg-white/10 transition">
+              Review Signals
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {!!error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard label="Pilot Day" value={currentDay ? `${currentDay}/${PILOT_LENGTH_DAYS}` : 'Not started'} hint={`Started ${formatDate(pilotStart)}`} tone={currentDay ? 'emerald' : 'amber'} />
+        <MetricCard label="Trust Gates" value={formatPercent(gateProgress)} hint={`${gates.filter((gate) => gate.complete).length}/${gates.length} proof points ready`} tone={gateProgress >= 80 ? 'emerald' : 'amber'} />
+        <MetricCard label="Paper Orders" value={orders.length} hint={`${orderStats.filled} filled, ${orderStats.pending} pending, ${orderStats.rejected} rejected`} tone={orders.length > 0 ? 'sky' : 'zinc'} />
+        <MetricCard label="Beta Feedback" value={feedbackEntries.length} hint={`${feedbackStats.payYes} yes, ${feedbackStats.payMaybe} maybe, ${feedbackStats.payNo} no on willingness to pay`} tone={feedbackEntries.length >= 5 ? 'emerald' : 'amber'} />
+      </div>
+
+      <div className="market-panel rounded-md p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Pilot Progress</h2>
+            <p className="text-sm text-zinc-600">Keep the pilot narrow until these proof points are working in front of real users.</p>
+          </div>
+          <Pill tone={gateProgress >= 80 ? 'emerald' : 'amber'}>{formatPercent(gateProgress)} ready</Pill>
+        </div>
+        <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${gateProgress}%` }} />
+        </div>
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div className="h-full bg-sky-500 transition-all" style={{ width: `${timeProgress}%` }} />
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">Green is readiness. Blue is elapsed pilot time.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6">
+        <div className="market-panel rounded-md p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Feedback</h2>
+              <p className="text-sm text-zinc-600">Log each pilot conversation while the product is still fresh in the user's mind.</p>
+            </div>
+            <Pill tone={feedbackEntries.length >= 5 ? 'emerald' : 'amber'}>{feedbackEntries.length}/5 minimum</Pill>
+          </div>
+
+          <form onSubmit={saveFeedback} className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="text-sm font-medium text-zinc-700">
+                Participant
+                <input
+                  value={feedbackForm.participant}
+                  onChange={(event) => updateFeedbackForm('participant', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  placeholder="Name or short label"
+                />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Segment
+                <select
+                  value={feedbackForm.segment}
+                  onChange={(event) => updateFeedbackForm('segment', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                >
+                  <option>MT5 trader</option>
+                  <option>Alpaca paper trader</option>
+                  <option>Crypto trader</option>
+                  <option>Signal reviewer</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label className="text-sm font-medium text-zinc-700">
+                Trust
+                <select
+                  value={feedbackForm.trustScore}
+                  onChange={(event) => updateFeedbackForm('trustScore', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                >
+                  {[1, 2, 3, 4, 5].map((score) => <option key={`trust-${score}`} value={score}>{score}/5</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Value
+                <select
+                  value={feedbackForm.valueScore}
+                  onChange={(event) => updateFeedbackForm('valueScore', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                >
+                  {[1, 2, 3, 4, 5].map((score) => <option key={`value-${score}`} value={score}>{score}/5</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Would Pay
+                <select
+                  value={feedbackForm.wouldPay}
+                  onChange={(event) => updateFeedbackForm('wouldPay', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                >
+                  <option>Maybe</option>
+                  <option>Yes</option>
+                  <option>No</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-sm font-medium text-zinc-700">
+              Main Friction
+              <input
+                value={feedbackForm.friction}
+                onChange={(event) => updateFeedbackForm('friction', event.target.value)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                placeholder="What made them hesitate?"
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-zinc-700">
+              Notes
+              <textarea
+                value={feedbackForm.notes}
+                onChange={(event) => updateFeedbackForm('notes', event.target.value)}
+                className="mt-1 min-h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                placeholder="What did they trust, misunderstand, or ask to see next?"
+              />
+            </label>
+
+            <button type="submit" className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+              Save Feedback
+            </button>
+          </form>
+        </div>
+
+        <div className="market-panel rounded-md p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Feedback Evidence</h2>
+              <p className="text-sm text-zinc-600">Use this to decide whether to improve onboarding, signal trust, or execution clarity next.</p>
+            </div>
+            <Pill tone={feedbackStats.avgTrust >= 4 && feedbackStats.avgValue >= 4 ? 'emerald' : 'sky'}>
+              Trust {feedbackStats.avgTrust.toFixed(1)} / Value {feedbackStats.avgValue.toFixed(1)}
+            </Pill>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+            <div className="rounded-md border border-zinc-200 bg-white p-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Yes</p>
+              <p className="mt-1 text-xl font-display font-bold text-emerald-700">{feedbackStats.payYes}</p>
+            </div>
+            <div className="rounded-md border border-zinc-200 bg-white p-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Maybe</p>
+              <p className="mt-1 text-xl font-display font-bold text-amber-700">{feedbackStats.payMaybe}</p>
+            </div>
+            <div className="rounded-md border border-zinc-200 bg-white p-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">No</p>
+              <p className="mt-1 text-xl font-display font-bold text-red-700">{feedbackStats.payNo}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {!feedbackEntries.length && (
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                No beta feedback logged yet.
+              </div>
+            )}
+            {feedbackEntries.map((entry) => (
+              <div key={entry.id} className="rounded-md border border-zinc-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-zinc-900">{entry.participant}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{entry.segment} | {new Date(entry.createdAt).toLocaleString()}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteFeedback(entry.id)}
+                    className="rounded bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Pill tone={entry.trustScore >= 4 ? 'emerald' : 'amber'}>Trust {entry.trustScore}/5</Pill>
+                  <Pill tone={entry.valueScore >= 4 ? 'emerald' : 'amber'}>Value {entry.valueScore}/5</Pill>
+                  <Pill tone={entry.wouldPay === 'Yes' ? 'emerald' : entry.wouldPay === 'No' ? 'red' : 'amber'}>Pay {entry.wouldPay}</Pill>
+                </div>
+                {entry.friction && <p className="mt-3 text-sm text-zinc-700"><span className="font-semibold">Friction:</span> {entry.friction}</p>}
+                {entry.notes && <p className="mt-2 text-sm text-zinc-600">{entry.notes}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
+        <div className="market-panel rounded-md p-4 space-y-3">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Trust Gates</h2>
+            <p className="text-sm text-zinc-600">These gates define whether the product is ready for the next batch of beta users.</p>
+          </div>
+          {gates.map((gate) => (
+            <PilotGate key={gate.key} {...gate} />
+          ))}
+        </div>
+
+        <div className="space-y-6">
+          <div className="market-panel rounded-md p-4">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Success Questions</h2>
+            <div className="mt-4 space-y-3">
+              {betaQuestions.map((question, index) => (
+                <div key={question} className="flex gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+                  <span className="font-display font-bold text-zinc-900">{index + 1}</span>
+                  <span>{question}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="market-panel rounded-md p-4">
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Current Evidence</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Trading mode</span>
+                <span className="font-semibold text-zinc-900">{startupHealth?.trading?.trading_mode || 'unknown'}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Broker provider</span>
+                <span className="font-semibold text-zinc-900">{startupHealth?.trading?.broker_provider || 'unknown'}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Actionable signals</span>
+                <span className="font-semibold text-zinc-900">{actionableSignals.length}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Portfolio holdings</span>
+                <span className="font-semibold text-zinc-900">{portfolio.length}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Filled notional</span>
+                <span className="font-semibold text-zinc-900">{orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Bridge alerts</span>
+                <span className={`font-semibold ${bridgeErrors > 0 ? 'text-red-700' : 'text-zinc-900'}`}>{bridgeAlerts.length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="market-panel rounded-md p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">14-Day Operating Plan</h2>
+            <p className="text-sm text-zinc-600">Do these in order. Resist broad feature work until the pilot answers the trust questions.</p>
+          </div>
+          <Pill tone="sky">Pilot script</Pill>
+        </div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {weeklyPlan.map((item) => (
+            <div key={item.label} className="rounded-md border border-zinc-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">{item.label}</p>
+              <h3 className="mt-2 font-display font-bold text-zinc-900 uppercase">{item.title}</h3>
+              <p className="mt-2 text-sm text-zinc-600">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

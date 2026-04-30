@@ -271,6 +271,18 @@ The verification helper creates a temporary user, resolves that user's real `id`
 
 ## 🚢 Production Setup (1-4)
 
+## 🎯 Current Success Milestone: 14-Day Trust Pilot
+
+The next product milestone is not more feature breadth. It is proving one complete, trustworthy paper-trading workflow with 5-10 beta users:
+
+1. Connect paper broker or MT5 demo setup.
+2. Review AI signals with rationale, confidence, entry, stop, target, and risk.
+3. Execute only tiny paper trades with risk limits enabled.
+4. Track orders, blocked decisions, fills, and portfolio movement.
+5. Interview users after repeated use and turn trust gaps into the next milestone.
+
+The app includes a protected `/app/pilot` page for this loop. Use it during beta sessions to track readiness gates, paper-order evidence, bridge alerts, feedback scores, willingness to pay, and the 14-day operating plan. Every pilot session should end with one saved feedback entry while the user's reaction is still fresh.
+
 ### 1) Enable real paper broker/data (Alpaca)
 - Set in backend env:
   - `TRADING_MODE=paper`

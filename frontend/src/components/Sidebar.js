@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
   { path: '/app', label: 'Dashboard', icon: '📊' },
+  { path: '/app/pilot', label: '14-Day Pilot', icon: '14' },
   { path: '/app/connect', label: 'Connection Center', icon: '🛰️' },
   { path: '/app/notifications', label: 'Notifications', icon: '🔔' },
   { path: '/app/markets', label: 'Markets', icon: '💹' },
@@ -28,7 +29,7 @@ export default function Sidebar({ isOpen, unreadNotifications = 0 }) {
                   : 'text-zinc-700 hover:bg-zinc-100'
               }`}
             >
-              <span className="text-xl">{item.icon}</span>
+              <span className="text-xl min-w-6 text-center">{item.icon}</span>
               <span className="font-medium">{item.label}</span>
               {item.path === '/app/notifications' && unreadNotifications > 0 && (
                 <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-zinc-950">
