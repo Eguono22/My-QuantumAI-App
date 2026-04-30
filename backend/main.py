@@ -5,7 +5,7 @@ import logging
 import httpx
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing
+from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
 from config.settings import settings
@@ -34,6 +34,7 @@ app.include_router(portfolio.router)
 app.include_router(monitoring.router)
 app.include_router(mql5.router)
 app.include_router(billing.router)
+app.include_router(pilot.router)
 
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):

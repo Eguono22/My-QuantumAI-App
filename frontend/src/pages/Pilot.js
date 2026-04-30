@@ -121,6 +121,21 @@ function getFeedbackStats(entries) {
   };
 }
 
+function normalizeFeedbackEntry(entry) {
+  return {
+    id: entry.id,
+    participant: entry.participant,
+    segment: entry.segment,
+    trustScore: Number(entry.trust_score ?? entry.trustScore ?? 0),
+    valueScore: Number(entry.value_score ?? entry.valueScore ?? 0),
+    wouldPay: entry.would_pay ?? entry.wouldPay ?? 'Maybe',
+    friction: entry.friction || '',
+    notes: entry.notes || '',
+    createdAt: entry.created_at ?? entry.createdAt ?? new Date().toISOString(),
+    persisted: Boolean(entry.id && typeof entry.id === 'number'),
+  };
+}
+
 function Pill({ tone = 'zinc', children }) {
   const tones = {
     emerald: 'bg-emerald-100 text-emerald-800',
@@ -181,6 +196,7 @@ export default function Pilot() {
   const [pilotStart, setPilotStart] = useState(localStorage.getItem(PILOT_START_KEY));
   const [feedbackEntries, setFeedbackEntries] = useState(loadStoredFeedback);
   const [feedbackForm, setFeedbackForm] = useState(initialFeedbackForm);
+  const [feedbackSyncState, setFeedbackSyncState] = useState('local');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -189,12 +205,13 @@ export default function Pilot() {
 
     const load = async () => {
       try {
-        const [health, bridge, signalData, orderData, portfolioData] = await Promise.all([
+        const [health, bridge, signalData, orderData, portfolioData, feedbackData] = await Promise.all([
           tradingService.getStartupHealth().catch(() => null),
           tradingService.getMql5Status().catch(() => null),
           tradingService.getSignals().catch(() => []),
           tradingService.getOrders().catch(() => []),
           tradingService.getPortfolio().catch(() => []),
+          tradingService.getPilotFeedback().catch(() => null),
         ]);
 
         if (!isMounted) return;
@@ -203,6 +220,14 @@ export default function Pilot() {
         setSignals(Array.isArray(signalData) ? signalData : []);
         setOrders(Array.isArray(orderData) ? orderData : []);
         setPortfolio(Array.isArray(portfolioData) ? portfolioData : []);
+        if (Array.isArray(feedbackData)) {
+          const normalizedFeedback = feedbackData.map(normalizeFeedbackEntry);
+          setFeedbackEntries(normalizedFeedback);
+          localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(normalizedFeedback));
+          setFeedbackSyncState('synced');
+        } else {
+          setFeedbackSyncState('local');
+        }
         setError('');
       } catch (err) {
         if (!isMounted) return;
@@ -235,27 +260,53 @@ export default function Pilot() {
     setFeedbackForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const saveFeedback = (event) => {
+  const saveFeedback = async (event) => {
     event.preventDefault();
     const participant = feedbackForm.participant.trim() || `Pilot user ${feedbackEntries.length + 1}`;
-    const entry = {
-      id: `feedback-${Date.now()}`,
+    const payload = {
       participant,
       segment: feedbackForm.segment,
-      trustScore: Number(feedbackForm.trustScore),
-      valueScore: Number(feedbackForm.valueScore),
-      wouldPay: feedbackForm.wouldPay,
+      trust_score: Number(feedbackForm.trustScore),
+      value_score: Number(feedbackForm.valueScore),
+      would_pay: feedbackForm.wouldPay,
       friction: feedbackForm.friction.trim(),
       notes: feedbackForm.notes.trim(),
-      createdAt: new Date().toISOString(),
     };
+    let entry;
+    try {
+      const saved = await tradingService.createPilotFeedback(payload);
+      entry = normalizeFeedbackEntry(saved);
+      setFeedbackSyncState('synced');
+    } catch (_err) {
+      entry = {
+        id: `feedback-${Date.now()}`,
+        participant,
+        segment: payload.segment,
+        trustScore: payload.trust_score,
+        valueScore: payload.value_score,
+        wouldPay: payload.would_pay,
+        friction: payload.friction,
+        notes: payload.notes,
+        createdAt: new Date().toISOString(),
+        persisted: false,
+      };
+      setFeedbackSyncState('local');
+    }
     const next = [entry, ...feedbackEntries].slice(0, 25);
     localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
     setFeedbackEntries(next);
     setFeedbackForm(initialFeedbackForm);
   };
 
-  const deleteFeedback = (id) => {
+  const deleteFeedback = async (id) => {
+    if (typeof id === 'number') {
+      try {
+        await tradingService.deletePilotFeedback(id);
+        setFeedbackSyncState('synced');
+      } catch (_err) {
+        setFeedbackSyncState('local');
+      }
+    }
     const next = feedbackEntries.filter((entry) => entry.id !== id);
     localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
     setFeedbackEntries(next);
@@ -381,7 +432,10 @@ export default function Pilot() {
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Feedback</h2>
               <p className="text-sm text-zinc-600">Log each pilot conversation while the product is still fresh in the user's mind.</p>
             </div>
-            <Pill tone={feedbackEntries.length >= 5 ? 'emerald' : 'amber'}>{feedbackEntries.length}/5 minimum</Pill>
+            <div className="flex gap-2">
+              <Pill tone={feedbackSyncState === 'synced' ? 'emerald' : 'amber'}>{feedbackSyncState === 'synced' ? 'Synced' : 'Local'}</Pill>
+              <Pill tone={feedbackEntries.length >= 5 ? 'emerald' : 'amber'}>{feedbackEntries.length}/5 minimum</Pill>
+            </div>
           </div>
 
           <form onSubmit={saveFeedback} className="mt-4 space-y-3">
@@ -508,7 +562,7 @@ export default function Pilot() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-zinc-900">{entry.participant}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{entry.segment} | {new Date(entry.createdAt).toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{entry.segment} | {new Date(entry.createdAt).toLocaleString()} | {entry.persisted ? 'synced' : 'local'}</p>
                   </div>
                   <button
                     type="button"

@@ -346,6 +346,18 @@ class NotificationDeliveryLogResponse(BaseModel):
     created_at: str
 
 
+class PilotFeedbackResponse(BaseModel):
+    id: int
+    participant: str
+    segment: str
+    trust_score: int
+    value_score: int
+    would_pay: str
+    friction: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str
+
+
 class MQL5BridgeStatusResponse(BaseModel):
     enabled: bool
     bridge_ready: bool

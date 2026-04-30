@@ -27,6 +27,7 @@ class User(Base):
     notification_preferences = relationship("UserNotificationPreference", back_populates="user", uselist=False)
     notification_deliveries = relationship("NotificationDeliveryLog", back_populates="user")
     billing_customer = relationship("BillingCustomer", back_populates="user", uselist=False)
+    pilot_feedback = relationship("PilotFeedback", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -171,6 +172,21 @@ class NotificationDeliveryLog(Base):
     reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     user = relationship("User", back_populates="notification_deliveries")
+
+
+class PilotFeedback(Base):
+    __tablename__ = "pilot_feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    participant = Column(String, nullable=False)
+    segment = Column(String, nullable=False, default="MT5 trader")
+    trust_score = Column(Integer, nullable=False)
+    value_score = Column(Integer, nullable=False)
+    would_pay = Column(String, nullable=False, default="Maybe")
+    friction = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    user = relationship("User", back_populates="pilot_feedback")
 
 
 class BillingCustomer(Base):

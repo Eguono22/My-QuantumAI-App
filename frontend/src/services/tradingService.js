@@ -123,4 +123,16 @@ export const tradingService = {
     const response = await api.post('/billing/portal-session', {});
     return response.data;
   },
+  getPilotFeedback: async () => {
+    const response = await api.get('/pilot/feedback');
+    return response.data;
+  },
+  createPilotFeedback: async (payload) => {
+    const response = await api.post('/pilot/feedback', payload);
+    return response.data;
+  },
+  deletePilotFeedback: async (feedbackId) => {
+    const response = await api.delete(`/pilot/feedback/${feedbackId}`);
+    return response.data;
+  },
 };

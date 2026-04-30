@@ -283,6 +283,11 @@ The next product milestone is not more feature breadth. It is proving one comple
 
 The app includes a protected `/app/pilot` page for this loop. Use it during beta sessions to track readiness gates, paper-order evidence, bridge alerts, feedback scores, willingness to pay, and the 14-day operating plan. Every pilot session should end with one saved feedback entry while the user's reaction is still fresh.
 
+Pilot feedback is persisted per authenticated user through:
+- `GET /pilot/feedback`
+- `POST /pilot/feedback`
+- `DELETE /pilot/feedback/{feedback_id}`
+
 ### 1) Enable real paper broker/data (Alpaca)
 - Set in backend env:
   - `TRADING_MODE=paper`
