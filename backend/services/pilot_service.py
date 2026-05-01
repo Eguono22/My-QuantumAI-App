@@ -12,6 +12,7 @@ class PilotFeedbackService:
     def _format_feedback(self, feedback: PilotFeedback) -> Dict:
         return {
             "id": feedback.id,
+            "candidate_id": feedback.candidate_id,
             "participant": feedback.participant,
             "segment": feedback.segment,
             "trust_score": feedback.trust_score,
@@ -142,6 +143,7 @@ class PilotFeedbackService:
         trust_score: int,
         value_score: int,
         would_pay: str,
+        candidate_id: Optional[int] = None,
         friction: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> Dict:
@@ -160,8 +162,20 @@ class PilotFeedbackService:
         if would_pay not in {"Yes", "Maybe", "No"}:
             raise ValueError("Would pay must be Yes, Maybe, or No")
 
+        candidate = None
+        if candidate_id is not None:
+            candidate = (
+                db.query(PilotCandidate)
+                .filter(PilotCandidate.id == candidate_id, PilotCandidate.user_id == user_id)
+                .first()
+            )
+            if not candidate:
+                raise ValueError("Pilot candidate not found")
+
+        now = datetime.now(timezone.utc)
         feedback = PilotFeedback(
             user_id=user_id,
+            candidate_id=candidate.id if candidate else None,
             participant=participant[:120],
             segment=segment[:80],
             trust_score=int(trust_score),
@@ -169,9 +183,12 @@ class PilotFeedbackService:
             would_pay=would_pay,
             friction=friction[:500] if friction else None,
             notes=notes[:2000] if notes else None,
-            created_at=datetime.now(timezone.utc),
+            created_at=now,
         )
         db.add(feedback)
+        if candidate:
+            candidate.status = "COMPLETED"
+            candidate.updated_at = now
         db.commit()
         db.refresh(feedback)
         return self._format_feedback(feedback)

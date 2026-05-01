@@ -100,6 +100,35 @@ def test_create_update_and_delete_pilot_candidate():
     db.close()
 
 
+def test_feedback_can_complete_linked_candidate():
+    db = make_db()
+    user = create_user(db)
+    candidate = pilot_feedback_service.create_candidate(
+        db=db,
+        user_id=user.id,
+        name="Linked Trader",
+        segment="MT5 trader",
+        status="SCHEDULED",
+    )
+
+    feedback = pilot_feedback_service.create_feedback(
+        db=db,
+        user_id=user.id,
+        candidate_id=candidate["id"],
+        participant="Linked Trader",
+        segment="MT5 trader",
+        trust_score=5,
+        value_score=4,
+        would_pay="Yes",
+    )
+
+    assert feedback["candidate_id"] == candidate["id"]
+    updated_candidate = pilot_feedback_service.list_candidates(db, user.id)[0]
+    assert updated_candidate["status"] == "COMPLETED"
+
+    db.close()
+
+
 def test_pilot_candidate_validation_and_user_scope():
     db = make_db()
     user_a = create_user(db, "candidatea", "candidatea@example.com")

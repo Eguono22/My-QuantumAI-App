@@ -179,6 +179,7 @@ class PilotFeedback(Base):
     __tablename__ = "pilot_feedback"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    candidate_id = Column(Integer, ForeignKey("pilot_candidates.id"), nullable=True, index=True)
     participant = Column(String, nullable=False)
     segment = Column(String, nullable=False, default="MT5 trader")
     trust_score = Column(Integer, nullable=False)
@@ -188,6 +189,7 @@ class PilotFeedback(Base):
     notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     user = relationship("User", back_populates="pilot_feedback")
+    candidate = relationship("PilotCandidate", back_populates="feedback_entries")
 
 
 class PilotCandidate(Base):
@@ -202,6 +204,7 @@ class PilotCandidate(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="pilot_candidates")
+    feedback_entries = relationship("PilotFeedback", back_populates="candidate")
 
 
 class BillingCustomer(Base):

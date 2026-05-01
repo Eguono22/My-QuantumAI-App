@@ -13,6 +13,7 @@ router = APIRouter(prefix="/pilot", tags=["pilot"])
 
 
 class PilotFeedbackCreateRequest(BaseModel):
+    candidate_id: Optional[int] = None
     participant: str
     segment: str = "MT5 trader"
     trust_score: int
@@ -127,6 +128,7 @@ def create_pilot_feedback(
             trust_score=request.trust_score,
             value_score=request.value_score,
             would_pay=request.would_pay,
+            candidate_id=request.candidate_id,
             friction=request.friction,
             notes=request.notes,
         )

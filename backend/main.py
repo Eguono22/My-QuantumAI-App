@@ -5,6 +5,7 @@ import logging
 import httpx
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
@@ -18,6 +19,7 @@ app = FastAPI(
 )
 APP_STARTED_AT = time.time()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("quantumai.startup")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,12 +45,28 @@ async def websocket_route(websocket: WebSocket):
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    ensure_sqlite_schema_compat()
     notification_scheduler.start()
 
 
 @app.on_event("shutdown")
 def shutdown():
     notification_scheduler.stop()
+
+
+def ensure_sqlite_schema_compat():
+    if "sqlite" not in settings.DATABASE_URL:
+        return
+    try:
+        with engine.begin() as conn:
+            pilot_feedback_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(pilot_feedback)")).fetchall()
+            }
+            if pilot_feedback_columns and "candidate_id" not in pilot_feedback_columns:
+                conn.execute(text("ALTER TABLE pilot_feedback ADD COLUMN candidate_id INTEGER"))
+                logger.info("Added missing pilot_feedback.candidate_id column")
+    except Exception:
+        logger.exception("Failed to apply SQLite schema compatibility checks")
 
 @app.get("/")
 def root():

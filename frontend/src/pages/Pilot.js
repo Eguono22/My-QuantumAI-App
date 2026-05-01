@@ -8,6 +8,7 @@ const PILOT_START_KEY = 'quantumai_pilot_started_at';
 const PILOT_FEEDBACK_KEY = 'quantumai_pilot_feedback';
 
 const initialFeedbackForm = {
+  candidateId: '',
   participant: '',
   segment: 'MT5 trader',
   trustScore: '3',
@@ -149,6 +150,7 @@ function getFeedbackStats(entries) {
 function normalizeFeedbackEntry(entry) {
   return {
     id: entry.id,
+    candidateId: entry.candidate_id ?? entry.candidateId ?? null,
     participant: entry.participant,
     segment: entry.segment,
     trustScore: Number(entry.trust_score ?? entry.trustScore ?? 0),
@@ -430,6 +432,16 @@ export default function Pilot() {
     setFeedbackForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const selectFeedbackCandidate = (candidateId) => {
+    const candidate = candidates.find((item) => String(item.id) === String(candidateId));
+    setFeedbackForm((prev) => ({
+      ...prev,
+      candidateId,
+      participant: candidate ? candidate.name : prev.participant,
+      segment: candidate ? candidate.segment : prev.segment,
+    }));
+  };
+
   const updateCandidateForm = (key, value) => {
     setCandidateForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -478,6 +490,7 @@ export default function Pilot() {
     event.preventDefault();
     const participant = feedbackForm.participant.trim() || `Pilot user ${feedbackEntries.length + 1}`;
     const payload = {
+      candidate_id: feedbackForm.candidateId ? Number(feedbackForm.candidateId) : undefined,
       participant,
       segment: feedbackForm.segment,
       trust_score: Number(feedbackForm.trustScore),
@@ -491,6 +504,13 @@ export default function Pilot() {
       const saved = await tradingService.createPilotFeedback(payload);
       entry = normalizeFeedbackEntry(saved);
       setFeedbackSyncState('synced');
+      if (payload.candidate_id) {
+        setCandidates((prev) => prev.map((candidate) => (
+          candidate.id === payload.candidate_id
+            ? { ...candidate, status: 'COMPLETED', updatedAt: new Date().toISOString() }
+            : candidate
+        )));
+      }
     } catch (_err) {
       entry = {
         id: `feedback-${Date.now()}`,
@@ -531,6 +551,7 @@ export default function Pilot() {
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
+  const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
   const actionableSignals = signals.filter((signal) => signal.signal_type && signal.signal_type !== 'HOLD');
   const bridgeAlerts = mql5Status?.alerts || [];
   const bridgeErrors = bridgeAlerts.filter((alert) => alert.severity === 'ERROR').length;
@@ -876,6 +897,21 @@ export default function Pilot() {
           </div>
 
           <form onSubmit={saveFeedback} className="mt-4 space-y-3">
+            <label className="block text-sm font-medium text-zinc-700">
+              Linked Candidate
+              <select
+                value={feedbackForm.candidateId}
+                onChange={(event) => selectFeedbackCandidate(event.target.value)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+              >
+                <option value="">No linked candidate</option>
+                {feedbackCandidateOptions.map((candidate) => (
+                  <option key={`feedback-candidate-${candidate.id}`} value={candidate.id}>
+                    {candidate.name} - {candidate.status.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="text-sm font-medium text-zinc-700">
                 Participant
@@ -1035,6 +1071,7 @@ export default function Pilot() {
                   <Pill tone={entry.trustScore >= 4 ? 'emerald' : 'amber'}>Trust {entry.trustScore}/5</Pill>
                   <Pill tone={entry.valueScore >= 4 ? 'emerald' : 'amber'}>Value {entry.valueScore}/5</Pill>
                   <Pill tone={entry.wouldPay === 'Yes' ? 'emerald' : entry.wouldPay === 'No' ? 'red' : 'amber'}>Pay {entry.wouldPay}</Pill>
+                  {entry.candidateId && <Pill tone="sky">Candidate linked</Pill>}
                 </div>
                 {entry.friction && <p className="mt-3 text-sm text-zinc-700"><span className="font-semibold">Friction:</span> {entry.friction}</p>}
                 {entry.notes && <p className="mt-2 text-sm text-zinc-600">{entry.notes}</p>}

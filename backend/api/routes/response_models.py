@@ -348,6 +348,7 @@ class NotificationDeliveryLogResponse(BaseModel):
 
 class PilotFeedbackResponse(BaseModel):
     id: int
+    candidate_id: Optional[int] = None
     participant: str
     segment: str
     trust_score: int
