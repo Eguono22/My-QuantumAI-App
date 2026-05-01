@@ -283,6 +283,7 @@ The next product milestone is not more feature breadth. It is proving one comple
 
 The app includes a protected `/app/pilot` page for this loop. Use it during beta sessions to track readiness gates, paper-order evidence, bridge alerts, feedback scores, willingness to pay, and the 14-day operating plan. Every pilot session should end with one saved feedback entry while the user's reaction is still fresh.
 The same page includes a beta candidate pipeline, repeatable session script, expansion criteria, and a generated pilot report for batch review. Feedback can be linked to a candidate so completed interviews close the invite loop automatically.
+Use `docs/beta-session-sprint.md` for the first 5-session outreach and interview sprint.
 
 Pilot feedback is persisted per authenticated user through:
 - `GET /pilot/candidates`
