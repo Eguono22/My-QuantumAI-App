@@ -63,3 +63,6 @@ Thumbs.db
 .docker/
 .vercel
 .env*.local
+
+# Local MT5 bridge presets with private secrets
+/scripts/mql5/*.local.set

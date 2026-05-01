@@ -303,6 +303,7 @@ class TestTradingService:
         )
         assert terminal["terminal_id"] == "mt5-terminal-001"
         status = self.mql5.get_bridge_status(db, user_id=user.id)
+        assert status["current_user_id"] == user.id
         assert status["terminal_count"] == 1
         assert status["terminals"][0]["symbols"] == ["EURUSD", "BTC"]
         assert len(status["recent_events"]) >= 1

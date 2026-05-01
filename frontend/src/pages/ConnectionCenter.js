@@ -5,6 +5,8 @@ import Mql5BridgePanel from '../components/Mql5BridgePanel';
 import { tradingService } from '../services/tradingService';
 import { API_BASE_URL } from '../utils/constants';
 
+const productionBridgeBaseUrl = 'https://my-quantum-ai-app.vercel.app/api';
+
 const checklistLabels = {
   backendHealthy: 'Backend API reachable',
   brokerReady: 'Trading backend ready',
@@ -464,19 +466,20 @@ export default function ConnectionCenter() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="market-panel-soft rounded-md p-4 border border-zinc-200">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">1. Backend</p>
-              <p className="mt-2 text-zinc-800 font-medium">Run the local backend on port `8011`.</p>
-              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-md px-3 py-2 overflow-x-auto">.\scripts\start_backend_local.ps1 -Port 8011</code>
+              <p className="text-xs uppercase tracking-wide text-zinc-500">1. API Base URL</p>
+              <p className="mt-2 text-zinc-800 font-medium">Use the production API URL in the EA inputs.</p>
+              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-md px-3 py-2 overflow-x-auto">{productionBridgeBaseUrl}</code>
             </div>
             <div className="market-panel-soft rounded-md p-4 border border-zinc-200">
               <p className="text-xs uppercase tracking-wide text-zinc-500">2. MT5 URL</p>
-              <p className="mt-2 text-zinc-800 font-medium">Allow `http://127.0.0.1:8011` in MT5 WebRequest settings.</p>
+              <p className="mt-2 text-zinc-800 font-medium">Allow the app origin in MT5 WebRequest settings.</p>
+              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-md px-3 py-2 overflow-x-auto">https://my-quantum-ai-app.vercel.app</code>
               <p className="mt-3 text-xs text-zinc-500">Tools → Options → Expert Advisors</p>
             </div>
             <div className="market-panel-soft rounded-md p-4 border border-zinc-200">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">3. EA Preset</p>
-              <p className="mt-2 text-zinc-800 font-medium">Load the local preset in MT5.</p>
-              <p className="mt-3 text-xs text-zinc-500">`scripts/mql5/QuantumAI_Bridge_Local_8011.set`</p>
+              <p className="text-xs uppercase tracking-wide text-zinc-500">3. EA Inputs</p>
+              <p className="mt-2 text-zinc-800 font-medium">Set your bridge secret and user id in the MT5 EA.</p>
+              <p className="mt-3 text-xs text-zinc-500">QuantumUserId: {mql5Status?.current_user_id || 'sign in first'}</p>
             </div>
             <div className="market-panel-soft rounded-md p-4 border border-zinc-200">
               <p className="text-xs uppercase tracking-wide text-zinc-500">4. Safety Mode</p>
@@ -486,7 +489,7 @@ export default function ConnectionCenter() {
           </div>
 
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            The bridge secret is intentionally not shown in the UI. Keep using the value stored in your local MT5 preset and backend `.env`.
+            The bridge secret is intentionally not shown in the UI. Use the `MQL5_SHARED_SECRET` value configured in Vercel production.
           </div>
         </div>
       </div>

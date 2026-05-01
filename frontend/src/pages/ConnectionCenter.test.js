@@ -41,6 +41,7 @@ describe('ConnectionCenter', () => {
       enabled: true,
       bridge_ready: true,
       shared_secret_configured: true,
+      current_user_id: 42,
       terminal_count: 0,
       active_terminals: 0,
       max_auto_notional: 10000,
@@ -67,6 +68,7 @@ describe('ConnectionCenter', () => {
     expect(screen.getByText('Healthy')).toBeInTheDocument();
     expect(screen.getAllByText('Analyze Only').length).toBeGreaterThan(0);
     expect(screen.getByText('Bridge is configured, terminal heartbeat pending')).toBeInTheDocument();
+    expect(screen.getByText('QuantumUserId: 42')).toBeInTheDocument();
     expect(screen.getAllByText('Ready').length).toBeGreaterThan(0);
     expect(screen.getByText('MQL5 Bridge Panel')).toBeInTheDocument();
   });
@@ -76,6 +78,7 @@ describe('ConnectionCenter', () => {
       enabled: true,
       bridge_ready: true,
       shared_secret_configured: true,
+      current_user_id: 42,
       terminal_count: 1,
       active_terminals: 1,
       max_auto_notional: 10000,

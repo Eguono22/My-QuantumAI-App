@@ -520,6 +520,7 @@ class MQL5BridgeService:
             "enabled": bool(settings.MQL5_BRIDGE_ENABLED),
             "bridge_ready": bool(settings.MQL5_BRIDGE_ENABLED and settings.MQL5_SHARED_SECRET),
             "shared_secret_configured": bool(settings.MQL5_SHARED_SECRET),
+            "current_user_id": user_id,
             "default_confidence_threshold": float(settings.MQL5_DEFAULT_CONFIDENCE_THRESHOLD),
             "default_risk_percent": float(settings.MQL5_DEFAULT_RISK_PERCENT),
             "default_order_quantity": float(settings.MQL5_DEFAULT_ORDER_QUANTITY),

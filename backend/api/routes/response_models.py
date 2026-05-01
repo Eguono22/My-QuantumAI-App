@@ -400,6 +400,7 @@ class MQL5BridgeStatusResponse(BaseModel):
     enabled: bool
     bridge_ready: bool
     shared_secret_configured: bool
+    current_user_id: Optional[int] = None
     default_confidence_threshold: float
     default_risk_percent: float
     default_order_quantity: float
