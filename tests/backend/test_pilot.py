@@ -62,6 +62,64 @@ def test_create_and_list_pilot_feedback():
     db.close()
 
 
+def test_create_update_and_delete_pilot_candidate():
+    db = make_db()
+    user = create_user(db)
+
+    created = pilot_feedback_service.create_candidate(
+        db=db,
+        user_id=user.id,
+        name="Beta Trader",
+        segment="MT5 trader",
+        source="Telegram",
+        status="INVITED",
+        notes="Uses MT5 daily.",
+    )
+
+    assert created["id"] is not None
+    assert created["name"] == "Beta Trader"
+    assert created["status"] == "INVITED"
+
+    candidates = pilot_feedback_service.list_candidates(db, user.id)
+    assert len(candidates) == 1
+
+    updated = pilot_feedback_service.update_candidate_status(
+        db=db,
+        user_id=user.id,
+        candidate_id=created["id"],
+        status="SCHEDULED",
+        notes="Call booked.",
+    )
+    assert updated["status"] == "SCHEDULED"
+    assert updated["notes"] == "Call booked."
+
+    deleted = pilot_feedback_service.delete_candidate(db, user.id, created["id"])
+    assert deleted["success"] is True
+    assert pilot_feedback_service.list_candidates(db, user.id) == []
+
+    db.close()
+
+
+def test_pilot_candidate_validation_and_user_scope():
+    db = make_db()
+    user_a = create_user(db, "candidatea", "candidatea@example.com")
+    user_b = create_user(db, "candidateb", "candidateb@example.com")
+
+    with pytest.raises(ValueError, match="Candidate name"):
+        pilot_feedback_service.create_candidate(db, user_a.id, name="", status="INVITED")
+
+    with pytest.raises(ValueError, match="Candidate status"):
+        pilot_feedback_service.create_candidate(db, user_a.id, name="Trader", status="UNKNOWN")
+
+    created = pilot_feedback_service.create_candidate(db, user_a.id, name="Trader", status="INVITED")
+    assert pilot_feedback_service.list_candidates(db, user_b.id) == []
+
+    with pytest.raises(ValueError, match="not found"):
+        pilot_feedback_service.update_candidate_status(db, user_b.id, created["id"], "COMPLETED")
+
+    db.close()
+
+
 def test_pilot_feedback_is_scoped_to_user():
     db = make_db()
     user_a = create_user(db, "pilota", "pilota@example.com")

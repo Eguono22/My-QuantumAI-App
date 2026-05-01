@@ -17,6 +17,15 @@ const initialFeedbackForm = {
   notes: '',
 };
 
+const initialCandidateForm = {
+  name: '',
+  segment: 'MT5 trader',
+  source: '',
+  notes: '',
+};
+
+const candidateStatuses = ['INVITED', 'SCHEDULED', 'COMPLETED', 'DECLINED'];
+
 const betaQuestions = [
   'Can a trader connect their paper setup without help?',
   'Can they understand why a signal exists before placing a trade?',
@@ -46,6 +55,22 @@ const weeklyPlan = [
     title: 'Decide what to double down on',
     detail: 'Interview pilot users and convert the clearest trust gaps into the next product milestone.',
   },
+];
+
+const sessionChecklist = [
+  'Confirm the trader can explain their current signal review workflow.',
+  'Ask them to connect or inspect the paper setup without taking over.',
+  'Have them review one AI signal and say what they trust or distrust.',
+  'Have them inspect risk limits before considering any paper order.',
+  'End by asking what would make this worth paying for.',
+];
+
+const exitCriteria = [
+  '5+ feedback entries logged',
+  'Average trust score is 4.0 or higher',
+  'Average value score is 4.0 or higher',
+  '40%+ of users answer Yes on willingness to pay',
+  'No unresolved blocker in setup, signal clarity, or risk explanation',
 ];
 
 function daysBetween(startDate, nowDate) {
@@ -136,6 +161,26 @@ function normalizeFeedbackEntry(entry) {
   };
 }
 
+function normalizeCandidate(candidate) {
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    segment: candidate.segment,
+    source: candidate.source || '',
+    status: candidate.status || 'INVITED',
+    notes: candidate.notes || '',
+    createdAt: candidate.created_at || candidate.createdAt || new Date().toISOString(),
+    updatedAt: candidate.updated_at || candidate.updatedAt || new Date().toISOString(),
+  };
+}
+
+function getCandidateStats(candidates) {
+  return candidateStatuses.reduce((acc, status) => ({
+    ...acc,
+    [status]: candidates.filter((candidate) => candidate.status === status).length,
+  }), {});
+}
+
 function buildLocalSummary(entries) {
   const stats = getFeedbackStats(entries);
   const total = entries.length;
@@ -196,6 +241,62 @@ function buildLocalSummary(entries) {
   };
 }
 
+function buildPilotReport({
+  currentDay,
+  gateProgress,
+  orderStats,
+  orders,
+  candidateStats,
+  candidates,
+  feedbackSummary,
+  recommendation,
+}) {
+  const segments = feedbackSummary?.top_segments?.length
+    ? feedbackSummary.top_segments.map((item) => `${item.segment} (${item.count})`).join(', ')
+    : 'None yet';
+  const frictions = feedbackSummary?.recent_frictions?.length
+    ? feedbackSummary.recent_frictions.map((item) => `- ${item}`).join('\n')
+    : '- None logged yet';
+
+  return [
+    '# QuantumAI 14-Day Trust Pilot Report',
+    '',
+    `Generated: ${new Date().toLocaleString()}`,
+    `Pilot day: ${currentDay || 'Not started'} / ${PILOT_LENGTH_DAYS}`,
+    `Trust gate readiness: ${gateProgress}%`,
+    '',
+    '## Candidate Pipeline',
+    `Candidates: ${candidates.length}`,
+    `Invited: ${candidateStats.INVITED || 0}`,
+    `Scheduled: ${candidateStats.SCHEDULED || 0}`,
+    `Completed: ${candidateStats.COMPLETED || 0}`,
+    `Declined: ${candidateStats.DECLINED || 0}`,
+    '',
+    '## Feedback',
+    `Entries: ${feedbackSummary?.total_feedback || 0}`,
+    `Average trust: ${Number(feedbackSummary?.avg_trust_score || 0).toFixed(1)} / 5`,
+    `Average value: ${Number(feedbackSummary?.avg_value_score || 0).toFixed(1)} / 5`,
+    `Willingness to pay: ${feedbackSummary?.would_pay_yes || 0} yes, ${feedbackSummary?.would_pay_maybe || 0} maybe, ${feedbackSummary?.would_pay_no || 0} no`,
+    `Yes rate: ${Number(feedbackSummary?.yes_rate_pct || 0).toFixed(0)}%`,
+    `Strongest segments: ${segments}`,
+    '',
+    '## Execution Evidence',
+    `Orders recorded: ${orders.length}`,
+    `Filled: ${orderStats.filled}`,
+    `Pending: ${orderStats.pending}`,
+    `Rejected: ${orderStats.rejected}`,
+    `Filled notional: ${orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+    '',
+    '## Recommendation',
+    `${recommendation.label}: ${recommendation.title}`,
+    recommendation.message,
+    `Next action: ${recommendation.next_action}`,
+    '',
+    '## Recent Frictions',
+    frictions,
+  ].join('\n');
+}
+
 function Pill({ tone = 'zinc', children }) {
   const tones = {
     emerald: 'bg-emerald-100 text-emerald-800',
@@ -253,11 +354,14 @@ export default function Pilot() {
   const [signals, setSignals] = useState([]);
   const [orders, setOrders] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
+  const [candidates, setCandidates] = useState([]);
   const [pilotStart, setPilotStart] = useState(localStorage.getItem(PILOT_START_KEY));
   const [feedbackEntries, setFeedbackEntries] = useState(loadStoredFeedback);
   const [feedbackSummary, setFeedbackSummary] = useState(() => buildLocalSummary(loadStoredFeedback()));
   const [feedbackForm, setFeedbackForm] = useState(initialFeedbackForm);
+  const [candidateForm, setCandidateForm] = useState(initialCandidateForm);
   const [feedbackSyncState, setFeedbackSyncState] = useState('local');
+  const [reportCopied, setReportCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -266,7 +370,7 @@ export default function Pilot() {
 
     const load = async () => {
       try {
-        const [health, bridge, signalData, orderData, portfolioData, feedbackData, feedbackSummaryData] = await Promise.all([
+        const [health, bridge, signalData, orderData, portfolioData, feedbackData, feedbackSummaryData, candidateData] = await Promise.all([
           tradingService.getStartupHealth().catch(() => null),
           tradingService.getMql5Status().catch(() => null),
           tradingService.getSignals().catch(() => []),
@@ -274,6 +378,7 @@ export default function Pilot() {
           tradingService.getPortfolio().catch(() => []),
           tradingService.getPilotFeedback().catch(() => null),
           tradingService.getPilotFeedbackSummary().catch(() => null),
+          tradingService.getPilotCandidates().catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -282,6 +387,7 @@ export default function Pilot() {
         setSignals(Array.isArray(signalData) ? signalData : []);
         setOrders(Array.isArray(orderData) ? orderData : []);
         setPortfolio(Array.isArray(portfolioData) ? portfolioData : []);
+        setCandidates(Array.isArray(candidateData) ? candidateData.map(normalizeCandidate) : []);
         if (Array.isArray(feedbackData)) {
           const normalizedFeedback = feedbackData.map(normalizeFeedbackEntry);
           setFeedbackEntries(normalizedFeedback);
@@ -322,6 +428,50 @@ export default function Pilot() {
 
   const updateFeedbackForm = (key, value) => {
     setFeedbackForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateCandidateForm = (key, value) => {
+    setCandidateForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const saveCandidate = async (event) => {
+    event.preventDefault();
+    const payload = {
+      name: candidateForm.name.trim(),
+      segment: candidateForm.segment,
+      source: candidateForm.source.trim(),
+      notes: candidateForm.notes.trim(),
+      status: 'INVITED',
+    };
+    if (!payload.name) return;
+    try {
+      const created = await tradingService.createPilotCandidate(payload);
+      setCandidates((prev) => [normalizeCandidate(created), ...prev]);
+      setCandidateForm(initialCandidateForm);
+    } catch (_err) {
+      // Keep the form intact so the operator can retry.
+    }
+  };
+
+  const updateCandidateStatus = async (candidate, status) => {
+    try {
+      const updated = await tradingService.updatePilotCandidateStatus(candidate.id, {
+        status,
+        notes: candidate.notes,
+      });
+      setCandidates((prev) => prev.map((item) => (item.id === candidate.id ? normalizeCandidate(updated) : item)));
+    } catch (_err) {
+      // Status updates are intentionally no-op on transient API errors.
+    }
+  };
+
+  const deleteCandidate = async (id) => {
+    try {
+      await tradingService.deletePilotCandidate(id);
+      setCandidates((prev) => prev.filter((candidate) => candidate.id !== id));
+    } catch (_err) {
+      // Leave the row visible if delete fails.
+    }
   };
 
   const saveFeedback = async (event) => {
@@ -380,6 +530,7 @@ export default function Pilot() {
 
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
+  const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const actionableSignals = signals.filter((signal) => signal.signal_type && signal.signal_type !== 'HOLD');
   const bridgeAlerts = mql5Status?.alerts || [];
   const bridgeErrors = bridgeAlerts.filter((alert) => alert.severity === 'ERROR').length;
@@ -440,6 +591,26 @@ export default function Pilot() {
       : recommendation.tone === 'sky'
         ? 'border-sky-200 bg-sky-50 text-sky-900'
         : 'border-amber-200 bg-amber-50 text-amber-900';
+  const pilotReport = buildPilotReport({
+    currentDay,
+    gateProgress,
+    orderStats,
+    orders,
+    candidateStats,
+    candidates,
+    feedbackSummary,
+    recommendation,
+  });
+
+  const copyPilotReport = async () => {
+    try {
+      await navigator.clipboard.writeText(pilotReport);
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 1800);
+    } catch (_err) {
+      setReportCopied(false);
+    }
+  };
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -479,7 +650,7 @@ export default function Pilot() {
         <MetricCard label="Pilot Day" value={currentDay ? `${currentDay}/${PILOT_LENGTH_DAYS}` : 'Not started'} hint={`Started ${formatDate(pilotStart)}`} tone={currentDay ? 'emerald' : 'amber'} />
         <MetricCard label="Trust Gates" value={formatPercent(gateProgress)} hint={`${gates.filter((gate) => gate.complete).length}/${gates.length} proof points ready`} tone={gateProgress >= 80 ? 'emerald' : 'amber'} />
         <MetricCard label="Paper Orders" value={orders.length} hint={`${orderStats.filled} filled, ${orderStats.pending} pending, ${orderStats.rejected} rejected`} tone={orders.length > 0 ? 'sky' : 'zinc'} />
-        <MetricCard label="Beta Feedback" value={feedbackEntries.length} hint={`${feedbackStats.payYes} yes, ${feedbackStats.payMaybe} maybe, ${feedbackStats.payNo} no on willingness to pay`} tone={feedbackEntries.length >= 5 ? 'emerald' : 'amber'} />
+        <MetricCard label="Beta Pipeline" value={candidates.length} hint={`${candidateStats.SCHEDULED} scheduled, ${candidateStats.COMPLETED} completed`} tone={candidates.length >= 10 ? 'emerald' : 'amber'} />
       </div>
 
       <div className="market-panel rounded-md p-4">
@@ -520,6 +691,173 @@ export default function Pilot() {
               <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
               <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.yes_rate_pct || 0).toFixed(0)}%</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
+        <div className="market-panel rounded-md p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Session Kit</h2>
+              <p className="text-sm text-zinc-600">Run every interview the same way so the feedback is comparable.</p>
+            </div>
+            <Pill tone="sky">30 min</Pill>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {sessionChecklist.map((item, index) => (
+              <div key={item} className="flex gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+                <span className="font-display font-bold text-zinc-900">{index + 1}</span>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Expansion Criteria</p>
+            <div className="mt-2 space-y-2">
+              {exitCriteria.map((item) => (
+                <p key={item} className="text-sm text-zinc-700">{item}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="market-panel rounded-md p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Pilot Report</h2>
+              <p className="text-sm text-zinc-600">A compact batch summary for roadmap and beta decisions.</p>
+            </div>
+            <button
+              type="button"
+              onClick={copyPilotReport}
+              className="rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+            >
+              {reportCopied ? 'Copied' : 'Copy Report'}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={pilotReport}
+            className="mt-4 h-80 w-full rounded-md border border-zinc-300 bg-zinc-950 px-3 py-3 font-mono text-xs text-zinc-100"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
+        <div className="market-panel rounded-md p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Candidate Pipeline</h2>
+              <p className="text-sm text-zinc-600">Track who should be invited before the feedback exists.</p>
+            </div>
+            <Pill tone={candidateStats.SCHEDULED + candidateStats.COMPLETED >= 5 ? 'emerald' : 'amber'}>
+              {candidateStats.SCHEDULED + candidateStats.COMPLETED}/5 active
+            </Pill>
+          </div>
+
+          <form onSubmit={saveCandidate} className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="text-sm font-medium text-zinc-700">
+                Candidate
+                <input
+                  value={candidateForm.name}
+                  onChange={(event) => updateCandidateForm('name', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  placeholder="Name, handle, or account"
+                />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Segment
+                <select
+                  value={candidateForm.segment}
+                  onChange={(event) => updateCandidateForm('segment', event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                >
+                  <option>MT5 trader</option>
+                  <option>Alpaca paper trader</option>
+                  <option>Crypto trader</option>
+                  <option>Signal reviewer</option>
+                </select>
+              </label>
+            </div>
+            <label className="block text-sm font-medium text-zinc-700">
+              Source
+              <input
+                value={candidateForm.source}
+                onChange={(event) => updateCandidateForm('source', event.target.value)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                placeholder="Discord, Telegram, X, referral..."
+              />
+            </label>
+            <label className="block text-sm font-medium text-zinc-700">
+              Notes
+              <textarea
+                value={candidateForm.notes}
+                onChange={(event) => updateCandidateForm('notes', event.target.value)}
+                className="mt-1 min-h-20 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                placeholder="Why are they a useful pilot user?"
+              />
+            </label>
+            <button type="submit" className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+              Add Candidate
+            </button>
+          </form>
+        </div>
+
+        <div className="market-panel rounded-md p-4">
+          <div className="grid grid-cols-4 gap-2 text-center text-sm">
+            {candidateStatuses.map((status) => (
+              <div key={status} className="rounded-md border border-zinc-200 bg-white p-2">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">{status.toLowerCase()}</p>
+                <p className="mt-1 font-display text-xl font-bold text-zinc-900">{candidateStats[status]}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {!candidates.length && (
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                No beta candidates yet. Add 10 likely users before widening the pilot.
+              </div>
+            )}
+            {candidates.map((candidate) => (
+              <div key={candidate.id} className="rounded-md border border-zinc-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-semibold text-zinc-900">{candidate.name}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {candidate.segment}{candidate.source ? ` | ${candidate.source}` : ''} | updated {new Date(candidate.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Pill tone={candidate.status === 'COMPLETED' ? 'emerald' : candidate.status === 'DECLINED' ? 'red' : candidate.status === 'SCHEDULED' ? 'sky' : 'amber'}>
+                    {candidate.status}
+                  </Pill>
+                </div>
+                {candidate.notes && <p className="mt-3 text-sm text-zinc-600">{candidate.notes}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {candidateStatuses.filter((status) => status !== candidate.status).map((status) => (
+                    <button
+                      key={`${candidate.id}-${status}`}
+                      type="button"
+                      onClick={() => updateCandidateStatus(candidate, status)}
+                      className="rounded bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                    >
+                      {status}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => deleteCandidate(candidate.id)}
+                    className="rounded bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ class User(Base):
     notification_deliveries = relationship("NotificationDeliveryLog", back_populates="user")
     billing_customer = relationship("BillingCustomer", back_populates="user", uselist=False)
     pilot_feedback = relationship("PilotFeedback", back_populates="user")
+    pilot_candidates = relationship("PilotCandidate", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -187,6 +188,20 @@ class PilotFeedback(Base):
     notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     user = relationship("User", back_populates="pilot_feedback")
+
+
+class PilotCandidate(Base):
+    __tablename__ = "pilot_candidates"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    segment = Column(String, nullable=False, default="MT5 trader")
+    source = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="INVITED", index=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="pilot_candidates")
 
 
 class BillingCustomer(Base):

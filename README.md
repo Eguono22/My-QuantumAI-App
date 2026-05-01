@@ -282,8 +282,13 @@ The next product milestone is not more feature breadth. It is proving one comple
 5. Interview users after repeated use and turn trust gaps into the next milestone.
 
 The app includes a protected `/app/pilot` page for this loop. Use it during beta sessions to track readiness gates, paper-order evidence, bridge alerts, feedback scores, willingness to pay, and the 14-day operating plan. Every pilot session should end with one saved feedback entry while the user's reaction is still fresh.
+The same page includes a beta candidate pipeline, repeatable session script, expansion criteria, and a generated pilot report for batch review.
 
 Pilot feedback is persisted per authenticated user through:
+- `GET /pilot/candidates`
+- `POST /pilot/candidates`
+- `PUT /pilot/candidates/{candidate_id}/status`
+- `DELETE /pilot/candidates/{candidate_id}`
 - `GET /pilot/feedback`
 - `GET /pilot/feedback/summary`
 - `POST /pilot/feedback`

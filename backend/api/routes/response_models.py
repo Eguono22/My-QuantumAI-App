@@ -358,6 +358,17 @@ class PilotFeedbackResponse(BaseModel):
     created_at: str
 
 
+class PilotCandidateResponse(BaseModel):
+    id: int
+    name: str
+    segment: str
+    source: Optional[str] = None
+    status: str
+    notes: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
 class PilotFeedbackSegmentSummary(BaseModel):
     segment: str
     count: int

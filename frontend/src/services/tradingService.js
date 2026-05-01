@@ -131,6 +131,22 @@ export const tradingService = {
     const response = await api.get('/pilot/feedback/summary');
     return response.data;
   },
+  getPilotCandidates: async () => {
+    const response = await api.get('/pilot/candidates');
+    return response.data;
+  },
+  createPilotCandidate: async (payload) => {
+    const response = await api.post('/pilot/candidates', payload);
+    return response.data;
+  },
+  updatePilotCandidateStatus: async (candidateId, payload) => {
+    const response = await api.put(`/pilot/candidates/${candidateId}/status`, payload);
+    return response.data;
+  },
+  deletePilotCandidate: async (candidateId) => {
+    const response = await api.delete(`/pilot/candidates/${candidateId}`);
+    return response.data;
+  },
   createPilotFeedback: async (payload) => {
     const response = await api.post('/pilot/feedback', payload);
     return response.data;

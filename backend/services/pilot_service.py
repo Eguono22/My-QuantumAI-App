@@ -3,7 +3,9 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from models.database import PilotFeedback
+from models.database import PilotCandidate, PilotFeedback
+
+PILOT_CANDIDATE_STATUSES = {"INVITED", "SCHEDULED", "COMPLETED", "DECLINED"}
 
 
 class PilotFeedbackService:
@@ -19,6 +21,106 @@ class PilotFeedbackService:
             "notes": feedback.notes,
             "created_at": feedback.created_at.isoformat(),
         }
+
+    def _format_candidate(self, candidate: PilotCandidate) -> Dict:
+        return {
+            "id": candidate.id,
+            "name": candidate.name,
+            "segment": candidate.segment,
+            "source": candidate.source,
+            "status": candidate.status,
+            "notes": candidate.notes,
+            "created_at": candidate.created_at.isoformat(),
+            "updated_at": candidate.updated_at.isoformat(),
+        }
+
+    def list_candidates(self, db: Session, user_id: int, limit: int = 50) -> List[Dict]:
+        limit = max(1, min(int(limit or 50), 100))
+        rows = (
+            db.query(PilotCandidate)
+            .filter(PilotCandidate.user_id == user_id)
+            .order_by(PilotCandidate.updated_at.desc(), PilotCandidate.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return [self._format_candidate(row) for row in rows]
+
+    def create_candidate(
+        self,
+        db: Session,
+        user_id: int,
+        name: str,
+        segment: str = "MT5 trader",
+        source: Optional[str] = None,
+        status: str = "INVITED",
+        notes: Optional[str] = None,
+    ) -> Dict:
+        name = (name or "").strip()
+        segment = (segment or "MT5 trader").strip()
+        source = (source or "").strip() or None
+        status = (status or "INVITED").strip().upper()
+        notes = (notes or "").strip() or None
+
+        if not name:
+            raise ValueError("Candidate name is required")
+        if status not in PILOT_CANDIDATE_STATUSES:
+            raise ValueError("Candidate status must be INVITED, SCHEDULED, COMPLETED, or DECLINED")
+
+        now = datetime.now(timezone.utc)
+        candidate = PilotCandidate(
+            user_id=user_id,
+            name=name[:120],
+            segment=segment[:80],
+            source=source[:120] if source else None,
+            status=status,
+            notes=notes[:1000] if notes else None,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(candidate)
+        db.commit()
+        db.refresh(candidate)
+        return self._format_candidate(candidate)
+
+    def update_candidate_status(
+        self,
+        db: Session,
+        user_id: int,
+        candidate_id: int,
+        status: str,
+        notes: Optional[str] = None,
+    ) -> Dict:
+        status = (status or "").strip().upper()
+        if status not in PILOT_CANDIDATE_STATUSES:
+            raise ValueError("Candidate status must be INVITED, SCHEDULED, COMPLETED, or DECLINED")
+
+        candidate = (
+            db.query(PilotCandidate)
+            .filter(PilotCandidate.id == candidate_id, PilotCandidate.user_id == user_id)
+            .first()
+        )
+        if not candidate:
+            raise ValueError("Pilot candidate not found")
+
+        candidate.status = status
+        if notes is not None:
+            candidate.notes = notes.strip()[:1000] or None
+        candidate.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(candidate)
+        return self._format_candidate(candidate)
+
+    def delete_candidate(self, db: Session, user_id: int, candidate_id: int) -> Dict:
+        candidate = (
+            db.query(PilotCandidate)
+            .filter(PilotCandidate.id == candidate_id, PilotCandidate.user_id == user_id)
+            .first()
+        )
+        if not candidate:
+            raise ValueError("Pilot candidate not found")
+        db.delete(candidate)
+        db.commit()
+        return {"success": True}
 
     def list_feedback(self, db: Session, user_id: int, limit: int = 25) -> List[Dict]:
         limit = max(1, min(int(limit or 25), 100))
