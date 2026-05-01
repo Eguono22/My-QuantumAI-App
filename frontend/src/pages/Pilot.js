@@ -556,6 +556,7 @@ export default function Pilot() {
   const bridgeAlerts = mql5Status?.alerts || [];
   const bridgeErrors = bridgeAlerts.filter((alert) => alert.severity === 'ERROR').length;
   const analytics = mql5Status?.analytics?.overview || {};
+  const databaseReady = startupHealth?.database?.ready !== false;
   const startedAt = pilotStart ? new Date(pilotStart) : null;
   const elapsedDays = startedAt ? daysBetween(startedAt, new Date()) : 0;
   const currentDay = startedAt ? Math.min(PILOT_LENGTH_DAYS, elapsedDays + 1) : 0;
@@ -565,8 +566,10 @@ export default function Pilot() {
     {
       key: 'backend',
       label: 'Backend and broker readiness',
-      complete: startupHealth?.status === 'ok' && startupHealth?.trading?.broker_ready === true,
-      detail: startupHealth?.trading?.reason || 'Startup diagnostics confirm the paper-trading backend is reachable.',
+      complete: startupHealth?.status === 'ok' && startupHealth?.trading?.broker_ready === true && databaseReady,
+      detail: !databaseReady
+        ? startupHealth?.database?.reason
+        : startupHealth?.trading?.reason || 'Startup diagnostics confirm the paper-trading backend is reachable.',
       action: 'Open Connection Center',
       to: '/app/connect',
     },
@@ -1115,6 +1118,12 @@ export default function Pilot() {
               <div className="flex justify-between gap-3">
                 <span className="text-zinc-500">Broker provider</span>
                 <span className="font-semibold text-zinc-900">{startupHealth?.trading?.broker_provider || 'unknown'}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Database</span>
+                <span className={`font-semibold ${databaseReady ? 'text-zinc-900' : 'text-red-700'}`}>
+                  {startupHealth?.database?.durable ? 'durable' : startupHealth?.database?.provider || 'unknown'}
+                </span>
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-zinc-500">Actionable signals</span>

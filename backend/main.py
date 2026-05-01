@@ -68,6 +68,24 @@ def ensure_sqlite_schema_compat():
     except Exception:
         logger.exception("Failed to apply SQLite schema compatibility checks")
 
+
+def get_database_readiness(database_url: str | None = None, app_env: str | None = None):
+    url = (database_url or settings.DATABASE_URL or "").lower()
+    env = (app_env or settings.APP_ENV or "development").lower()
+    is_sqlite = url.startswith("sqlite")
+    is_hosted = env != "development"
+    provider = "sqlite" if is_sqlite else url.split(":", 1)[0] if ":" in url else "unknown"
+    ready = not (is_hosted and is_sqlite)
+    reason = "ready"
+    if not ready:
+        reason = "Hosted beta users need a durable Postgres-compatible DATABASE_URL; SQLite is ephemeral on serverless."
+    return {
+        "provider": provider,
+        "durable": not is_sqlite,
+        "ready": ready,
+        "reason": reason,
+    }
+
 @app.get("/")
 def root():
     return {"message": "Quantum AI Trading Platform API", "version": "1.0.0", "status": "running"}
@@ -84,6 +102,7 @@ def health():
 
 @app.get("/health/startup")
 def startup_health(include_probe: bool = False):
+    database_ready = get_database_readiness()
     provider = (settings.BROKER_PROVIDER or "paper").lower()
     trading_mode = (settings.TRADING_MODE or "paper").lower()
     alpaca_ready = bool(settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET)
@@ -136,8 +155,9 @@ def startup_health(include_probe: bool = False):
             probes["alpaca_data"] = {"ok": False, "error": str(e)[:180]}
 
     return {
-        "status": "ok" if broker_ready else "degraded",
+        "status": "ok" if broker_ready and database_ready["ready"] else "degraded",
         "app": {"name": "Quantum AI Trading Platform API", "version": app.version},
+        "database": database_ready,
         "trading": {
             "trading_mode": trading_mode,
             "broker_provider": provider,
