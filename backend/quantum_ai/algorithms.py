@@ -1,6 +1,5 @@
 import numpy as np
 from typing import Dict
-from sklearn.linear_model import Ridge
 
 EPSILON = 1e-10  # Small constant to prevent division-by-zero
 
@@ -209,9 +208,22 @@ class MarketPredictionModel:
 
     def __init__(self, window_size: int = 36, alpha: float = 1.0):
         self.window_size = window_size
-        self.model = Ridge(alpha=alpha)
+        self.alpha = alpha
+        self.coefficients = None
         self.is_fitted = False
         self.residual_std = 0.0
+
+    def _fit_ridge(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
+        X_with_intercept = np.column_stack([np.ones(len(X)), X])
+        regularizer = np.eye(X_with_intercept.shape[1]) * self.alpha
+        regularizer[0, 0] = 0.0
+        return np.linalg.pinv(X_with_intercept.T @ X_with_intercept + regularizer) @ X_with_intercept.T @ y
+
+    def _predict_ridge(self, X: np.ndarray) -> np.ndarray:
+        if self.coefficients is None:
+            raise ValueError("Market prediction model is not fitted")
+        X_with_intercept = np.column_stack([np.ones(len(X)), X])
+        return X_with_intercept @ self.coefficients
 
     def _features_from_window(self, prices_window: np.ndarray) -> np.ndarray:
         log_prices = np.log(prices_window + EPSILON)
@@ -243,8 +255,8 @@ class MarketPredictionModel:
 
         X_arr = np.array(X)
         y_arr = np.array(y)
-        self.model.fit(X_arr, y_arr)
-        fitted = self.model.predict(X_arr)
+        self.coefficients = self._fit_ridge(X_arr, y_arr)
+        fitted = self._predict_ridge(X_arr)
         self.residual_std = float(np.std(y_arr - fitted))
         self.is_fitted = True
 
@@ -272,7 +284,7 @@ class MarketPredictionModel:
         for _ in range(max(1, horizon_steps)):
             window = np.array(simulated[-effective_window:], dtype=float)
             features = self._features_from_window(window).reshape(1, -1)
-            pred_return = float(self.model.predict(features)[0])
+            pred_return = float(self._predict_ridge(features)[0])
             pred_return = float(np.clip(pred_return, -0.2, 0.2))
             predicted_returns.append(pred_return)
             next_price = float(simulated[-1] * np.exp(pred_return))
