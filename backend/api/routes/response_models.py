@@ -358,6 +358,32 @@ class PilotFeedbackResponse(BaseModel):
     created_at: str
 
 
+class PilotFeedbackSegmentSummary(BaseModel):
+    segment: str
+    count: int
+
+
+class PilotRecommendationResponse(BaseModel):
+    label: str
+    tone: str
+    title: str
+    message: str
+    next_action: str
+
+
+class PilotFeedbackSummaryResponse(BaseModel):
+    total_feedback: int
+    avg_trust_score: float
+    avg_value_score: float
+    would_pay_yes: int
+    would_pay_maybe: int
+    would_pay_no: int
+    yes_rate_pct: float
+    top_segments: List[PilotFeedbackSegmentSummary]
+    recent_frictions: List[str]
+    recommendation: PilotRecommendationResponse
+
+
 class MQL5BridgeStatusResponse(BaseModel):
     enabled: bool
     bridge_ready: bool

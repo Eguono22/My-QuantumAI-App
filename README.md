@@ -285,6 +285,7 @@ The app includes a protected `/app/pilot` page for this loop. Use it during beta
 
 Pilot feedback is persisted per authenticated user through:
 - `GET /pilot/feedback`
+- `GET /pilot/feedback/summary`
 - `POST /pilot/feedback`
 - `DELETE /pilot/feedback/{feedback_id}`
 

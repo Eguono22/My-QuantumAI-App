@@ -116,3 +116,69 @@ def test_pilot_feedback_validates_scores_and_payment_signal():
         )
 
     db.close()
+
+
+def test_pilot_feedback_summary_recommends_collecting_feedback_when_empty():
+    db = make_db()
+    user = create_user(db)
+
+    summary = pilot_feedback_service.summarize_feedback(db, user.id)
+
+    assert summary["total_feedback"] == 0
+    assert summary["avg_trust_score"] == 0.0
+    assert summary["recommendation"]["label"] == "Collect Feedback"
+
+    db.close()
+
+
+def test_pilot_feedback_summary_recommends_expanding_when_signals_are_strong():
+    db = make_db()
+    user = create_user(db)
+
+    for index in range(5):
+        pilot_feedback_service.create_feedback(
+            db=db,
+            user_id=user.id,
+            participant=f"Trader {index}",
+            segment="MT5 trader" if index < 3 else "Alpaca paper trader",
+            trust_score=4,
+            value_score=5,
+            would_pay="Yes" if index < 3 else "Maybe",
+            friction="Wanted clearer setup" if index == 0 else None,
+        )
+
+    summary = pilot_feedback_service.summarize_feedback(db, user.id)
+
+    assert summary["total_feedback"] == 5
+    assert summary["avg_trust_score"] == 4.0
+    assert summary["avg_value_score"] == 5.0
+    assert summary["would_pay_yes"] == 3
+    assert summary["yes_rate_pct"] == 60.0
+    assert summary["top_segments"][0] == {"segment": "MT5 trader", "count": 3}
+    assert summary["recent_frictions"] == ["Wanted clearer setup"]
+    assert summary["recommendation"]["label"] == "Expand Pilot"
+
+    db.close()
+
+
+def test_pilot_feedback_summary_prioritizes_trust_blocker():
+    db = make_db()
+    user = create_user(db)
+
+    for index in range(5):
+        pilot_feedback_service.create_feedback(
+            db=db,
+            user_id=user.id,
+            participant=f"Trader {index}",
+            segment="Signal reviewer",
+            trust_score=3,
+            value_score=5,
+            would_pay="Yes",
+        )
+
+    summary = pilot_feedback_service.summarize_feedback(db, user.id)
+
+    assert summary["recommendation"]["label"] == "Fix Trust"
+    assert summary["recommendation"]["tone"] == "red"
+
+    db.close()

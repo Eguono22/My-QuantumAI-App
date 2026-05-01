@@ -127,6 +127,10 @@ export const tradingService = {
     const response = await api.get('/pilot/feedback');
     return response.data;
   },
+  getPilotFeedbackSummary: async () => {
+    const response = await api.get('/pilot/feedback/summary');
+    return response.data;
+  },
   createPilotFeedback: async (payload) => {
     const response = await api.post('/pilot/feedback', payload);
     return response.data;

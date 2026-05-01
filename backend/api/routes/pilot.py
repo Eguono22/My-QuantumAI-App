@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.routes.auth import get_current_user
-from api.routes.response_models import PilotFeedbackResponse
+from api.routes.response_models import PilotFeedbackResponse, PilotFeedbackSummaryResponse
 from models.database import User, get_db
 from services.pilot_service import pilot_feedback_service
 
@@ -29,6 +29,14 @@ def list_pilot_feedback(
     current_user: User = Depends(get_current_user),
 ):
     return pilot_feedback_service.list_feedback(db, current_user.id, limit=limit)
+
+
+@router.get("/feedback/summary", response_model=PilotFeedbackSummaryResponse)
+def summarize_pilot_feedback(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return pilot_feedback_service.summarize_feedback(db, current_user.id)
 
 
 @router.post("/feedback", response_model=PilotFeedbackResponse)

@@ -136,6 +136,66 @@ function normalizeFeedbackEntry(entry) {
   };
 }
 
+function buildLocalSummary(entries) {
+  const stats = getFeedbackStats(entries);
+  const total = entries.length;
+  const yesRate = total > 0 ? (stats.payYes / total) * 100 : 0;
+  const segmentCounts = entries.reduce((acc, entry) => {
+    const segment = entry.segment || 'Unknown';
+    return { ...acc, [segment]: (acc[segment] || 0) + 1 };
+  }, {});
+  const topSegments = Object.entries(segmentCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([segment, count]) => ({ segment, count }));
+  let recommendation = {
+    label: 'Collect Feedback',
+    tone: 'amber',
+    title: 'Run at least 5 pilot conversations',
+    message: 'The product needs real trader reactions before the next roadmap decision.',
+    next_action: 'Schedule private beta sessions and log one feedback entry after each session.',
+  };
+
+  if (total >= 5 && stats.avgTrust >= 4 && stats.avgValue >= 4 && yesRate >= 40) {
+    recommendation = {
+      label: 'Expand Pilot',
+      tone: 'emerald',
+      title: 'Trust and value are strong enough to widen the beta',
+      message: 'Users are signaling confidence and willingness to pay.',
+      next_action: 'Invite the next 10 beta users and keep execution paper-only.',
+    };
+  } else if (total >= 5 && stats.avgTrust < 4) {
+    recommendation = {
+      label: 'Fix Trust',
+      tone: 'red',
+      title: 'Trust is the main blocker',
+      message: 'Users are not yet confident enough in the signal, risk, or execution story.',
+      next_action: 'Improve signal rationale, audit trail clarity, and risk explanations before expanding.',
+    };
+  } else if (total >= 5 && stats.avgValue < 4) {
+    recommendation = {
+      label: 'Sharpen Value',
+      tone: 'amber',
+      title: 'Value is not obvious enough',
+      message: 'The workflow may be trustworthy, but users are not yet feeling a strong day-to-day benefit.',
+      next_action: 'Tighten the core loop around faster review and daily return habits.',
+    };
+  }
+
+  return {
+    total_feedback: total,
+    avg_trust_score: Number(stats.avgTrust.toFixed(2)),
+    avg_value_score: Number(stats.avgValue.toFixed(2)),
+    would_pay_yes: stats.payYes,
+    would_pay_maybe: stats.payMaybe,
+    would_pay_no: stats.payNo,
+    yes_rate_pct: Number(yesRate.toFixed(2)),
+    top_segments: topSegments,
+    recent_frictions: entries.filter((entry) => entry.friction).map((entry) => entry.friction).slice(0, 5),
+    recommendation,
+  };
+}
+
 function Pill({ tone = 'zinc', children }) {
   const tones = {
     emerald: 'bg-emerald-100 text-emerald-800',
@@ -195,6 +255,7 @@ export default function Pilot() {
   const [portfolio, setPortfolio] = useState([]);
   const [pilotStart, setPilotStart] = useState(localStorage.getItem(PILOT_START_KEY));
   const [feedbackEntries, setFeedbackEntries] = useState(loadStoredFeedback);
+  const [feedbackSummary, setFeedbackSummary] = useState(() => buildLocalSummary(loadStoredFeedback()));
   const [feedbackForm, setFeedbackForm] = useState(initialFeedbackForm);
   const [feedbackSyncState, setFeedbackSyncState] = useState('local');
   const [loading, setLoading] = useState(true);
@@ -205,13 +266,14 @@ export default function Pilot() {
 
     const load = async () => {
       try {
-        const [health, bridge, signalData, orderData, portfolioData, feedbackData] = await Promise.all([
+        const [health, bridge, signalData, orderData, portfolioData, feedbackData, feedbackSummaryData] = await Promise.all([
           tradingService.getStartupHealth().catch(() => null),
           tradingService.getMql5Status().catch(() => null),
           tradingService.getSignals().catch(() => []),
           tradingService.getOrders().catch(() => []),
           tradingService.getPortfolio().catch(() => []),
           tradingService.getPilotFeedback().catch(() => null),
+          tradingService.getPilotFeedbackSummary().catch(() => null),
         ]);
 
         if (!isMounted) return;
@@ -224,8 +286,10 @@ export default function Pilot() {
           const normalizedFeedback = feedbackData.map(normalizeFeedbackEntry);
           setFeedbackEntries(normalizedFeedback);
           localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(normalizedFeedback));
+          setFeedbackSummary(feedbackSummaryData || buildLocalSummary(normalizedFeedback));
           setFeedbackSyncState('synced');
         } else {
+          setFeedbackSummary(buildLocalSummary(loadStoredFeedback()));
           setFeedbackSyncState('local');
         }
         setError('');
@@ -295,6 +359,7 @@ export default function Pilot() {
     const next = [entry, ...feedbackEntries].slice(0, 25);
     localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
     setFeedbackEntries(next);
+    setFeedbackSummary(buildLocalSummary(next));
     setFeedbackForm(initialFeedbackForm);
   };
 
@@ -310,6 +375,7 @@ export default function Pilot() {
     const next = feedbackEntries.filter((entry) => entry.id !== id);
     localStorage.setItem(PILOT_FEEDBACK_KEY, JSON.stringify(next));
     setFeedbackEntries(next);
+    setFeedbackSummary(buildLocalSummary(next));
   };
 
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
@@ -366,6 +432,14 @@ export default function Pilot() {
     },
   ];
   const gateProgress = Math.round((gates.filter((gate) => gate.complete).length / gates.length) * 100);
+  const recommendation = feedbackSummary?.recommendation || buildLocalSummary(feedbackEntries).recommendation;
+  const recommendationTone = recommendation.tone === 'red'
+    ? 'border-red-200 bg-red-50 text-red-900'
+    : recommendation.tone === 'emerald'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      : recommendation.tone === 'sky'
+        ? 'border-sky-200 bg-sky-50 text-sky-900'
+        : 'border-amber-200 bg-amber-50 text-amber-900';
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -423,6 +497,31 @@ export default function Pilot() {
           <div className="h-full bg-sky-500 transition-all" style={{ width: `${timeProgress}%` }} />
         </div>
         <p className="mt-2 text-xs text-zinc-500">Green is readiness. Blue is elapsed pilot time.</p>
+      </div>
+
+      <div className={`rounded-md border px-5 py-4 ${recommendationTone}`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="max-w-3xl">
+            <Pill tone={recommendation.tone || 'amber'}>{recommendation.label}</Pill>
+            <h2 className="mt-3 text-xl font-display font-bold uppercase">{recommendation.title}</h2>
+            <p className="mt-2 text-sm opacity-90">{recommendation.message}</p>
+            <p className="mt-3 text-sm font-semibold">{recommendation.next_action}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-sm">
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Trust</p>
+              <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.avg_trust_score || 0).toFixed(1)}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Value</p>
+              <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.avg_value_score || 0).toFixed(1)}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
+              <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.yes_rate_pct || 0).toFixed(0)}%</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6">
@@ -550,6 +649,28 @@ export default function Pilot() {
               <p className="mt-1 text-xl font-display font-bold text-red-700">{feedbackStats.payNo}</p>
             </div>
           </div>
+
+          {!!feedbackSummary?.top_segments?.length && (
+            <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Strongest Segments</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {feedbackSummary.top_segments.map((item) => (
+                  <Pill key={item.segment} tone="zinc">{item.segment}: {item.count}</Pill>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!feedbackSummary?.recent_frictions?.length && (
+            <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Recent Frictions</p>
+              <div className="mt-2 space-y-2">
+                {feedbackSummary.recent_frictions.map((friction, index) => (
+                  <p key={`${friction}-${index}`} className="text-sm text-zinc-700">{friction}</p>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 space-y-3">
             {!feedbackEntries.length && (
