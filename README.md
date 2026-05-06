@@ -103,6 +103,11 @@ Windows local launcher with the MT5-friendly port used in this repo:
 .\scripts\start_backend_local.ps1 -Port 8011
 ```
 
+By default, the local backend launcher forces a repo-local SQLite database so it still works when `.env.local` contains a hosted `DATABASE_URL`. If you want to use the configured database instead, run:
+```powershell
+.\scripts\start_backend_local.ps1 -Port 8011 -UseConfiguredDatabase
+```
+
 Windows one-command launcher for backend and frontend together:
 ```powershell
 .\scripts\start_local_stack.ps1
@@ -284,6 +289,7 @@ The next product milestone is not more feature breadth. It is proving one comple
 The app includes a protected `/app/pilot` page for this loop. Use it during beta sessions to track readiness gates, paper-order evidence, bridge alerts, feedback scores, willingness to pay, and the 14-day operating plan. Every pilot session should end with one saved feedback entry while the user's reaction is still fresh.
 The same page includes a beta candidate pipeline, repeatable session script, expansion criteria, and a generated pilot report for batch review. Feedback can be linked to a candidate so completed interviews close the invite loop automatically.
 Use `docs/beta-session-sprint.md` for the first 5-session outreach and interview sprint.
+Use `docs/pilot-dry-run-checklist.md` for a one-person self-test before the first live beta session.
 
 Pilot feedback is persisted per authenticated user through:
 - `GET /pilot/candidates`
