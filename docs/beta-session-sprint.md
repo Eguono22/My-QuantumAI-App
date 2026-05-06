@@ -3,6 +3,7 @@
 Use this sprint to get the first real evidence from traders without expanding the product scope.
 
 Run [`docs/pilot-dry-run-checklist.md`](./pilot-dry-run-checklist.md) once yourself before session 1 so the pilot flow is proven locally before a real user sees it.
+Use [`docs/first-beta-outreach-pack.md`](./first-beta-outreach-pack.md) to line up the first 3 candidate conversations before you touch the roadmap again.
 
 ## Goal
 
