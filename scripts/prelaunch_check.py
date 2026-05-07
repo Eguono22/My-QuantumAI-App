@@ -71,14 +71,24 @@ def validate_startup_payload(
     if expected_broker == "alpaca" or expected_market_data == "alpaca":
         require(credentials.get("alpaca_configured") is True, "Alpaca credentials configured")
         if include_probe:
-            require(
-                probes.get("alpaca_account", {}).get("ok") is True,
-                "Alpaca account probe passed",
-            )
-            require(
-                probes.get("alpaca_data", {}).get("ok") is True,
-                "Alpaca market data probe passed",
-            )
+            account_probe = probes.get("alpaca_account", {})
+            data_probe = probes.get("alpaca_data", {})
+            if account_probe.get("ok") is not True:
+                fail(
+                    "Alpaca account probe failed "
+                    f"(status_code={account_probe.get('status_code')}, "
+                    f"error={account_probe.get('error')}). "
+                    "Regenerate the Alpaca PAPER key/secret pair and rerun configure_alpaca_paper_env.ps1."
+                )
+            ok("Alpaca account probe passed")
+            if data_probe.get("ok") is not True:
+                fail(
+                    "Alpaca market data probe failed "
+                    f"(status_code={data_probe.get('status_code')}, "
+                    f"error={data_probe.get('error')}). "
+                    "Confirm the same paper key pair has market-data access."
+                )
+            ok("Alpaca market data probe passed")
 
     ok(
         "risk limits loaded "
