@@ -118,6 +118,12 @@ Optional smoke test for the combined launcher:
 .\scripts\start_local_stack.ps1 -SmokeTest
 ```
 
+Paper-trading readiness check for Alpaca-backed paper execution:
+```powershell
+.\scripts\configure_alpaca_paper_env.ps1
+.\scripts\run_paper_trading_check.ps1
+```
+
 ### Frontend Setup
 ```bash
 cd frontend
@@ -290,6 +296,7 @@ The app includes a protected `/app/pilot` page for this loop. Use it during beta
 The same page includes a beta candidate pipeline, repeatable session script, expansion criteria, and a generated pilot report for batch review. Feedback can be linked to a candidate so completed interviews close the invite loop automatically.
 Use `docs/beta-session-sprint.md` for the first 5-session outreach and interview sprint.
 Use `docs/pilot-dry-run-checklist.md` for a one-person self-test before the first live beta session.
+Use `docs/first-paper-trading-runbook.md` to move from local setup into real paper-trading readiness with Alpaca.
 
 Pilot feedback is persisted per authenticated user through:
 - `GET /pilot/candidates`
