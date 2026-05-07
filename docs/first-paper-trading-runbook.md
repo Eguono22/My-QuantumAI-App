@@ -58,6 +58,12 @@ Wait for:
 .\scripts\run_paper_trading_check.ps1
 ```
 
+If the backend is not already running, use:
+
+```powershell
+.\scripts\run_paper_trading_check.ps1 -StartBackend
+```
+
 This check verifies:
 
 - backend health

@@ -123,6 +123,10 @@ Paper-trading readiness check for Alpaca-backed paper execution:
 .\scripts\configure_alpaca_paper_env.ps1
 .\scripts\run_paper_trading_check.ps1
 ```
+If the backend is not already running, use:
+```powershell
+.\scripts\run_paper_trading_check.ps1 -StartBackend
+```
 
 ### Frontend Setup
 ```bash
