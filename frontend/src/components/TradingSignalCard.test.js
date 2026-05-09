@@ -8,6 +8,14 @@ const buySignal = {
   confidence: 0.82,
   price: 43250.0,
   timestamp: '2024-01-15T14:30:00Z',
+  entry_price: 43250.0,
+  stop_loss: 42100.0,
+  take_profit: 45500.0,
+  expected_move_pct: 5.2,
+  risk_level: 'MEDIUM',
+  market_regime: 'TRENDING',
+  vote_breakdown: { buy: 6, sell: 1, hold: 2 },
+  rationale: ['Quantum walk projects upward drift.', 'MACD histogram is positive.'],
 };
 
 const sellSignal = {
@@ -39,7 +47,7 @@ describe('TradingSignalCard', () => {
 
   it('renders the formatted price', () => {
     render(<TradingSignalCard signal={buySignal} />);
-    expect(screen.getByText('$43,250.00')).toBeInTheDocument();
+    expect(screen.getAllByText('$43,250.00').length).toBeGreaterThan(0);
   });
 
   it('renders the confidence percentage', () => {
@@ -79,5 +87,16 @@ describe('TradingSignalCard', () => {
   it('renders HOLD signal type text', () => {
     render(<TradingSignalCard signal={holdSignal} />);
     expect(screen.getByText('HOLD')).toBeInTheDocument();
+  });
+
+  it('renders the signal trust panel with paper-only risk context', () => {
+    render(<TradingSignalCard signal={buySignal} />);
+
+    expect(screen.getByText('Signal Trust Panel')).toBeInTheDocument();
+    expect(screen.getByText('Paper-only review before any order')).toBeInTheDocument();
+    expect(screen.getByText('Why this signal appeared now')).toBeInTheDocument();
+    expect(screen.getByText('Invalidates If')).toBeInTheDocument();
+    expect(screen.getByText('Below $42,100.00')).toBeInTheDocument();
+    expect(screen.getByText('$1,150.00')).toBeInTheDocument();
   });
 });

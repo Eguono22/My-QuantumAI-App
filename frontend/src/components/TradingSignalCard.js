@@ -18,6 +18,25 @@ export default function TradingSignalCard({ signal }) {
   const expiresMinutes = signal.expires_at
     ? Math.max(0, Math.round((new Date(signal.expires_at).getTime() - Date.now()) / 60000))
     : null;
+  const entryPrice = Number(signal.entry_price || signal.price || 0);
+  const stopLoss = Number(signal.stop_loss || 0);
+  const takeProfit = Number(signal.take_profit || 0);
+  const riskPerUnit = entryPrice > 0 && stopLoss > 0 ? Math.abs(entryPrice - stopLoss) : 0;
+  const estimatedNotional = entryPrice > 0 ? entryPrice : Number(signal.price || 0);
+  const invalidationCondition = stopLoss > 0
+    ? `${signal.signal_type === 'SELL' ? 'Above' : 'Below'} ${formatCurrency(stopLoss)}`
+    : 'Missing stop level';
+  const confidenceDrivers = [
+    signal.market_regime ? `Regime: ${regimeLabel}` : null,
+    signal.risk_level ? `Risk: ${signal.risk_level}` : null,
+    signal.expected_move_pct !== undefined && signal.expected_move_pct !== null
+      ? `Expected move: ${formatPercent(signal.expected_move_pct)}`
+      : null,
+    signal.vote_breakdown ? `Vote mix: B${buyPct}/S${sellPct}/H${holdPct}` : null,
+  ].filter(Boolean);
+  const trustRationale = signal.rationale?.length
+    ? signal.rationale
+    : ['Signal generated from momentum, volatility, and quantum model agreement.'];
 
   return (
     <div className={`rounded-md p-4 border ${bgColor} transition hover:opacity-95`}>
@@ -112,6 +131,59 @@ export default function TradingSignalCard({ signal }) {
           ))}
         </div>
       )}
+
+      <div className="mt-4 rounded border border-zinc-300 bg-white/80 p-3 text-xs text-zinc-700">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-zinc-500 uppercase tracking-wide">Signal Trust Panel</p>
+            <p className="mt-1 font-semibold text-zinc-900">
+              Paper-only review before any order
+            </p>
+          </div>
+          <span className="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-700">PAPER</span>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <div>
+            <p className="font-semibold text-zinc-900">Why this signal appeared now</p>
+            <ul className="mt-1 space-y-1">
+              {trustRationale.slice(0, 3).map((line, idx) => (
+                <li key={`${signal.asset}-trust-rationale-${idx}`}>{line}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="font-semibold text-zinc-900">Confidence drivers</p>
+            <p className="mt-1">
+              {confidenceDrivers.length ? confidenceDrivers.join(' | ') : 'Confidence is based on model agreement and recent market structure.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">
+              <p className="text-zinc-500 uppercase">Invalidates If</p>
+              <p className="mt-1 font-semibold text-zinc-900">{invalidationCondition}</p>
+            </div>
+            <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">
+              <p className="text-zinc-500 uppercase">Risk / Unit</p>
+              <p className="mt-1 font-semibold text-zinc-900">{riskPerUnit > 0 ? formatCurrency(riskPerUnit) : 'N/A'}</p>
+            </div>
+            <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">
+              <p className="text-zinc-500 uppercase">Est. Notional / Unit</p>
+              <p className="mt-1 font-semibold text-zinc-900">{estimatedNotional > 0 ? formatCurrency(estimatedNotional) : 'N/A'}</p>
+            </div>
+            <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">
+              <p className="text-zinc-500 uppercase">Target</p>
+              <p className="mt-1 font-semibold text-zinc-900">{takeProfit > 0 ? formatCurrency(takeProfit) : 'N/A'}</p>
+            </div>
+          </div>
+
+          <p className="rounded bg-amber-50 px-2 py-2 font-medium text-amber-800">
+            Confirm entry, stop, target, and account risk before paper execution.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
