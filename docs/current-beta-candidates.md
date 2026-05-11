@@ -11,8 +11,8 @@ These are working assumptions based on the first-3 outreach structure:
 | Emmanuel | MT5 trader | Direct outreach | Useful for trust and execution feedback in an MT5-style workflow | COMPLETED |
 | Omojesus | Alpaca paper trader | Direct outreach | Useful for testing broker-backed paper workflow and risk review | COMPLETED |
 | Joshua | Signal reviewer | Direct outreach | Useful for comparing AI rationale against existing signal-review habits | COMPLETED |
-| Session 4 candidate | Signal reviewer | Trust panel validation | Validate whether the Signal Trust Panel raises trust above 4.0 | SCHEDULED |
-| Session 5 candidate | Paper trader | Trust panel validation | Validate whether paper-only risk and execution clarity raises trade confidence | SCHEDULED |
+| Session 4 candidate | Signal reviewer | Trust panel validation | Validate whether the Signal Trust Panel raises trust above 4.0 | COMPLETED |
+| Session 5 candidate | Paper trader | Trust panel validation | Validate whether paper-only risk and execution clarity raises trade confidence | COMPLETED |
 
 ## Ready-To-Add Entries
 
@@ -48,7 +48,7 @@ Use these values when adding them in `/app/pilot`:
 - Segment: `Signal reviewer`
 - Source: `Trust panel validation`
 - Notes: `Use the updated Signal Trust Panel. Focus on whether rationale, invalidation, confidence drivers, and risk-per-unit are enough to trust a tiny paper trade.`
-- Status: `SCHEDULED`
+- Status: `COMPLETED`
 
 ### 5. Session 5 candidate
 
@@ -56,7 +56,7 @@ Use these values when adding them in `/app/pilot`:
 - Segment: `Paper trader`
 - Source: `Trust panel validation`
 - Notes: `Use the updated Signal Trust Panel. Focus on whether paper-only confirmation, estimated notional, max risk, stop, and target are clear enough before execution.`
-- Status: `SCHEDULED`
+- Status: `COMPLETED`
 
 ## Invite Messages
 
@@ -98,6 +98,6 @@ Would you be open to being one of the first 5 beta users this week?
 
 ## Next Move
 
-1. Run sessions 4 and 5 with the updated Signal Trust Panel visible.
-2. Log only real answers in `/app/pilot`.
-3. Check whether average trust reaches `4.0+`.
+1. Fix the remaining trust gap before expanding the beta.
+2. Add stronger signal proof: recent price-action context, audit trail, and final max-loss confirmation.
+3. Run 2 more validation sessions and check whether average trust reaches `4.0+`.
