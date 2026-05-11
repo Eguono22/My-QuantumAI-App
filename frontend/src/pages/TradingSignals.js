@@ -34,6 +34,7 @@ export default function TradingSignals({ preferences }) {
   const [quickQty, setQuickQty] = useState({});
   const [quickTradeLoading, setQuickTradeLoading] = useState({});
   const [quickTradeResult, setQuickTradeResult] = useState({});
+  const [pendingQuickTrade, setPendingQuickTrade] = useState(null);
   const [riskBudget, setRiskBudget] = useState({
     accountSize: 10000,
     riskPerTradePct: 1,
@@ -166,7 +167,7 @@ export default function TradingSignals({ preferences }) {
     }, 0);
   };
 
-  const handleQuickTrade = async (signal, action) => {
+  const handleQuickTrade = (signal, action) => {
     const qty = Number(quickQty[signal.asset] ?? 1);
     if (!qty || qty <= 0) {
       setAlert({ type: 'error', message: 'Quick trade quantity must be greater than zero.' });
@@ -202,10 +203,39 @@ export default function TradingSignals({ preferences }) {
       return;
     }
 
+    const executionPrice = Number(signal.price || signal.entry_price || 0);
+    const stopLoss = Number(signal.stop_loss || 0);
+    const takeProfit = Number(signal.take_profit || 0);
+    setPendingQuickTrade({
+      signal,
+      action,
+      quantity: qty,
+      price: executionPrice,
+      estimatedNotional: qty * executionPrice,
+      riskPerUnit,
+      orderRisk,
+      additionalHeatPct,
+      projectedHeatPct,
+      perTradeRiskCap,
+      stopLoss,
+      takeProfit,
+    });
+  };
+
+  const handleConfirmQuickTrade = async () => {
+    if (!pendingQuickTrade) return;
+
+    const {
+      signal,
+      action,
+      quantity: qty,
+      price,
+    } = pendingQuickTrade;
     const key = `${signal.asset}-${action}`;
     setQuickTradeLoading((prev) => ({ ...prev, [key]: true }));
+    setPendingQuickTrade(null);
     try {
-      const result = await tradingService.executeTrade(signal.asset, action, qty, signal.price);
+      const result = await tradingService.executeTrade(signal.asset, action, qty, price);
       const trade = result?.trade;
       setQuickTradeResult((prev) => ({
         ...prev,
@@ -512,6 +542,96 @@ export default function TradingSignals({ preferences }) {
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      {pendingQuickTrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 px-4 py-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-trade-confirm-title"
+            className="w-full max-w-xl rounded-2xl border border-amber-200 bg-white shadow-2xl"
+          >
+            <div className="rounded-t-2xl bg-gradient-to-r from-zinc-950 via-slate-900 to-amber-950 p-5 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">Paper Trade Confirmation</p>
+                  <h2 id="quick-trade-confirm-title" className="mt-1 text-2xl font-display font-bold">
+                    Review {pendingQuickTrade.action} {pendingQuickTrade.signal.asset}
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-200">
+                    Final check before sending this paper order to the broker.
+                  </p>
+                </div>
+                <span className="rounded bg-sky-100 px-2 py-1 text-xs font-bold text-sky-800">PAPER</span>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Quantity</p>
+                  <p className="mt-1 font-bold text-zinc-900">{pendingQuickTrade.quantity}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Entry Price</p>
+                  <p className="mt-1 font-bold text-zinc-900">{formatCurrency(pendingQuickTrade.price)}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Est. Notional</p>
+                  <p className="mt-1 font-bold text-zinc-900">{formatCurrency(pendingQuickTrade.estimatedNotional)}</p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-amber-700">Max Risk</p>
+                  <p className="mt-1 font-bold text-amber-900">{formatCurrency(pendingQuickTrade.orderRisk)}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Risk / Unit</p>
+                  <p className="mt-1 font-bold text-zinc-900">{formatCurrency(pendingQuickTrade.riskPerUnit)}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Heat Impact</p>
+                  <p className="mt-1 font-bold text-zinc-900">+{pendingQuickTrade.additionalHeatPct.toFixed(2)}%</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-red-700">Invalidates / Stop</p>
+                  <p className="mt-1 font-semibold text-red-900">
+                    {pendingQuickTrade.stopLoss > 0 ? formatCurrency(pendingQuickTrade.stopLoss) : 'No stop supplied'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">Target</p>
+                  <p className="mt-1 font-semibold text-emerald-900">
+                    {pendingQuickTrade.takeProfit > 0 ? formatCurrency(pendingQuickTrade.takeProfit) : 'No target supplied'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                Projected portfolio heat after this order: <span className="font-semibold text-zinc-900">{pendingQuickTrade.projectedHeatPct.toFixed(2)}%</span>.
+                Per-trade risk cap: <span className="font-semibold text-zinc-900">{formatCurrency(pendingQuickTrade.perTradeRiskCap)}</span>.
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  onClick={() => setPendingQuickTrade(null)}
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmQuickTrade}
+                  className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  Confirm Paper Order
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="market-panel rounded-md p-4 space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1272,14 +1392,14 @@ export default function TradingSignals({ preferences }) {
                       disabled={buyLoading || hasNoSafeCapacity || wouldBreach}
                       className="market-btn-primary px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
                     >
-                      {buyLoading ? 'Buying...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Quick Buy'}
+                      {buyLoading ? 'Buying...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Review Buy'}
                     </button>
                     <button
                       onClick={() => handleQuickTrade(signal, 'SELL')}
                       disabled={sellLoading || hasNoSafeCapacity || wouldBreach}
                       className="market-btn-dark px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
                     >
-                      {sellLoading ? 'Selling...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Quick Sell'}
+                      {sellLoading ? 'Selling...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Review Sell'}
                     </button>
                   </div>
 
