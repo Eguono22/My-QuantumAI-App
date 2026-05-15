@@ -53,6 +53,8 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 |--------|----------|------|-------------|
 | POST | `/auth/register` | No | Register new user |
 | POST | `/auth/login` | No | Login, returns JWT |
+| POST | `/auth/forgot-password` | No | Request a short-lived password reset token |
+| POST | `/auth/reset-password` | No | Set a new password with a reset token |
 | GET | `/auth/me` | Yes | Get current user |
 | GET | `/market/overview` | No | All asset prices |
 | GET | `/market/{symbol}` | No | Single asset data |
