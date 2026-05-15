@@ -48,7 +48,12 @@ export default function Login({ onLogin }) {
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-600 mb-1">Password</label>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="block text-sm text-zinc-600">Password</label>
+              <Link to="/forgot-password" className="text-xs font-semibold text-market-yellow hover:text-yellow-300">
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               value={form.password}

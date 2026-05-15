@@ -11,6 +11,8 @@ import Markets from './pages/Markets';
 import Pilot from './pages/Pilot';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import ConnectionCenter from './pages/ConnectionCenter';
 import NotificationsCenter from './pages/NotificationsCenter';
@@ -222,6 +224,8 @@ function App() {
           <Route path="/" element={<Landing user={user} theme={theme} onToggleTheme={toggleTheme} />} />
           <Route path="/login" element={user ? <Navigate to="/app" /> : <Login onLogin={setUser} />} />
           <Route path="/register" element={user ? <Navigate to="/app" /> : <Register onLogin={setUser} />} />
+          <Route path="/forgot-password" element={user ? <Navigate to="/app" /> : <ForgotPassword />} />
+          <Route path="/reset-password" element={user ? <Navigate to="/app" /> : <ResetPassword />} />
           <Route
             path="/app"
             element={

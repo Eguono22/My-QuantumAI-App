@@ -23,6 +23,20 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    identifier: str
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_token: str | None = None
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+class PasswordResetResponse(BaseModel):
+    message: str
+
 def normalize_username(username: str) -> str:
     return username.strip().lower()
 
@@ -41,6 +55,24 @@ def create_access_token(data: dict) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def create_password_reset_token(user: User) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    payload = {
+        "sub": user.username,
+        "purpose": "password_reset",
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def decode_password_reset_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+    if payload.get("purpose") != "password_reset" or not payload.get("sub"):
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+    return payload["sub"]
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if credentials is None:
@@ -104,6 +136,38 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         db.refresh(user)
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "username": user.username}
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    identifier = request.identifier.strip()
+    username = normalize_username(identifier)
+    email = normalize_email(identifier)
+    user = db.query(User).filter(
+        or_(
+            func.lower(User.username) == username,
+            func.lower(User.email) == email,
+        )
+    ).first()
+
+    message = "If that account exists, a password reset link is ready."
+    if not user:
+        return {"message": message, "reset_token": None}
+
+    return {"message": message, "reset_token": create_password_reset_token(user)}
+
+@router.post("/reset-password", response_model=PasswordResetResponse)
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if len(request.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    username = decode_password_reset_token(request.token)
+    user = db.query(User).filter(func.lower(User.username) == normalize_username(username)).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+
+    user.hashed_password = pwd_context.hash(request.password)
+    db.commit()
+    return {"message": "Password reset complete. You can sign in with your new password."}
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):

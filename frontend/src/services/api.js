@@ -20,7 +20,11 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
     const requestUrl = error.config?.url || '';
-    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/register') ||
+      requestUrl.includes('/auth/forgot-password') ||
+      requestUrl.includes('/auth/reset-password');
     const isAuthFailure =
       status === 401 ||
       (status === 403 && (detail === 'Not authenticated' || detail === 'Could not validate credentials'));
@@ -29,7 +33,11 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('username');
       const currentPath = window.location.pathname;
-      const isAlreadyOnAuthPage = currentPath === '/login' || currentPath === '/register';
+      const isAlreadyOnAuthPage =
+        currentPath === '/login' ||
+        currentPath === '/register' ||
+        currentPath === '/forgot-password' ||
+        currentPath === '/reset-password';
       if (!isAuthEndpoint && !isAlreadyOnAuthPage) {
         window.location.href = '/login';
       }
