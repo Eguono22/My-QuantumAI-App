@@ -267,5 +267,6 @@ def test_pilot_feedback_summary_prioritizes_trust_blocker():
 
     assert summary["recommendation"]["label"] == "Fix Trust"
     assert summary["recommendation"]["tone"] == "red"
+    assert "Run 2 validation sessions" in summary["recommendation"]["next_action"]
 
     db.close()

@@ -278,7 +278,7 @@ class PilotFeedbackService:
                 "tone": "red",
                 "title": "Trust is the main blocker",
                 "message": "Users are not yet confident enough in the signal, risk, or execution story.",
-                "next_action": "Improve signal rationale, audit trail clarity, and risk explanations before expanding.",
+                "next_action": "Run 2 validation sessions on the updated trust flow. If trust stays below 4.0, keep improving signal rationale, audit trail clarity, and risk explanations.",
             }
         elif avg_value < 4.0:
             recommendation = {
