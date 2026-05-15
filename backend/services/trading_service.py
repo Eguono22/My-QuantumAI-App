@@ -108,11 +108,11 @@ class TradingService:
         risk_reward_ratio = None
 
         if stop_loss is not None and stop_loss > 0:
-            max_loss_at_stop = abs(float(reference_price) - float(stop_loss)) * float(quantity)
+            max_loss_at_stop = round(abs(float(reference_price) - float(stop_loss)) * float(quantity), 2)
         if take_profit is not None and take_profit > 0:
-            potential_reward = abs(float(take_profit) - float(reference_price)) * float(quantity)
-        if max_loss_at_stop and potential_reward is not None and max_loss_at_stop > 0:
-            risk_reward_ratio = potential_reward / max_loss_at_stop
+            potential_reward = round(abs(float(take_profit) - float(reference_price)) * float(quantity), 2)
+        if max_loss_at_stop is not None and potential_reward is not None and max_loss_at_stop > 0:
+            risk_reward_ratio = round(potential_reward / max_loss_at_stop, 2)
 
         accepted_reasons = [
             "Paper mode is still active.",
@@ -140,9 +140,9 @@ class TradingService:
             "status": order_status,
             "decision_summary": f"Paper order {status_phrase}.",
             "estimated_notional": round(estimated_notional, 2),
-            "max_loss_at_stop": round(max_loss_at_stop, 2) if max_loss_at_stop is not None else None,
-            "potential_reward": round(potential_reward, 2) if potential_reward is not None else None,
-            "risk_reward_ratio": round(risk_reward_ratio, 2) if risk_reward_ratio is not None else None,
+            "max_loss_at_stop": max_loss_at_stop,
+            "potential_reward": potential_reward,
+            "risk_reward_ratio": risk_reward_ratio,
             "accepted_reasons": accepted_reasons,
             "blocked_reasons": blocked_reasons,
             "checklist": [
