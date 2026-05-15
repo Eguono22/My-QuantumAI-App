@@ -23,11 +23,19 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:3004",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
+        "http://127.0.0.1:3004",
     ]
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
+    PASSWORD_RESET_TOKEN_MINUTES: int = 30
+    PASSWORD_RESET_EXPOSE_TOKEN: Optional[bool] = None
+    PASSWORD_RESET_DELIVERY: str = "preview"
+    PASSWORD_RESET_FROM_EMAIL: Optional[str] = None
+    PASSWORD_RESET_EMAIL_TIMEOUT_S: float = 8.0
+    RESEND_API_KEY: Optional[str] = None
     TRADING_MODE: str = "paper"
     BROKER_PROVIDER: str = "paper"
     BROKER_REQUEST_TIMEOUT_S: float = 8.0

@@ -49,6 +49,11 @@ export default function ForgotPassword() {
                 </Link>
               </div>
             )}
+            {!resetUrl && (
+              <p className="mt-3 text-emerald-800">
+                If email delivery is enabled, check your inbox for the reset link.
+              </p>
+            )}
           </div>
         )}
 

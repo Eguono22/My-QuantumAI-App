@@ -9,6 +9,7 @@ from passlib.context import CryptContext
 from models.database import User, get_db
 from config.settings import settings
 from api.routes.response_models import TokenResponse, UserResponse
+from services.email_service import password_reset_email_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -57,7 +58,7 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def create_password_reset_token(user: User) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_MINUTES)
     payload = {
         "sub": user.username,
         "purpose": "password_reset",
@@ -153,7 +154,19 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
     if not user:
         return {"message": message, "reset_token": None}
 
-    return {"message": message, "reset_token": create_password_reset_token(user)}
+    reset_token = create_password_reset_token(user)
+    reset_url = password_reset_email_service.build_reset_url(reset_token)
+    password_reset_email_service.send_password_reset_email(user.email, reset_url)
+
+    expose_token = (
+        settings.PASSWORD_RESET_EXPOSE_TOKEN
+        if settings.PASSWORD_RESET_EXPOSE_TOKEN is not None
+        else settings.APP_ENV == "development"
+    )
+    return {
+        "message": message,
+        "reset_token": reset_token if expose_token else None,
+    }
 
 @router.post("/reset-password", response_model=PasswordResetResponse)
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):

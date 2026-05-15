@@ -20,6 +20,7 @@ from api.routes.auth import (
     reset_password,
 )
 from models.database import Base, User
+from config.settings import settings
 
 
 def make_db():
@@ -61,6 +62,41 @@ def test_forgot_password_uses_generic_response_for_unknown_account():
 
     assert response["message"] == "If that account exists, a password reset link is ready."
     assert response["reset_token"] is None
+
+    db.close()
+
+
+def test_forgot_password_can_hide_reset_token(monkeypatch):
+    db = make_db()
+    create_user(db)
+    monkeypatch.setattr(settings, "PASSWORD_RESET_EXPOSE_TOKEN", False)
+    monkeypatch.setattr(settings, "PASSWORD_RESET_DELIVERY", "preview")
+
+    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+
+    assert response["message"] == "If that account exists, a password reset link is ready."
+    assert response["reset_token"] is None
+
+    db.close()
+
+
+def test_forgot_password_calls_password_reset_email_preview(monkeypatch):
+    db = make_db()
+    create_user(db)
+    sent = {}
+
+    def fake_send(to_email, reset_url):
+        sent["to_email"] = to_email
+        sent["reset_url"] = reset_url
+        return {"ok": True, "delivered": False, "delivery_mode": "preview"}
+
+    monkeypatch.setattr("api.routes.auth.password_reset_email_service.send_password_reset_email", fake_send)
+
+    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+
+    assert response["reset_token"]
+    assert sent["to_email"] == "reset@example.com"
+    assert "/reset-password?token=" in sent["reset_url"]
 
     db.close()
 
