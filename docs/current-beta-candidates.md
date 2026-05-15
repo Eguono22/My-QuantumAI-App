@@ -143,4 +143,5 @@ Would you be open to being part of this final validation round this week?
 1. Run sessions 6 and 7 using [`docs/final-trust-validation-sessions.md`](./final-trust-validation-sessions.md).
 2. Use [`docs/session-6-7-operator-answer-sheet.md`](./session-6-7-operator-answer-sheet.md) during the calls.
 3. Use [`docs/session-6-7-outreach-pack.md`](./session-6-7-outreach-pack.md) to send invites, schedule, and run the calls with less prep.
-4. Log both sessions in `/app/pilot` and check whether average trust reaches `4.0+`.
+4. If Emma is running one of the final validation sessions, use [`docs/emma-final-trust-validation-live-notes.md`](./emma-final-trust-validation-live-notes.md) during the call.
+5. Log both sessions in `/app/pilot` and check whether average trust reaches `4.0+`.

@@ -90,6 +90,7 @@ After the call:
 2. Mark the candidate `COMPLETED`.
 3. Save one clear friction line and one clear value line.
 4. Check the updated pilot recommendation.
+5. If Emma is the participant, use [`docs/emma-final-trust-validation-live-notes.md`](./emma-final-trust-validation-live-notes.md) as the live run sheet.
 
 ## Paste-Back Template
 
