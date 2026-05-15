@@ -2,6 +2,70 @@ import React from 'react';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import { SIGNAL_BG_COLORS, SIGNAL_COLORS } from '../utils/constants';
 
+function buildPostTradeOutcome(signal, executionAudit, invalidationCondition) {
+  const lastOrder = executionAudit?.lastOrder;
+  if (!lastOrder) {
+    return {
+      label: 'Manual review needed',
+      explanation: 'No paper order outcome is available yet for this signal.',
+      rows: [
+        ['Original thesis', signal.rationale?.[0] || 'Signal thesis is still collecting paper evidence.'],
+        ['Submitted order', 'No paper order submitted yet'],
+        ['Order status', 'No recent order'],
+        ['Invalidation check', invalidationCondition],
+      ],
+    };
+  }
+
+  const status = lastOrder.status || 'UNKNOWN';
+  const filledQuantity = Number(lastOrder.filled_quantity || 0);
+  const requestedQuantity = Number(lastOrder.requested_quantity || 0);
+  const fillPrice = Number(lastOrder.fill_price || lastOrder.market_price || 0);
+  const stopLoss = Number(signal.stop_loss || 0);
+  const marketPrice = Number(lastOrder.market_price || signal.price || 0);
+  const thesisRespected = stopLoss > 0 && marketPrice > 0
+    ? signal.signal_type === 'SELL'
+      ? marketPrice < stopLoss
+      : marketPrice > stopLoss
+    : null;
+  const submittedQuantity = requestedQuantity || filledQuantity;
+  const submittedNotional = submittedQuantity && marketPrice
+    ? submittedQuantity * marketPrice
+    : null;
+  const maxLossAtStop = submittedQuantity && stopLoss > 0 && marketPrice > 0
+    ? Math.abs(marketPrice - stopLoss) * submittedQuantity
+    : null;
+
+  let label = 'Manual review needed';
+  if (status === 'REJECTED') {
+    label = 'Manual review needed';
+  } else if (status === 'PENDING') {
+    label = 'Working';
+  } else if (['FILLED', 'PARTIAL_FILL'].includes(status)) {
+    label = thesisRespected === false ? 'Invalidated' : 'Working';
+  } else if (status === 'CANCELED') {
+    label = 'Manual review needed';
+  }
+
+  const invalidationCheck = thesisRespected === null
+    ? invalidationCondition
+    : thesisRespected
+      ? `Price still respects invalidation: ${invalidationCondition}`
+      : `Price violated invalidation: ${invalidationCondition}`;
+
+  return {
+    label,
+    explanation: lastOrder.reason || `Latest paper order is ${status.toLowerCase()} and ${label.toLowerCase()}.`,
+    rows: [
+      ['Original thesis', signal.rationale?.[0] || 'Signal thesis is based on current model agreement and market context.'],
+      ['Submitted order', `${lastOrder.action?.toUpperCase() || signal.signal_type} ${submittedQuantity || 'N/A'} ${signal.asset}${submittedNotional ? ` (${formatCurrency(submittedNotional)})` : ''}`],
+      ['Order status', fillPrice > 0 ? `${status} at ${formatCurrency(fillPrice)}` : status],
+      ['Invalidation check', invalidationCheck],
+      ['Max loss at stop', maxLossAtStop ? formatCurrency(maxLossAtStop) : 'Needs stop level and order size'],
+    ],
+  };
+}
+
 export default function TradingSignalCard({ signal }) {
   const bgColor = SIGNAL_BG_COLORS[signal.signal_type] || 'bg-white border-zinc-300';
   const textColor = SIGNAL_COLORS[signal.signal_type] || 'text-zinc-600';
@@ -62,6 +126,7 @@ export default function TradingSignalCard({ signal }) {
     || signal.similar_signal_outcome
     || 'Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.';
   const executionAudit = signal.execution_audit;
+  const postTradeOutcome = buildPostTradeOutcome(signal, executionAudit, invalidationCondition);
 
   return (
     <div className={`rounded-md p-4 border ${bgColor} transition hover:opacity-95`}>
@@ -210,6 +275,24 @@ export default function TradingSignalCard({ signal }) {
                   <p className="mt-1 text-zinc-800">{executionAudit.summary}</p>
                 </div>
               )}
+              <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-emerald-800 uppercase tracking-wide">Post-Trade Outcome Summary</p>
+                    <p className="mt-1 font-semibold text-emerald-950">{postTradeOutcome.label}</p>
+                  </div>
+                  <span className="rounded bg-white px-2 py-1 font-semibold text-emerald-800">PAPER</span>
+                </div>
+                <p className="mt-2 text-zinc-800">{postTradeOutcome.explanation}</p>
+                <div className="mt-2 space-y-1">
+                  {postTradeOutcome.rows.map(([label, value]) => (
+                    <div key={`${signal.asset}-post-trade-${label}`} className="flex justify-between gap-3">
+                      <span className="text-emerald-800">{label}</span>
+                      <span className="text-right font-semibold text-zinc-900">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

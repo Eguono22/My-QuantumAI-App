@@ -69,11 +69,54 @@ The first feature to build should be a compact post-trade outcome summary:
 - whether price respected the original invalidation point
 - simple outcome label: `working`, `invalidated`, `stopped`, `target reached`, or `manual review needed`
 
+## Rehearsal Decision Outcome
+
+Use this as the working product direction only if Emma's real answers match the rehearsal notes.
+
+- Decision: `Build More Proof`
+- Reason: Emma is willing to place a tiny paper trade, but payment confidence is still gated by repeated proof, post-trade outcome clarity, and longer-term paper performance evidence.
+- Next action: Build a compact post-trade outcome summary before expanding the paper beta.
+- Do not expand live-money scope: `Yes`
+
+## Next Build Brief
+
+Build a compact post-trade outcome summary that appears after a paper order has enough status or price context to explain what happened.
+
+### User Outcome
+
+The trader should be able to answer:
+
+- What was the original trade thesis?
+- What paper order was submitted?
+- Was the order accepted, filled, rejected, or still pending?
+- Did price respect or violate the original invalidation point?
+- Is the trade working, invalidated, stopped, target reached, or still needing manual review?
+
+### Minimum Fields
+
+- signal symbol
+- signal direction
+- original rationale
+- invalidation level
+- submitted quantity
+- submitted notional
+- max loss at stop
+- latest order status
+- latest fill price if available
+- outcome label
+- short outcome explanation
+
+### Scope Guardrails
+
+- Keep this paper-only.
+- Do not add live-money automation.
+- Do not widen the beta until real feedback confirms trust and willingness to pay.
+
 ## Final Note To Save
 
 ```text
-Decision:
-Reason:
-Next action:
-Do not expand live-money scope:
+Decision: Build More Proof
+Reason: Emma is willing to place a tiny paper trade, but payment confidence still depends on repeated proof and clearer post-trade outcomes.
+Next action: Build a compact post-trade outcome summary.
+Do not expand live-money scope: Yes
 ```

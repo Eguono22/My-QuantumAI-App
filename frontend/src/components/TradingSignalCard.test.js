@@ -18,6 +18,14 @@ const buySignal = {
   rationale: ['Quantum walk projects upward drift.', 'MACD histogram is positive.'],
   execution_audit: {
     summary: '2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.',
+    lastOrder: {
+      action: 'buy',
+      status: 'FILLED',
+      requested_quantity: 1,
+      filled_quantity: 1,
+      fill_price: 43280,
+      market_price: 43250,
+    },
   },
 };
 
@@ -100,7 +108,7 @@ describe('TradingSignalCard', () => {
     expect(screen.getByText('Why this signal appeared now')).toBeInTheDocument();
     expect(screen.getByText('What Proves It Wrong')).toBeInTheDocument();
     expect(screen.getByText('Below $42,100.00')).toBeInTheDocument();
-    expect(screen.getByText('$1,150.00')).toBeInTheDocument();
+    expect(screen.getAllByText('$1,150.00').length).toBeGreaterThan(0);
   });
 
   it('renders signal proof and audit trail evidence', () => {
@@ -118,5 +126,11 @@ describe('TradingSignalCard', () => {
     expect(screen.getByText('Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.')).toBeInTheDocument();
     expect(screen.getByText('Recent Execution Audit')).toBeInTheDocument();
     expect(screen.getByText('2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.')).toBeInTheDocument();
+    expect(screen.getByText('Post-Trade Outcome Summary')).toBeInTheDocument();
+    expect(screen.getByText('Working')).toBeInTheDocument();
+    expect(screen.getByText('BUY 1 BTC ($43,250.00)')).toBeInTheDocument();
+    expect(screen.getByText('FILLED at $43,280.00')).toBeInTheDocument();
+    expect(screen.getByText('Price still respects invalidation: Below $42,100.00')).toBeInTheDocument();
+    expect(screen.getAllByText('$1,150.00').length).toBeGreaterThan(0);
   });
 });
