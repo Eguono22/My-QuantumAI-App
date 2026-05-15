@@ -119,6 +119,88 @@ class SignalGenerator:
             "risk_reward_ratio": float(max(0.5, min(rr, 8.0)))
         }
 
+    def _build_recent_price_context(
+        self,
+        prices: List[float],
+        current_price: float,
+        trend_strength: float,
+        realized_volatility: float,
+        bb_data: Dict,
+    ) -> List[str]:
+        trailing_prices = np.array(prices[-20:]) if len(prices) >= 20 else np.array(prices)
+        trailing_mean = float(np.mean(trailing_prices)) if len(trailing_prices) else current_price
+        distance_from_mean_pct = ((current_price / trailing_mean) - 1.0) * 100 if trailing_mean else 0.0
+        short_drift_pct = trend_strength * 100.0
+
+        if current_price >= bb_data["upper"]:
+            band_context = "Price is pressing the upper Bollinger band."
+        elif current_price <= bb_data["lower"]:
+            band_context = "Price is testing the lower Bollinger band."
+        else:
+            band_context = "Price is trading inside the Bollinger envelope."
+
+        return [
+            f"20-bar mean distance: {distance_from_mean_pct:+.2f}%.",
+            f"Recent 8-bar drift: {short_drift_pct:+.2f}%.",
+            f"Realized volatility: {realized_volatility * 100:.2f}%.",
+            band_context,
+        ]
+
+    def _build_invalidation_reason(self, signal_type: str, stop_loss: float) -> str:
+        if stop_loss <= 0:
+            return "No stop was generated, so invalidation proof is incomplete."
+        if signal_type == "SELL":
+            return f"The short thesis is wrong if price reclaims {stop_loss:.2f} and holds above it."
+        if signal_type == "BUY":
+            return f"The long thesis is wrong if price loses {stop_loss:.2f} and trades below it."
+        return f"Treat {stop_loss:.2f} as the invalidation line while the market stays indecisive."
+
+    def _summarize_previous_similar_outcome(
+        self,
+        signal_type: str,
+        prices: List[float],
+        forward_bars: int = 6,
+        sample_limit: int = 6,
+    ) -> str:
+        if signal_type == "HOLD" or len(prices) < 45:
+            return "Not enough closed similar signals yet. Treat this as evidence to collect in paper mode."
+
+        returns = np.diff(np.array(prices)) / (np.array(prices[:-1]) + 1e-10)
+        matching_indices = []
+        for idx in range(12, len(prices) - forward_bars):
+            local_drift = float(np.mean(returns[idx - 8:idx])) if idx >= 8 else 0.0
+            if signal_type == "BUY" and local_drift > 0:
+                matching_indices.append(idx)
+            elif signal_type == "SELL" and local_drift < 0:
+                matching_indices.append(idx)
+
+        if not matching_indices:
+            return "Not enough closed similar signals yet. Treat this as evidence to collect in paper mode."
+
+        matching_indices = matching_indices[-sample_limit:]
+        wins = 0
+        future_returns = []
+        for idx in matching_indices:
+            start_price = float(prices[idx])
+            end_price = float(prices[min(len(prices) - 1, idx + forward_bars)])
+            if start_price <= 0:
+                continue
+            realized_return_pct = ((end_price / start_price) - 1.0) * 100.0
+            future_returns.append(realized_return_pct)
+            if signal_type == "BUY" and realized_return_pct > 0:
+                wins += 1
+            elif signal_type == "SELL" and realized_return_pct < 0:
+                wins += 1
+
+        if not future_returns:
+            return "Not enough closed similar signals yet. Treat this as evidence to collect in paper mode."
+
+        avg_abs_move = float(np.mean(np.abs(future_returns)))
+        return (
+            f"{wins} of the last {len(future_returns)} similar {signal_type.lower()} setups moved in the expected "
+            f"direction within about {forward_bars} bars, with an average move of {avg_abs_move:.2f}%."
+        )
+
     def generate_signal(self, asset: str, prices: List[float], volume: float = 1000000.0) -> Dict:
         """Generate trading signal using quantum AI algorithms."""
         if not prices:
@@ -197,6 +279,15 @@ class SignalGenerator:
         trend_strength = float(np.mean(returns[-8:])) if len(returns) >= 8 else 0.0
         market_regime = self._market_regime(trend_strength, realized_volatility)
         levels = self._position_levels(final_signal, current_price, expected_move_pct, risk_level)
+        recent_price_context = self._build_recent_price_context(
+            prices=prices,
+            current_price=current_price,
+            trend_strength=trend_strength,
+            realized_volatility=realized_volatility,
+            bb_data=bb_data,
+        )
+        invalidation_reason = self._build_invalidation_reason(final_signal, levels["stop_loss"])
+        previous_similar_outcome = self._summarize_previous_similar_outcome(final_signal, prices)
 
         half_life_min = 45 if horizon == "SCALP" else 180 if horizon == "INTRADAY" else 720
         if risk_level == "HIGH":
@@ -258,5 +349,8 @@ class SignalGenerator:
                 "sell": int(signal_votes["SELL"]),
                 "hold": int(signal_votes["HOLD"]),
             },
+            "invalidation_reason": invalidation_reason,
+            "recent_price_context": recent_price_context,
+            "previous_similar_outcome": previous_similar_outcome,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }

@@ -6,6 +6,37 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
+function summarizeOrderAudit(orders) {
+  if (!orders.length) {
+    return {
+      summary: 'No recent paper-order audit trail yet for this asset.',
+      filledCount: 0,
+      pendingCount: 0,
+      rejectedCount: 0,
+      canceledCount: 0,
+      lastOrder: null,
+    };
+  }
+
+  const filledCount = orders.filter((order) => ['FILLED', 'PARTIAL_FILL'].includes(order.status)).length;
+  const pendingCount = orders.filter((order) => order.status === 'PENDING').length;
+  const rejectedCount = orders.filter((order) => order.status === 'REJECTED').length;
+  const canceledCount = orders.filter((order) => order.status === 'CANCELED').length;
+  const lastOrder = orders[0];
+  const lastOutcome = lastOrder.reason
+    ? `${lastOrder.status}: ${lastOrder.reason}`
+    : `${lastOrder.status} ${lastOrder.filled_quantity ? `for ${lastOrder.filled_quantity}` : ''}`.trim();
+
+  return {
+    summary: `${filledCount} filled/partial, ${pendingCount} pending, ${rejectedCount} rejected, ${canceledCount} canceled. Last outcome: ${lastOutcome}.`,
+    filledCount,
+    pendingCount,
+    rejectedCount,
+    canceledCount,
+    lastOrder,
+  };
+}
+
 export default function TradingSignals({ preferences }) {
   const RISK_PRESETS = {
     CONSERVATIVE: { riskPerTradePct: 0.5, maxPortfolioHeatPct: 3 },
@@ -35,6 +66,7 @@ export default function TradingSignals({ preferences }) {
   const [quickTradeLoading, setQuickTradeLoading] = useState({});
   const [quickTradeResult, setQuickTradeResult] = useState({});
   const [pendingQuickTrade, setPendingQuickTrade] = useState(null);
+  const [orders, setOrders] = useState([]);
   const [riskBudget, setRiskBudget] = useState({
     accountSize: 10000,
     riskPerTradePct: 1,
@@ -72,11 +104,12 @@ export default function TradingSignals({ preferences }) {
 
   const fetchSignals = useCallback(async () => {
     try {
-      const [signalsResult, overviewResult, watchResult, alertsResult] = await Promise.allSettled([
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
         tradingService.getPriceAlerts(true),
+        tradingService.getOrders(),
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -98,6 +131,9 @@ export default function TradingSignals({ preferences }) {
       );
       setPriceAlerts(
         alertsResult.status === 'fulfilled' && Array.isArray(alertsResult.value) ? alertsResult.value : []
+      );
+      setOrders(
+        ordersResult.status === 'fulfilled' && Array.isArray(ordersResult.value) ? ordersResult.value : []
       );
 
       if (symbols.length > 0) {
@@ -206,6 +242,10 @@ export default function TradingSignals({ preferences }) {
     const executionPrice = Number(signal.price || signal.entry_price || 0);
     const stopLoss = Number(signal.stop_loss || 0);
     const takeProfit = Number(signal.take_profit || 0);
+    const rewardPerUnit = takeProfit > 0 ? Math.abs(takeProfit - executionPrice) : 0;
+    const potentialReward = qty * rewardPerUnit;
+    const maxLossAtStop = qty * riskPerUnit;
+    const recentOrderAudit = summarizeOrderAudit(orderAuditByAsset[signal.asset] || []);
     setPendingQuickTrade({
       signal,
       action,
@@ -214,11 +254,28 @@ export default function TradingSignals({ preferences }) {
       estimatedNotional: qty * executionPrice,
       riskPerUnit,
       orderRisk,
+      maxLossAtStop,
+      rewardPerUnit,
+      potentialReward,
+      riskRewardRatio: maxLossAtStop > 0 && potentialReward > 0 ? potentialReward / maxLossAtStop : Number(signal.risk_reward_ratio || 0),
       additionalHeatPct,
       projectedHeatPct,
       perTradeRiskCap,
       stopLoss,
       takeProfit,
+      invalidationSummary: signal.invalidation_reason || (
+        stopLoss > 0
+          ? `${action === 'SELL' ? 'The short thesis is wrong if price trades back above' : 'The long thesis is wrong if price trades below'} ${formatCurrency(stopLoss)}.`
+          : 'No invalidation level is attached yet.'
+      ),
+      proofPoints: signal.rationale?.length
+        ? signal.rationale.slice(0, 3)
+        : ['Signal generated from momentum, volatility, and model agreement.'],
+      recentPriceContext: signal.recent_price_context?.length
+        ? signal.recent_price_context
+        : ['Recent price context is not available yet.'],
+      previousSimilarOutcome: signal.previous_similar_outcome || recentOrderAudit.summary,
+      recentOrderAudit,
     });
   };
 
@@ -230,13 +287,20 @@ export default function TradingSignals({ preferences }) {
       action,
       quantity: qty,
       price,
+      stopLoss,
+      takeProfit,
     } = pendingQuickTrade;
     const key = `${signal.asset}-${action}`;
     setQuickTradeLoading((prev) => ({ ...prev, [key]: true }));
     setPendingQuickTrade(null);
     try {
-      const result = await tradingService.executeTrade(signal.asset, action, qty, price);
+      const result = await tradingService.executeTrade(signal.asset, action, qty, price, {
+        stop_loss: stopLoss || undefined,
+        take_profit: takeProfit || undefined,
+      });
       const trade = result?.trade;
+      const order = result?.order;
+      const audit = result?.audit;
       setQuickTradeResult((prev) => ({
         ...prev,
         [signal.asset]: {
@@ -245,9 +309,19 @@ export default function TradingSignals({ preferences }) {
           price: trade?.price ?? signal.price,
           at: new Date().toISOString(),
           ok: true,
+          status: order?.status || 'FILLED',
+          auditSummary: audit?.decision_summary || 'Paper order accepted.',
+          maxLossAtStop: audit?.max_loss_at_stop,
+          potentialReward: audit?.potential_reward,
         },
       }));
-      setAlert({ type: 'success', message: `${action} order submitted for ${qty} ${signal.asset}.` });
+      if (order) {
+        setOrders((prev) => [order, ...prev.filter((item) => item.id !== order.id)].slice(0, 200));
+      }
+      setAlert({
+        type: 'success',
+        message: `${action} order ${order?.status?.toLowerCase() || 'submitted'} for ${qty} ${signal.asset}.`,
+      });
     } catch (err) {
       setQuickTradeResult((prev) => ({
         ...prev,
@@ -257,6 +331,7 @@ export default function TradingSignals({ preferences }) {
           price: signal.price,
           at: new Date().toISOString(),
           ok: false,
+          status: 'BLOCKED',
           error: err.response?.data?.detail || 'Quick trade failed',
         },
       }));
@@ -491,6 +566,16 @@ export default function TradingSignals({ preferences }) {
     }, {});
   }, [riskBudgetRows]);
 
+  const orderAuditByAsset = useMemo(() => {
+    return orders.reduce((acc, order) => {
+      if (!acc[order.asset]) {
+        acc[order.asset] = [];
+      }
+      acc[order.asset].push(order);
+      return acc;
+    }, {});
+  }, [orders]);
+
   const getMaxSafeQtyForSignal = useCallback((signal) => {
     const accountSize = Number(riskBudget.accountSize) || 0;
     const perTradeRiskCap = accountSize * ((Number(riskBudget.riskPerTradePct) || 0) / 100);
@@ -581,8 +666,8 @@ export default function TradingSignals({ preferences }) {
                   <p className="mt-1 font-bold text-zinc-900">{formatCurrency(pendingQuickTrade.estimatedNotional)}</p>
                 </div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-xs uppercase tracking-wide text-amber-700">Max Risk</p>
-                  <p className="mt-1 font-bold text-amber-900">{formatCurrency(pendingQuickTrade.orderRisk)}</p>
+                  <p className="text-xs uppercase tracking-wide text-amber-700">Max Loss At Stop</p>
+                  <p className="mt-1 font-bold text-amber-900">{formatCurrency(pendingQuickTrade.maxLossAtStop)}</p>
                 </div>
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                   <p className="text-xs uppercase tracking-wide text-zinc-500">Risk / Unit</p>
@@ -591,6 +676,14 @@ export default function TradingSignals({ preferences }) {
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                   <p className="text-xs uppercase tracking-wide text-zinc-500">Heat Impact</p>
                   <p className="mt-1 font-bold text-zinc-900">+{pendingQuickTrade.additionalHeatPct.toFixed(2)}%</p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">Potential Reward</p>
+                  <p className="mt-1 font-bold text-emerald-900">{pendingQuickTrade.potentialReward > 0 ? formatCurrency(pendingQuickTrade.potentialReward) : 'N/A'}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Risk / Reward</p>
+                  <p className="mt-1 font-bold text-zinc-900">{pendingQuickTrade.riskRewardRatio > 0 ? `${pendingQuickTrade.riskRewardRatio.toFixed(2)} R` : 'N/A'}</p>
                 </div>
               </div>
 
@@ -612,6 +705,38 @@ export default function TradingSignals({ preferences }) {
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
                 Projected portfolio heat after this order: <span className="font-semibold text-zinc-900">{pendingQuickTrade.projectedHeatPct.toFixed(2)}%</span>.
                 Per-trade risk cap: <span className="font-semibold text-zinc-900">{formatCurrency(pendingQuickTrade.perTradeRiskCap)}</span>.
+              </div>
+
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">What Would Prove This Trade Wrong</p>
+                <p className="mt-1 font-medium text-red-950">{pendingQuickTrade.invalidationSummary}</p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-zinc-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Why This Signal Passed</p>
+                  <ul className="mt-2 space-y-1">
+                    {pendingQuickTrade.proofPoints.map((line, idx) => (
+                      <li key={`pending-proof-${idx}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-zinc-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Recent Price Context</p>
+                  <ul className="mt-2 space-y-1">
+                    {pendingQuickTrade.recentPriceContext.map((line, idx) => (
+                      <li key={`pending-context-${idx}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Signal Audit Trail</p>
+                <p className="mt-2">{pendingQuickTrade.previousSimilarOutcome}</p>
+                <p className="mt-2 text-zinc-600">
+                  Recent paper decisions on {pendingQuickTrade.signal.asset}: {pendingQuickTrade.recentOrderAudit.summary}
+                </p>
               </div>
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1315,6 +1440,7 @@ export default function TradingSignals({ preferences }) {
               const sellLoading = !!quickTradeLoading[`${signal.asset}-SELL`];
               const latestTrade = quickTradeResult[signal.asset];
               const riskRow = riskRowByAsset[signal.asset];
+              const recentAudit = summarizeOrderAudit(orderAuditByAsset[signal.asset] || []);
               const qtyInput = Number(quickQty[signal.asset] ?? 0);
               const projectedOrderRisk = (riskRow?.riskPerUnit || 0) * (qtyInput > 0 ? qtyInput : 0);
               const projectedOrderHeat = (Number(riskBudget.accountSize) || 0) > 0
@@ -1413,6 +1539,10 @@ export default function TradingSignals({ preferences }) {
                     </div>
                   )}
 
+                  <div className="mt-2 rounded border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] text-sky-900">
+                    Audit trail: {recentAudit.summary}
+                  </div>
+
                   {latestTrade && (
                     <div className={`mt-2 rounded px-2 py-1 text-[11px] border ${
                       latestTrade.ok
@@ -1420,7 +1550,7 @@ export default function TradingSignals({ preferences }) {
                         : 'bg-red-50 text-red-700 border-red-200'
                     }`}>
                       {latestTrade.ok
-                        ? `Last ${latestTrade.action}: ${latestTrade.quantity} @ ${formatCurrency(latestTrade.price)}`
+                        ? `${latestTrade.auditSummary || `Last ${latestTrade.action}: ${latestTrade.quantity} @ ${formatCurrency(latestTrade.price)}`}`
                         : `Last ${latestTrade.action} failed: ${latestTrade.error}`}
                     </div>
                   )}
@@ -1439,13 +1569,19 @@ export default function TradingSignals({ preferences }) {
         {filtered.map((signal, i) => {
           const signalKey = signal.id ?? `${signal.asset}-${signal.timestamp}`;
           const selected = selectedSignalId === signalKey;
+          const recentAudit = summarizeOrderAudit(orderAuditByAsset[signal.asset] || []);
+          const signalWithAudit = {
+            ...signal,
+            previous_similar_outcome: signal.previous_similar_outcome || recentAudit.summary,
+            execution_audit: recentAudit,
+          };
           return (
             <div
               key={signal.id ?? i}
               id={`signal-card-${signalKey}`}
               className={selected ? 'ring-2 ring-amber-400 rounded-md' : ''}
             >
-              <TradingSignalCard signal={signal} />
+              <TradingSignalCard signal={signalWithAudit} />
             </div>
           );
         })}

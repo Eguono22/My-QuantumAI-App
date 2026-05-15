@@ -23,9 +23,23 @@ export default function TradingSignalCard({ signal }) {
   const takeProfit = Number(signal.take_profit || 0);
   const riskPerUnit = entryPrice > 0 && stopLoss > 0 ? Math.abs(entryPrice - stopLoss) : 0;
   const estimatedNotional = entryPrice > 0 ? entryPrice : Number(signal.price || 0);
-  const invalidationCondition = stopLoss > 0
-    ? `${signal.signal_type === 'SELL' ? 'Above' : 'Below'} ${formatCurrency(stopLoss)}`
-    : 'Missing stop level';
+  const rewardPerUnit = entryPrice > 0 && takeProfit > 0 ? Math.abs(takeProfit - entryPrice) : 0;
+  const invalidationCondition = signal.invalidation_reason || (
+    stopLoss > 0
+      ? `${signal.signal_type === 'SELL' ? 'Above' : 'Below'} ${formatCurrency(stopLoss)}`
+      : 'Missing stop level'
+  );
+  const priceActionContext = signal.recent_price_context?.length
+    ? signal.recent_price_context.join(' | ')
+    : [
+      signal.market_regime ? `${regimeLabel} regime` : 'Regime not supplied',
+      signal.expected_move_pct !== undefined && signal.expected_move_pct !== null
+        ? `${formatPercent(signal.expected_move_pct)} expected move`
+        : 'Expected move not supplied',
+      signal.signal_strength !== undefined && signal.signal_strength !== null
+        ? `${signal.signal_strength.toFixed(1)}/100 strength`
+        : 'Strength score pending',
+    ].join(' | ');
   const confidenceDrivers = [
     signal.market_regime ? `Regime: ${regimeLabel}` : null,
     signal.risk_level ? `Risk: ${signal.risk_level}` : null,
@@ -37,6 +51,17 @@ export default function TradingSignalCard({ signal }) {
   const trustRationale = signal.rationale?.length
     ? signal.rationale
     : ['Signal generated from momentum, volatility, and quantum model agreement.'];
+  const auditSteps = [
+    `Direction selected: ${signal.signal_type || 'UNKNOWN'}`,
+    `Confidence checked: ${((Number(signal.confidence) || 0) * 100).toFixed(1)}%`,
+    riskPerUnit > 0 ? `Risk bounded at ${formatCurrency(riskPerUnit)} per unit` : 'Risk bound pending stop level',
+    rewardPerUnit > 0 ? `Target reward is ${formatCurrency(rewardPerUnit)} per unit` : 'Target reward pending take-profit level',
+    totalVotes > 0 ? `Model vote split: buy ${buyPct}%, sell ${sellPct}%, hold ${holdPct}%` : 'Vote split not supplied',
+  ];
+  const similarSignalOutcome = signal.previous_similar_outcome
+    || signal.similar_signal_outcome
+    || 'Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.';
+  const executionAudit = signal.execution_audit;
 
   return (
     <div className={`rounded-md p-4 border ${bgColor} transition hover:opacity-95`}>
@@ -160,9 +185,37 @@ export default function TradingSignalCard({ signal }) {
             </p>
           </div>
 
+          <div className="rounded border border-sky-200 bg-sky-50 px-2 py-2">
+            <p className="font-semibold text-sky-950">Signal Proof & Audit Trail</p>
+            <div className="mt-2 space-y-2">
+              <div>
+                <p className="text-sky-800 uppercase tracking-wide">Why this signal passed</p>
+                <ul className="mt-1 space-y-1 text-zinc-800">
+                  {auditSteps.map((line, idx) => (
+                    <li key={`${signal.asset}-audit-step-${idx}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-sky-800 uppercase tracking-wide">Recent Price-Action Context</p>
+                <p className="mt-1 text-zinc-800">{priceActionContext}</p>
+              </div>
+              <div>
+                <p className="text-sky-800 uppercase tracking-wide">Previous Similar Signal Outcome</p>
+                <p className="mt-1 text-zinc-800">{similarSignalOutcome}</p>
+              </div>
+              {executionAudit && (
+                <div>
+                  <p className="text-sky-800 uppercase tracking-wide">Recent Execution Audit</p>
+                  <p className="mt-1 text-zinc-800">{executionAudit.summary}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">
-              <p className="text-zinc-500 uppercase">Invalidates If</p>
+              <p className="text-zinc-500 uppercase">What Proves It Wrong</p>
               <p className="mt-1 font-semibold text-zinc-900">{invalidationCondition}</p>
             </div>
             <div className="rounded border border-zinc-200 bg-zinc-50 px-2 py-2">

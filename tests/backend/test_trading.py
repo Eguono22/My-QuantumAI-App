@@ -48,6 +48,9 @@ class TestTradingService:
             assert "asset" in signal
             assert "signal_type" in signal
             assert "confidence" in signal
+            assert "invalidation_reason" in signal
+            assert "recent_price_context" in signal
+            assert "previous_similar_outcome" in signal
             assert signal["signal_type"] in ["BUY", "SELL", "HOLD"]
             assert 0.0 <= signal["confidence"] <= 1.0
         
@@ -211,6 +214,42 @@ class TestTradingService:
         assert result["order"]["broker"] == "paper-broker"
         assert result["order"]["mode"] == "paper"
         assert result["risk"]["risk_passed"] is True
+        assert result["audit"]["decision"] == "ACCEPTED"
+        assert "Paper mode is still active." in result["audit"]["accepted_reasons"]
+
+        db.close()
+
+    def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser10", email="test10@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        result = self.service.execute_trade(
+            db,
+            user.id,
+            "BTC",
+            "buy",
+            0.01,
+            43000.0,
+            stop_loss=42000.0,
+            take_profit=45000.0,
+        )
+        reference_price = result["trade"]["price"]
+        expected_max_loss = round(abs(reference_price - 42000.0) * 0.01, 2)
+        expected_reward = round(abs(45000.0 - reference_price) * 0.01, 2)
+        assert result["audit"]["max_loss_at_stop"] == pytest.approx(expected_max_loss)
+        assert result["audit"]["potential_reward"] == pytest.approx(expected_reward)
+        assert result["audit"]["risk_reward_ratio"] == pytest.approx(round(expected_reward / expected_max_loss, 2))
 
         db.close()
 

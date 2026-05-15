@@ -89,6 +89,7 @@ class TradeResponse(BaseModel):
     order: Optional[dict] = None
     protection: Optional[dict] = None
     risk: Optional[dict] = None
+    audit: Optional[dict] = None
     message: Optional[str] = None
 
 
@@ -152,6 +153,9 @@ class SignalResponse(BaseModel):
     expires_at: Optional[str] = None
     rationale: Optional[List[str]] = None
     vote_breakdown: Optional[VoteBreakdown] = None
+    invalidation_reason: Optional[str] = None
+    recent_price_context: Optional[List[str]] = None
+    previous_similar_outcome: Optional[str] = None
 
 
 class HFTResponse(BaseModel):

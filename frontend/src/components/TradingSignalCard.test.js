@@ -16,6 +16,9 @@ const buySignal = {
   market_regime: 'TRENDING',
   vote_breakdown: { buy: 6, sell: 1, hold: 2 },
   rationale: ['Quantum walk projects upward drift.', 'MACD histogram is positive.'],
+  execution_audit: {
+    summary: '2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.',
+  },
 };
 
 const sellSignal = {
@@ -95,8 +98,25 @@ describe('TradingSignalCard', () => {
     expect(screen.getByText('Signal Trust Panel')).toBeInTheDocument();
     expect(screen.getByText('Paper-only review before any order')).toBeInTheDocument();
     expect(screen.getByText('Why this signal appeared now')).toBeInTheDocument();
-    expect(screen.getByText('Invalidates If')).toBeInTheDocument();
+    expect(screen.getByText('What Proves It Wrong')).toBeInTheDocument();
     expect(screen.getByText('Below $42,100.00')).toBeInTheDocument();
     expect(screen.getByText('$1,150.00')).toBeInTheDocument();
+  });
+
+  it('renders signal proof and audit trail evidence', () => {
+    render(<TradingSignalCard signal={buySignal} />);
+
+    expect(screen.getByText('Signal Proof & Audit Trail')).toBeInTheDocument();
+    expect(screen.getByText('Why this signal passed')).toBeInTheDocument();
+    expect(screen.getByText('Direction selected: BUY')).toBeInTheDocument();
+    expect(screen.getByText('Confidence checked: 82.0%')).toBeInTheDocument();
+    expect(screen.getByText('Risk bounded at $1,150.00 per unit')).toBeInTheDocument();
+    expect(screen.getByText('Target reward is $2,250.00 per unit')).toBeInTheDocument();
+    expect(screen.getByText('Recent Price-Action Context')).toBeInTheDocument();
+    expect(screen.getByText('TRENDING regime | +5.20% expected move | Strength score pending')).toBeInTheDocument();
+    expect(screen.getByText('Previous Similar Signal Outcome')).toBeInTheDocument();
+    expect(screen.getByText('Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.')).toBeInTheDocument();
+    expect(screen.getByText('Recent Execution Audit')).toBeInTheDocument();
+    expect(screen.getByText('2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.')).toBeInTheDocument();
   });
 });

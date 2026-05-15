@@ -89,6 +89,70 @@ class TradingService:
             "updated_at": order.updated_at.isoformat(),
         }
 
+    def _build_trade_audit(
+        self,
+        *,
+        asset: str,
+        action: str,
+        quantity: float,
+        reference_price: float,
+        order_status: str,
+        stop_loss: Optional[float],
+        take_profit: Optional[float],
+        risk_check: Optional[Dict],
+        broker_reason: Optional[str] = None,
+    ) -> Dict:
+        estimated_notional = float(quantity) * float(reference_price)
+        max_loss_at_stop = None
+        potential_reward = None
+        risk_reward_ratio = None
+
+        if stop_loss is not None and stop_loss > 0:
+            max_loss_at_stop = abs(float(reference_price) - float(stop_loss)) * float(quantity)
+        if take_profit is not None and take_profit > 0:
+            potential_reward = abs(float(take_profit) - float(reference_price)) * float(quantity)
+        if max_loss_at_stop and potential_reward is not None and max_loss_at_stop > 0:
+            risk_reward_ratio = potential_reward / max_loss_at_stop
+
+        accepted_reasons = [
+            "Paper mode is still active.",
+            f"Broker accepted the {action.upper()} order for {asset}.",
+        ]
+        if stop_loss is not None and stop_loss > 0:
+            accepted_reasons.append("A stop-loss invalidation level is attached to the order.")
+        if take_profit is not None and take_profit > 0:
+            accepted_reasons.append("A take-profit target is attached to the order.")
+        if risk_check and risk_check.get("risk_passed"):
+            accepted_reasons.append("Pre-trade risk limits passed for the filled quantity.")
+
+        blocked_reasons = []
+        if broker_reason:
+            blocked_reasons.append(str(broker_reason))
+
+        status_phrase = {
+            "FILLED": "accepted and filled",
+            "PARTIAL_FILL": "accepted and partially filled",
+            "PENDING": "accepted and waiting for its trigger",
+        }.get(order_status, f"recorded with status {order_status}")
+
+        return {
+            "decision": "ACCEPTED",
+            "status": order_status,
+            "decision_summary": f"Paper order {status_phrase}.",
+            "estimated_notional": round(estimated_notional, 2),
+            "max_loss_at_stop": round(max_loss_at_stop, 2) if max_loss_at_stop is not None else None,
+            "potential_reward": round(potential_reward, 2) if potential_reward is not None else None,
+            "risk_reward_ratio": round(risk_reward_ratio, 2) if risk_reward_ratio is not None else None,
+            "accepted_reasons": accepted_reasons,
+            "blocked_reasons": blocked_reasons,
+            "checklist": [
+                "Confirm the order stays paper-only.",
+                "Confirm quantity and estimated notional match the plan.",
+                "Confirm stop-loss defines the invalidation point.",
+                "Confirm max loss is acceptable before execution.",
+            ],
+        }
+
     def _apply_filled_trade(
         self,
         db: Session,
@@ -272,6 +336,18 @@ class TradingService:
         message = None
         if order_status == "PENDING":
             message = "Order accepted and pending trigger."
+        reference_price = execution_price if execution_price is not None else float(order.market_price or price or 0.0)
+        audit = self._build_trade_audit(
+            asset=asset,
+            action=action,
+            quantity=float(order.requested_quantity),
+            reference_price=reference_price,
+            order_status=order_status,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            risk_check=risk_check,
+            broker_reason=order.reason,
+        )
 
         logger.info(
             "trade_submitted user_id=%s asset=%s action=%s order_type=%s status=%s qty=%s filled_qty=%s broker=%s",
@@ -296,6 +372,7 @@ class TradingService:
                 "risk_percent": risk_percent,
             },
             "risk": risk_check,
+            "audit": audit,
             "message": message,
         }
     
@@ -530,6 +607,9 @@ class TradingService:
                 "expires_at": analytics.get("expires_at"),
                 "rationale": analytics.get("rationale"),
                 "vote_breakdown": analytics.get("vote_breakdown"),
+                "invalidation_reason": analytics.get("invalidation_reason"),
+                "recent_price_context": analytics.get("recent_price_context"),
+                "previous_similar_outcome": analytics.get("previous_similar_outcome"),
             })
         return enriched
 

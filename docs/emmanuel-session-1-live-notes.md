@@ -1,4 +1,4 @@
-# Emmanuel Session 1 Live Notes
+    # Emmanuel Session 1 Live Notes
 
 Use this during the call, then copy the final summary into `/app/pilot`.
 

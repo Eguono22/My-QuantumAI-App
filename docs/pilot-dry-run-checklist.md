@@ -13,7 +13,6 @@ Confirm the full `/app/pilot` workflow works end to end:
 5. save one feedback entry linked to that candidate
 6. confirm the candidate moves to `COMPLETED`
 7. copy the pilot report
-
 ## Before You Start
 
 - start the backend:

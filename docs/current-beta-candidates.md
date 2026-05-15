@@ -13,6 +13,8 @@ These are working assumptions based on the first-3 outreach structure:
 | Joshua | Signal reviewer | Direct outreach | Useful for comparing AI rationale against existing signal-review habits | COMPLETED |
 | Session 4 candidate | Signal reviewer | Trust panel validation | Validate whether the Signal Trust Panel raises trust above 4.0 | COMPLETED |
 | Session 5 candidate | Paper trader | Trust panel validation | Validate whether paper-only risk and execution clarity raises trade confidence | COMPLETED |
+| Session 6 candidate | Signal reviewer | Final trust validation | Validate whether signal proof, price context, and previous similar outcome now feel trustworthy enough for a tiny paper trade | READY |
+| Session 7 candidate | Paper trader | Final trust validation | Validate whether final confirmation, explicit max loss, and order audit trail now reduce execution anxiety | READY |
 
 ## Ready-To-Add Entries
 
@@ -58,6 +60,22 @@ Use these values when adding them in `/app/pilot`:
 - Notes: `Use the updated Signal Trust Panel. Focus on whether paper-only confirmation, estimated notional, max risk, stop, and target are clear enough before execution.`
 - Status: `COMPLETED`
 
+### 6. Session 6 candidate
+
+- Candidate: `Session 6 candidate`
+- Segment: `Signal reviewer`
+- Source: `Final trust validation`
+- Notes: `Use the final trust layer. Focus on whether why-this-passed proof, what-proves-it-wrong framing, recent price context, and previous similar outcome are enough to trust a tiny paper trade.`
+- Status: `READY`
+
+### 7. Session 7 candidate
+
+- Candidate: `Session 7 candidate`
+- Segment: `Paper trader`
+- Source: `Final trust validation`
+- Notes: `Use the final Paper Trade Confirmation. Focus on whether max loss, potential reward, risk/reward, and order audit trail make execution feel controlled enough for a tiny paper trade.`
+- Status: `READY`
+
 ## Invite Messages
 
 ### Emmanuel
@@ -96,8 +114,32 @@ It takes about 30 minutes. I’ll ask you to use the app, think out loud, and te
 Would you be open to being one of the first 5 beta users this week?
 ```
 
+### Session 6 candidate
+
+```text
+Hey [name], I’m running one more short private validation round for QuantumAI, an AI-assisted paper-trading workflow.
+
+I’m not asking you to trade real money. I want to see whether the updated signal review now feels trustworthy enough to use: why the signal passed, what would prove it wrong, recent price context, and what similar setups did before.
+
+It takes about 30 minutes. I’ll ask you to review one signal, think out loud, inspect the final paper-trade confirmation, and tell me what still feels unclear, useful, or not worth paying for.
+
+Would you be open to being part of this final validation round this week?
+```
+
+### Session 7 candidate
+
+```text
+Hey [name], I’m running one more short private validation round for QuantumAI, an AI-assisted paper-trading workflow.
+
+I’m not asking you to trade real money. I want to test whether the updated paper-trade flow now feels controlled enough to use, especially the final confirmation with quantity, notional, max loss, reward, and audit trail.
+
+It takes about 30 minutes. I’ll ask you to review one setup, inspect the paper-order confirmation, and tell me where the workflow feels safe, unclear, or not yet worth paying for.
+
+Would you be open to being part of this final validation round this week?
+```
+
 ## Next Move
 
-1. Fix the remaining trust gap before expanding the beta.
-2. Add stronger signal proof: recent price-action context, audit trail, and final max-loss confirmation.
-3. Run 2 more validation sessions and check whether average trust reaches `4.0+`.
+1. Run sessions 6 and 7 using [`docs/final-trust-validation-sessions.md`](./final-trust-validation-sessions.md).
+2. Use [`docs/session-6-7-operator-answer-sheet.md`](./session-6-7-operator-answer-sheet.md) during the calls.
+3. Log both sessions in `/app/pilot` and check whether average trust reaches `4.0+`.

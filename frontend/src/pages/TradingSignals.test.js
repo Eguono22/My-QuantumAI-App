@@ -11,6 +11,7 @@ jest.mock('../services/tradingService', () => ({
     generateSignals: jest.fn(),
     executeTrade: jest.fn(),
     executeHFT: jest.fn(),
+    getOrders: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
     addWatchlistItem: jest.fn(),
@@ -48,9 +49,21 @@ describe('TradingSignals', () => {
     tradingService.getSignals.mockResolvedValue([signal]);
     tradingService.getWatchlist.mockResolvedValue([]);
     tradingService.getPriceAlerts.mockResolvedValue([]);
+    tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
       trade: {
         price: 100,
+      },
+      order: {
+        id: 101,
+        asset: 'AAPL',
+        status: 'FILLED',
+        filled_quantity: 1,
+      },
+      audit: {
+        decision_summary: 'Paper order accepted and filled.',
+        max_loss_at_stop: 5,
+        potential_reward: 12,
       },
     });
     marketService.getOverview.mockResolvedValue([{ symbol: 'AAPL' }]);
@@ -67,13 +80,19 @@ describe('TradingSignals', () => {
     expect(screen.getByRole('dialog', { name: 'Review BUY AAPL' })).toBeInTheDocument();
     expect(screen.getByText('Paper Trade Confirmation')).toBeInTheDocument();
     expect(screen.getByText('Est. Notional')).toBeInTheDocument();
-    expect(screen.getByText('Max Risk')).toBeInTheDocument();
+    expect(screen.getByText('Max Loss At Stop')).toBeInTheDocument();
+    expect(screen.getByText('Potential Reward')).toBeInTheDocument();
+    expect(screen.getByText('What Would Prove This Trade Wrong')).toBeInTheDocument();
+    expect(screen.getByText('Signal Audit Trail')).toBeInTheDocument();
     expect(screen.getAllByText('$5.00').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Confirm Paper Order' }));
 
     await waitFor(() => {
-      expect(tradingService.executeTrade).toHaveBeenCalledWith('AAPL', 'BUY', 1, 100);
+      expect(tradingService.executeTrade).toHaveBeenCalledWith('AAPL', 'BUY', 1, 100, {
+        stop_loss: 95,
+        take_profit: 112,
+      });
     });
   });
 });
