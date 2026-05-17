@@ -52,3 +52,9 @@ PASSWORD_RESET_RATE_LIMIT_WINDOW_S=900
 - Production does not expose reset tokens in the browser response.
 - Repeated reset requests return `429` after the configured rate-limit threshold.
 - `/health/startup` reports `password_reset.ready=true` after production email env vars are configured.
+
+Run the production readiness check after deploying the env vars:
+
+```powershell
+.\scripts\check_password_reset_readiness.ps1 -ApiBase "https://my-quantum-ai-app.vercel.app"
+```
