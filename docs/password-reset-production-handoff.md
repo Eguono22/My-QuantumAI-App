@@ -51,3 +51,4 @@ PASSWORD_RESET_RATE_LIMIT_WINDOW_S=900
 - The new password works on `/login`.
 - Production does not expose reset tokens in the browser response.
 - Repeated reset requests return `429` after the configured rate-limit threshold.
+- `/health/startup` reports `password_reset.ready=true` after production email env vars are configured.

@@ -86,6 +86,73 @@ def get_database_readiness(database_url: str | None = None, app_env: str | None 
         "reason": reason,
     }
 
+
+def get_password_reset_readiness(
+    app_env: str | None = None,
+    delivery: str | None = None,
+    resend_api_key: str | None = None,
+    from_email: str | None = None,
+    app_public_url: str | None = None,
+    expose_token: bool | None = None,
+    rate_limit_max: int | None = None,
+    rate_limit_window_s: int | None = None,
+):
+    env = (app_env or settings.APP_ENV or "development").lower()
+    delivery_mode = (delivery or settings.PASSWORD_RESET_DELIVERY or "preview").strip().lower()
+    hosted = env != "development"
+    email_configured = bool(resend_api_key or settings.RESEND_API_KEY) and bool(
+        from_email or settings.PASSWORD_RESET_FROM_EMAIL
+    )
+    public_url = app_public_url or settings.APP_PUBLIC_URL
+    public_url_configured = bool(public_url and public_url.startswith(("https://", "http://")))
+    resolved_expose_token = (
+        expose_token if expose_token is not None else settings.PASSWORD_RESET_EXPOSE_TOKEN
+    )
+    token_exposed = (
+        resolved_expose_token
+        if resolved_expose_token is not None
+        else env == "development"
+    )
+    resolved_rate_limit_max = (
+        rate_limit_max if rate_limit_max is not None else settings.PASSWORD_RESET_RATE_LIMIT_MAX
+    )
+    resolved_rate_limit_window_s = (
+        rate_limit_window_s
+        if rate_limit_window_s is not None
+        else settings.PASSWORD_RESET_RATE_LIMIT_WINDOW_S
+    )
+    rate_limit_enabled = resolved_rate_limit_max > 0 and resolved_rate_limit_window_s > 0
+
+    ready = True
+    reasons = []
+    if hosted and delivery_mode != "email":
+        ready = False
+        reasons.append("PASSWORD_RESET_DELIVERY must be email in hosted environments")
+    if delivery_mode == "email" and not email_configured:
+        ready = False
+        reasons.append("RESEND_API_KEY and PASSWORD_RESET_FROM_EMAIL are required for email delivery")
+    if not public_url_configured:
+        ready = False
+        reasons.append("APP_PUBLIC_URL must be configured so reset links point to the app")
+    if hosted and token_exposed:
+        ready = False
+        reasons.append("PASSWORD_RESET_EXPOSE_TOKEN must be false in hosted environments")
+    if not rate_limit_enabled:
+        ready = False
+        reasons.append("password reset rate limiting must be enabled")
+
+    return {
+        "ready": ready,
+        "delivery_mode": delivery_mode,
+        "email_configured": email_configured,
+        "public_url_configured": public_url_configured,
+        "token_exposed": token_exposed,
+        "rate_limit_enabled": rate_limit_enabled,
+        "rate_limit_max": resolved_rate_limit_max,
+        "rate_limit_window_seconds": resolved_rate_limit_window_s,
+        "reason": "ready" if ready else "; ".join(reasons),
+    }
+
 @app.get("/")
 def root():
     return {"message": "Quantum AI Trading Platform API", "version": "1.0.0", "status": "running"}
@@ -103,6 +170,7 @@ def health():
 @app.get("/health/startup")
 def startup_health(include_probe: bool = False):
     database_ready = get_database_readiness()
+    password_reset_ready = get_password_reset_readiness()
     provider = (settings.BROKER_PROVIDER or "paper").lower()
     trading_mode = (settings.TRADING_MODE or "paper").lower()
     alpaca_ready = bool(settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET)
@@ -155,9 +223,10 @@ def startup_health(include_probe: bool = False):
             probes["alpaca_data"] = {"ok": False, "error": str(e)[:180]}
 
     return {
-        "status": "ok" if broker_ready and database_ready["ready"] else "degraded",
+        "status": "ok" if broker_ready and database_ready["ready"] and password_reset_ready["ready"] else "degraded",
         "app": {"name": "Quantum AI Trading Platform API", "version": app.version},
         "database": database_ready,
+        "password_reset": password_reset_ready,
         "trading": {
             "trading_mode": trading_mode,
             "broker_provider": provider,
