@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
@@ -14,6 +14,7 @@ from services.email_service import password_reset_email_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
+_password_reset_attempts: dict[str, list[datetime]] = {}
 
 class RegisterRequest(BaseModel):
     username: str
@@ -74,6 +75,35 @@ def decode_password_reset_token(token: str) -> str:
     if payload.get("purpose") != "password_reset" or not payload.get("sub"):
         raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
     return payload["sub"]
+
+def enforce_password_reset_rate_limit(identifier: str, http_request: Request | None = None) -> None:
+    max_attempts = settings.PASSWORD_RESET_RATE_LIMIT_MAX
+    window_seconds = settings.PASSWORD_RESET_RATE_LIMIT_WINDOW_S
+    if max_attempts <= 0 or window_seconds <= 0:
+        return
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=window_seconds)
+    client_host = "local"
+    if http_request is not None and http_request.client is not None:
+        client_host = http_request.client.host
+
+    keys = [
+        f"identifier:{normalize_email(identifier)}",
+        f"ip:{client_host.strip().lower()}",
+    ]
+    for key in keys:
+        _password_reset_attempts[key] = [
+            attempted_at for attempted_at in _password_reset_attempts.get(key, []) if attempted_at >= cutoff
+        ]
+        if len(_password_reset_attempts[key]) >= max_attempts:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many password reset requests. Try again later.",
+            )
+
+    for key in keys:
+        _password_reset_attempts.setdefault(key, []).append(now)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if credentials is None:
@@ -139,8 +169,13 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer", "username": user.username}
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(
+    request: ForgotPasswordRequest,
+    http_request: Request = None,
+    db: Session = Depends(get_db),
+):
     identifier = request.identifier.strip()
+    enforce_password_reset_rate_limit(identifier, http_request)
     username = normalize_username(identifier)
     email = normalize_email(identifier)
     user = db.query(User).filter(

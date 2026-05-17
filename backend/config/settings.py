@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     PASSWORD_RESET_DELIVERY: str = "preview"
     PASSWORD_RESET_FROM_EMAIL: Optional[str] = None
     PASSWORD_RESET_EMAIL_TIMEOUT_S: float = 8.0
+    PASSWORD_RESET_RATE_LIMIT_MAX: int = 5
+    PASSWORD_RESET_RATE_LIMIT_WINDOW_S: int = 900
     RESEND_API_KEY: Optional[str] = None
     TRADING_MODE: str = "paper"
     BROKER_PROVIDER: str = "paper"

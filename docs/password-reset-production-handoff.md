@@ -5,6 +5,7 @@ The app now has a working password reset loop:
 - `/forgot-password` accepts a username or email
 - `/auth/forgot-password` returns a short-lived reset token for an existing account only when token exposure is enabled
 - password reset email delivery runs in preview mode by default and can use Resend when configured
+- reset requests are rate-limited per identifier and IP address
 - `/reset-password?token=...` lets the user set a new password
 - `/auth/reset-password` validates the token and updates the stored password hash
 
@@ -23,7 +24,7 @@ Before broad launch, replace the in-app recovery link with email delivery:
 3. Generate the same 30-minute reset token on `/auth/forgot-password`.
 4. Send an email containing `${APP_PUBLIC_URL}/reset-password?token=...`.
 5. Set `PASSWORD_RESET_EXPOSE_TOKEN=false` so production API responses do not expose `reset_token`.
-6. Add rate limiting per identifier and IP address.
+6. Keep rate limiting enabled per identifier and IP address.
 7. Log reset requests without storing raw reset tokens.
 
 ## Suggested Environment Variables
@@ -36,6 +37,8 @@ PASSWORD_RESET_EXPOSE_TOKEN=false
 RESEND_API_KEY=
 PASSWORD_RESET_FROM_EMAIL=
 PASSWORD_RESET_EMAIL_TIMEOUT_S=8.0
+PASSWORD_RESET_RATE_LIMIT_MAX=5
+PASSWORD_RESET_RATE_LIMIT_WINDOW_S=900
 ```
 
 ## Acceptance Checklist
@@ -47,3 +50,4 @@ PASSWORD_RESET_EMAIL_TIMEOUT_S=8.0
 - The old password no longer works after reset.
 - The new password works on `/login`.
 - Production does not expose reset tokens in the browser response.
+- Repeated reset requests return `429` after the configured rate-limit threshold.

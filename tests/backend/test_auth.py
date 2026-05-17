@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ from api.routes.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     ResetPasswordRequest,
+    _password_reset_attempts,
     forgot_password,
     login,
     pwd_context,
@@ -43,11 +45,18 @@ def create_user(db, username="resetuser", email="reset@example.com", password="o
     return user
 
 
+@pytest.fixture(autouse=True)
+def clear_password_reset_rate_limit():
+    _password_reset_attempts.clear()
+    yield
+    _password_reset_attempts.clear()
+
+
 def test_forgot_password_generates_reset_token_for_existing_email():
     db = make_db()
     create_user(db)
 
-    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db=db)
 
     assert response["message"] == "If that account exists, a password reset link is ready."
     assert response["reset_token"]
@@ -58,7 +67,7 @@ def test_forgot_password_generates_reset_token_for_existing_email():
 def test_forgot_password_uses_generic_response_for_unknown_account():
     db = make_db()
 
-    response = forgot_password(ForgotPasswordRequest(identifier="missing@example.com"), db)
+    response = forgot_password(ForgotPasswordRequest(identifier="missing@example.com"), db=db)
 
     assert response["message"] == "If that account exists, a password reset link is ready."
     assert response["reset_token"] is None
@@ -72,7 +81,7 @@ def test_forgot_password_can_hide_reset_token(monkeypatch):
     monkeypatch.setattr(settings, "PASSWORD_RESET_EXPOSE_TOKEN", False)
     monkeypatch.setattr(settings, "PASSWORD_RESET_DELIVERY", "preview")
 
-    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db=db)
 
     assert response["message"] == "If that account exists, a password reset link is ready."
     assert response["reset_token"] is None
@@ -92,7 +101,7 @@ def test_forgot_password_calls_password_reset_email_preview(monkeypatch):
 
     monkeypatch.setattr("api.routes.auth.password_reset_email_service.send_password_reset_email", fake_send)
 
-    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+    response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db=db)
 
     assert response["reset_token"]
     assert sent["to_email"] == "reset@example.com"
@@ -101,10 +110,28 @@ def test_forgot_password_calls_password_reset_email_preview(monkeypatch):
     db.close()
 
 
+def test_forgot_password_rate_limits_repeated_requests(monkeypatch):
+    db = make_db()
+    http_request = SimpleNamespace(client=SimpleNamespace(host="203.0.113.8"))
+    monkeypatch.setattr(settings, "PASSWORD_RESET_RATE_LIMIT_MAX", 2)
+    monkeypatch.setattr(settings, "PASSWORD_RESET_RATE_LIMIT_WINDOW_S", 900)
+
+    forgot_password(ForgotPasswordRequest(identifier="missing@example.com"), http_request=http_request, db=db)
+    forgot_password(ForgotPasswordRequest(identifier="missing@example.com"), http_request=http_request, db=db)
+
+    with pytest.raises(HTTPException) as exc:
+        forgot_password(ForgotPasswordRequest(identifier="missing@example.com"), http_request=http_request, db=db)
+
+    assert exc.value.status_code == 429
+    assert exc.value.detail == "Too many password reset requests. Try again later."
+
+    db.close()
+
+
 def test_reset_password_updates_login_password():
     db = make_db()
     create_user(db, password="oldpassword")
-    reset_response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+    reset_response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db=db)
 
     response = reset_password(
         ResetPasswordRequest(token=reset_response["reset_token"], password="newpassword123"),
@@ -126,7 +153,7 @@ def test_reset_password_updates_login_password():
 def test_reset_password_rejects_short_password():
     db = make_db()
     create_user(db)
-    reset_response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db)
+    reset_response = forgot_password(ForgotPasswordRequest(identifier="reset@example.com"), db=db)
 
     with pytest.raises(HTTPException) as exc:
         reset_password(ResetPasswordRequest(token=reset_response["reset_token"], password="short"), db)
