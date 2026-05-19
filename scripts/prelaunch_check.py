@@ -105,13 +105,8 @@ def main() -> None:
     expected_market_data = (
         (os.getenv("PRELAUNCH_EXPECT_MARKET_DATA_PROVIDER") or "").strip().lower() or None
     )
-    default_asset, default_quantity = choose_trade_defaults(expected_broker)
-    trade_asset = os.getenv("PRELAUNCH_TRADE_ASSET", default_asset)
-    trade_quantity_raw = os.getenv("PRELAUNCH_TRADE_QUANTITY", default_quantity)
-    try:
-        trade_quantity = float(trade_quantity_raw)
-    except ValueError:
-        fail(f"PRELAUNCH_TRADE_QUANTITY must be numeric, got {trade_quantity_raw!r}")
+    trade_asset_override = os.getenv("PRELAUNCH_TRADE_ASSET")
+    trade_quantity_override = os.getenv("PRELAUNCH_TRADE_QUANTITY")
 
     username = f"prelaunch_{uuid.uuid4().hex[:8]}"
     email = f"{username}@example.com"
@@ -130,7 +125,17 @@ def main() -> None:
         if startup.status_code != 200:
             fail(f"/health/startup returned {startup.status_code}")
         ok("/health/startup")
-        validate_startup_payload(startup.json(), expected_broker, expected_market_data, include_probe)
+        startup_payload = startup.json()
+        validate_startup_payload(startup_payload, expected_broker, expected_market_data, include_probe)
+
+        resolved_broker = expected_broker or startup_payload.get("trading", {}).get("broker_provider")
+        default_asset, default_quantity = choose_trade_defaults(resolved_broker)
+        trade_asset = trade_asset_override or default_asset
+        trade_quantity_raw = trade_quantity_override or default_quantity
+        try:
+            trade_quantity = float(trade_quantity_raw)
+        except ValueError:
+            fail(f"PRELAUNCH_TRADE_QUANTITY must be numeric, got {trade_quantity_raw!r}")
 
         reg = client.post(
             f"{base}/auth/register",

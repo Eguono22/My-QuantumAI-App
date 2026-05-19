@@ -83,8 +83,19 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 
 ### Prerequisites
 - Python 3.11+
-- Node.js 18+
+- Node.js 18+ (Node 20 LTS recommended)
 - Docker & docker-compose (optional)
+
+If you use `nvm` on Windows, run this from the repo root before frontend commands:
+```powershell
+nvm use 20.18.3
+```
+
+Or use the repo helper script (auto-switches to Node 20.18.3 before npm):
+```powershell
+.\scripts\frontend_with_node20.ps1 install --no-audit --no-fund
+.\scripts\frontend_with_node20.ps1 start
+```
 
 ### Environment Setup
 ```powershell
@@ -135,6 +146,12 @@ If the backend is not already running, use:
 cd frontend
 npm install
 npm start
+```
+
+Windows (with automatic Node runtime switch):
+```powershell
+.\scripts\frontend_with_node20.ps1 install --no-audit --no-fund
+.\scripts\frontend_with_node20.ps1 start
 ```
 
 ### Docker Deployment (Full Stack)

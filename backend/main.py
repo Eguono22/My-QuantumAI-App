@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import time
 import logging
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, WebSocket
@@ -12,10 +13,22 @@ from models.database import Base, engine
 from config.settings import settings
 from services.notification_scheduler import notification_scheduler
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    ensure_sqlite_schema_compat()
+    notification_scheduler.start()
+    try:
+        yield
+    finally:
+        notification_scheduler.stop()
+
 app = FastAPI(
     title="Quantum AI Trading Platform",
     description="AI-powered trading platform with quantum-inspired algorithms",
     version=settings.APP_VERSION,
+    lifespan=lifespan,
 )
 APP_STARTED_AT = time.time()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -41,17 +54,6 @@ app.include_router(pilot.router)
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await websocket_endpoint(websocket)
-
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
-    ensure_sqlite_schema_compat()
-    notification_scheduler.start()
-
-
-@app.on_event("shutdown")
-def shutdown():
-    notification_scheduler.stop()
 
 
 def ensure_sqlite_schema_compat():

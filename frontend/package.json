@@ -2,6 +2,10 @@
   "name": "quantum-ai-trading",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18 <23",
+    "npm": ">=9 <11"
+  },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
     "axios": "^1.6.2",
