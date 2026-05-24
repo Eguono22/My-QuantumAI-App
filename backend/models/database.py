@@ -22,6 +22,7 @@ class User(Base):
     watchlist_items = relationship("WatchlistItem", back_populates="user")
     price_alerts = relationship("PriceAlert", back_populates="user")
     orders = relationship("Order", back_populates="user")
+    trade_audit_events = relationship("TradeAuditEvent", back_populates="user")
     mql5_terminals = relationship("MQL5Terminal", back_populates="user")
     mql5_bridge_events = relationship("MQL5BridgeEvent", back_populates="user")
     notification_preferences = relationship("UserNotificationPreference", back_populates="user", uselist=False)
@@ -99,11 +100,35 @@ class Order(Base):
     slippage_bps = Column(Float, nullable=True)
     broker = Column(String, nullable=False, default="paper-broker")
     mode = Column(String, nullable=False, default="paper")
+    manual_confirmation = Column(Integer, nullable=False, default=0)
+    confirmation_text = Column(String, nullable=True)
+    operator_note = Column(String, nullable=True)
     broker_order_id = Column(String, nullable=True, index=True)
     reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="orders")
+    audit_events = relationship("TradeAuditEvent", back_populates="order")
+
+
+class TradeAuditEvent(Base):
+    __tablename__ = "trade_audit_events"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    trading_mode = Column(String, nullable=False, default="paper", index=True)
+    broker = Column(String, nullable=True)
+    severity = Column(String, nullable=False, default="INFO")
+    summary = Column(String, nullable=False)
+    asset = Column(String, nullable=True, index=True)
+    action = Column(String, nullable=True)
+    requested_quantity = Column(Float, nullable=True)
+    filled_quantity = Column(Float, nullable=True)
+    metadata_json = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    user = relationship("User", back_populates="trade_audit_events")
+    order = relationship("Order", back_populates="audit_events")
 
 
 class MQL5Terminal(Base):

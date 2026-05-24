@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../backend"))
 
-from main import get_database_readiness, get_password_reset_readiness
+from main import get_database_readiness, get_password_reset_readiness, get_trading_readiness
 
 
 def test_sqlite_is_allowed_for_development_startup_health():
@@ -76,3 +76,33 @@ def test_password_reset_email_is_ready_for_hosted_startup_health():
     assert readiness["ready"] is True
     assert readiness["email_configured"] is True
     assert readiness["token_exposed"] is False
+
+
+def test_live_trading_readiness_blocks_when_disabled():
+    readiness = get_trading_readiness(
+        trading_mode="live",
+        provider="alpaca",
+        live_enabled=False,
+        kill_switch=False,
+        alpaca_live_key="live-key",
+        alpaca_live_secret="live-secret",
+    )
+
+    assert readiness["ready"] is False
+    assert readiness["trading_mode"] == "live"
+    assert "LIVE_TRADING_ENABLED" in readiness["reason"]
+
+
+def test_live_trading_readiness_is_ready_with_live_credentials():
+    readiness = get_trading_readiness(
+        trading_mode="live",
+        provider="alpaca",
+        live_enabled=True,
+        kill_switch=False,
+        alpaca_live_key="live-key",
+        alpaca_live_secret="live-secret",
+    )
+
+    assert readiness["ready"] is True
+    assert readiness["live_credentials_ready"] is True
+    assert readiness["kill_switch_active"] is False

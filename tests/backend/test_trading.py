@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
-from services.mql5_service import MQL5BridgeService
+from services.mql5_service import MQL5BridgeService, MQL5BridgeError
 from services.market_service import MarketService
 from services.notification_service import notification_service
 from config.settings import settings
@@ -300,10 +300,133 @@ class TestTradingService:
         original_limit = settings.MAX_NOTIONAL_PER_TRADE
         settings.MAX_NOTIONAL_PER_TRADE = 10.0
         try:
-            with pytest.raises(ValueError, match="MAX_NOTIONAL_PER_TRADE"):
+            with pytest.raises(ValueError, match="exceeds mode limit"):
                 self.service.execute_trade(db, user.id, "BTC", "buy", 1.0)
         finally:
             settings.MAX_NOTIONAL_PER_TRADE = original_limit
+
+        db.close()
+
+    def test_live_trade_requires_manual_confirmation(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="liveuser1", email="live1@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        monkeypatch.setattr(settings, "TRADING_MODE", "live")
+        monkeypatch.setattr(settings, "BROKER_PROVIDER", "alpaca")
+        monkeypatch.setattr(settings, "LIVE_TRADING_ENABLED", True)
+        monkeypatch.setattr(settings, "TRADING_KILL_SWITCH", False)
+        monkeypatch.setattr(settings, "ALPACA_LIVE_API_KEY", "live-key")
+        monkeypatch.setattr(settings, "ALPACA_LIVE_API_SECRET", "live-secret")
+        monkeypatch.setattr(settings, "LIVE_PILOT_ALLOWED_SYMBOLS", ["AAPL"])
+
+        with pytest.raises(ValueError, match="manual_confirmation=true"):
+            self.service.execute_trade(db, user.id, "AAPL", "buy", 1.0)
+
+        db.close()
+
+    def test_live_trade_stores_confirmation_metadata(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+
+        class FakeLiveBroker:
+            def execute_order(self, symbol, action, order_type, quantity, market_price, requested_price=None):
+                return {
+                    "status": "FILLED",
+                    "fill_price": market_price,
+                    "market_price": market_price,
+                    "requested_quantity": quantity,
+                    "filled_quantity": quantity,
+                    "fee_paid": 0.0,
+                    "slippage_bps": 0.0,
+                    "broker": "alpaca-live",
+                    "mode": "live",
+                    "broker_order_id": "live-123",
+                }
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="liveuser2", email="live2@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        monkeypatch.setattr(settings, "TRADING_MODE", "live")
+        monkeypatch.setattr(settings, "BROKER_PROVIDER", "alpaca")
+        monkeypatch.setattr(settings, "LIVE_TRADING_ENABLED", True)
+        monkeypatch.setattr(settings, "TRADING_KILL_SWITCH", False)
+        monkeypatch.setattr(settings, "LIVE_PILOT_ALLOWED_SYMBOLS", ["AAPL"])
+        monkeypatch.setattr(settings, "MAX_LIVE_NOTIONAL_PER_TRADE", 1000.0)
+        monkeypatch.setattr(settings, "MAX_LIVE_DAILY_NOTIONAL", 5000.0)
+        monkeypatch.setattr(settings, "MAX_LIVE_DAILY_TRADES", 5)
+        monkeypatch.setattr("services.trading_service.get_broker", lambda mode=None: FakeLiveBroker())
+
+        result = self.service.execute_trade(
+            db,
+            user.id,
+            "AAPL",
+            "buy",
+            1.0,
+            manual_confirmation=True,
+            confirmation_text="LIVE",
+            operator_note="Tiny supervised pilot order.",
+        )
+
+        assert result["order"]["mode"] == "live"
+        assert result["order"]["manual_confirmation"] is True
+        assert result["order"]["confirmation_text"] == "LIVE"
+        assert result["order"]["operator_note"] == "Tiny supervised pilot order."
+        assert result["audit"]["manual_confirmation_recorded"] is True
+        assert result["risk"]["mode"] == "live"
+
+        db.close()
+
+    def test_live_trade_respects_kill_switch(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="liveuser3", email="live3@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        monkeypatch.setattr(settings, "TRADING_MODE", "live")
+        monkeypatch.setattr(settings, "BROKER_PROVIDER", "alpaca")
+        monkeypatch.setattr(settings, "LIVE_TRADING_ENABLED", True)
+        monkeypatch.setattr(settings, "TRADING_KILL_SWITCH", True)
+        monkeypatch.setattr(settings, "ALPACA_LIVE_API_KEY", "live-key")
+        monkeypatch.setattr(settings, "ALPACA_LIVE_API_SECRET", "live-secret")
+        monkeypatch.setattr(settings, "LIVE_PILOT_ALLOWED_SYMBOLS", ["AAPL"])
+        monkeypatch.setattr(settings, "MAX_LIVE_NOTIONAL_PER_TRADE", 1000.0)
+
+        with pytest.raises(ValueError, match="TRADING_KILL_SWITCH"):
+            self.service.execute_trade(
+                db,
+                user.id,
+                "AAPL",
+                "buy",
+                1.0,
+                manual_confirmation=True,
+                confirmation_text="LIVE",
+                operator_note="Testing kill switch",
+            )
 
         db.close()
 
@@ -404,6 +527,34 @@ class TestTradingService:
             assert result["execution"]["order"]["broker"] == "paper-broker"
         else:
             assert result["executed"] is False
+
+        db.close()
+
+    def test_mql5_execute_ai_trade_is_blocked_in_live_mode(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="liveuser4", email="live4@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        monkeypatch.setattr(settings, "TRADING_MODE", "live")
+
+        with pytest.raises(MQL5BridgeError, match="disabled while TRADING_MODE=live"):
+            self.mql5.execute_ai_trade(
+                db=db,
+                user_id=user.id,
+                asset="AAPL",
+                timeframe="M15",
+                quantity=1.0,
+                min_confidence=0.0,
+            )
 
         db.close()
 
@@ -603,7 +754,7 @@ class TestTradingService:
     def test_mql5_status_alerts_flag_missing_terminal_registration(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from models.database import Base, User
+        from models.database import Base, User, MQL5BridgeEvent
         import datetime
 
         engine = create_engine("sqlite:///:memory:")
@@ -614,12 +765,51 @@ class TestTradingService:
         user = User(username="testuser13b", email="test13b@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
         db.add(user)
         db.commit()
+        db.add(
+            MQL5BridgeEvent(
+                user_id=user.id,
+                terminal_id="terminal-missing",
+                event_type="AI_DECISION",
+                severity="INFO",
+                summary="Bridge activity exists but terminal is no longer registered.",
+                asset="EURUSD",
+                action="BUY",
+                confidence=0.72,
+                should_execute=1,
+                executed=0,
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+        )
+        db.commit()
 
         status = self.mql5.get_bridge_status(db, user_id=user.id)
         alert_codes = [alert["code"] for alert in status["alerts"]]
 
         assert "NO_REGISTERED_TERMINALS" in alert_codes
         assert "SYSTEM_HEALTHY" not in alert_codes
+
+        db.close()
+
+    def test_mql5_status_hides_missing_terminal_alert_before_onboarding_starts(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="testuser13c", email="test13c@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        status = self.mql5.get_bridge_status(db, user_id=user.id)
+        alert_codes = [alert["code"] for alert in status["alerts"]]
+
+        assert "NO_REGISTERED_TERMINALS" not in alert_codes
+        assert alert_codes == ["SYSTEM_HEALTHY"]
 
         db.close()
 

@@ -8,10 +8,15 @@ export default function Orders() {
   const [polling, setPolling] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [lastPoll, setLastPoll] = useState(null);
+  const [startupHealth, setStartupHealth] = useState(null);
 
   const loadOrders = async () => {
-    const data = await tradingService.getOrders();
-    setOrders(data);
+    const [orderData, healthData] = await Promise.all([
+      tradingService.getOrders(),
+      tradingService.getStartupHealth().catch(() => null),
+    ]);
+    setOrders(orderData);
+    setStartupHealth(healthData);
   };
 
   const pollPending = async () => {
@@ -55,6 +60,9 @@ export default function Orders() {
 
   if (loading) return <LoadingSpinner size="lg" />;
 
+  const isLiveMode = startupHealth?.trading?.trading_mode === 'live';
+  const killSwitch = startupHealth?.live_trading?.kill_switch_active;
+
   return (
     <div className="space-y-8 animate-fadeRise">
       <div
@@ -81,6 +89,30 @@ export default function Orders() {
         </div>
       </div>
 
+      {startupHealth && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${
+          isLiveMode ? 'border-red-300 bg-red-50 text-red-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+                {isLiveMode ? 'Live Order Ledger' : 'Paper Order Ledger'}
+              </p>
+              <p className="mt-1">
+                Provider: <span className="font-semibold">{startupHealth?.trading?.broker_provider || 'unknown'}</span>.
+                {isLiveMode
+                  ? ' Manual confirmation and operator notes are stored on live orders.'
+                  : ' Orders remain in paper mode until live trading is explicitly enabled.'}
+              </p>
+            </div>
+            <div className="text-xs">
+              <p>Kill switch: <span className="font-semibold">{killSwitch ? 'ON' : 'OFF'}</span></p>
+              <p>Mode ready: <span className="font-semibold">{startupHealth?.trading?.broker_ready ? 'YES' : 'CHECK'}</span></p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="market-panel rounded-md overflow-hidden border border-zinc-700">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -94,6 +126,7 @@ export default function Orders() {
                 <th className="px-4 py-3">Filled</th>
                 <th className="px-4 py-3">Fill Price</th>
                 <th className="px-4 py-3">Broker</th>
+                <th className="px-4 py-3">Mode</th>
                 <th className="px-4 py-3">Updated</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -101,7 +134,7 @@ export default function Orders() {
             <tbody>
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-zinc-500">No orders yet.</td>
+                  <td colSpan={11} className="px-4 py-6 text-center text-zinc-500">No orders yet.</td>
                 </tr>
               )}
               {orders.map((order) => (
@@ -123,6 +156,11 @@ export default function Orders() {
                   <td className="px-4 py-3">{Number(order.filled_quantity).toFixed(6)}</td>
                   <td className="px-4 py-3">{order.fill_price != null ? Number(order.fill_price).toFixed(4) : '-'}</td>
                   <td className="px-4 py-3">{order.broker}</td>
+                  <td className="px-4 py-3 uppercase">
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${order.mode === 'live' ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'}`}>
+                      {order.mode}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-zinc-500">{new Date(order.updated_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {order.status === 'PENDING' ? (

@@ -2,6 +2,7 @@ import secrets
 import warnings
 import os
 import hashlib
+import json
 from pathlib import Path
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
@@ -11,6 +12,51 @@ from typing import List, Optional
 def _generate_dev_secret() -> str:
     """Return a cryptographically random 64-hex-char key for development use."""
     return secrets.token_hex(32)
+
+
+def _normalize_cors_origins(raw_origins: object, app_env: str) -> List[str]:
+    if isinstance(raw_origins, str):
+        value = raw_origins.strip()
+        if not value:
+            origins: List[str] = []
+        else:
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = [item.strip() for item in value.split(",") if item.strip()]
+            if isinstance(parsed, str):
+                origins = [parsed]
+            elif isinstance(parsed, list):
+                origins = [str(item).strip() for item in parsed if str(item).strip()]
+            else:
+                origins = []
+    elif isinstance(raw_origins, list):
+        origins = [str(item).strip() for item in raw_origins if str(item).strip()]
+    else:
+        origins = []
+
+    normalized: List[str] = []
+    seen = set()
+    for origin in origins:
+        if origin not in seen:
+            normalized.append(origin)
+            seen.add(origin)
+
+    if (app_env or "development").lower() == "development":
+        dev_loopback_origins = [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3004",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:3004",
+        ]
+        for origin in dev_loopback_origins:
+            if origin not in seen:
+                normalized.append(origin)
+                seen.add(origin)
+
+    return normalized
 
 
 class Settings(BaseSettings):
@@ -40,13 +86,21 @@ class Settings(BaseSettings):
     RESEND_API_KEY: Optional[str] = None
     TRADING_MODE: str = "paper"
     BROKER_PROVIDER: str = "paper"
+    LIVE_TRADING_ENABLED: bool = False
+    TRADING_KILL_SWITCH: bool = False
     BROKER_REQUEST_TIMEOUT_S: float = 8.0
     MARKET_DATA_PROVIDER: str = "mock"
     MARKET_DATA_TIMEOUT_S: float = 6.0
     ALPACA_DATA_BASE_URL: str = "https://data.alpaca.markets"
     ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"
+    ALPACA_PAPER_BASE_URL: str = "https://paper-api.alpaca.markets"
+    ALPACA_LIVE_BASE_URL: str = "https://api.alpaca.markets"
     ALPACA_API_KEY: Optional[str] = None
     ALPACA_API_SECRET: Optional[str] = None
+    ALPACA_PAPER_API_KEY: Optional[str] = None
+    ALPACA_PAPER_API_SECRET: Optional[str] = None
+    ALPACA_LIVE_API_KEY: Optional[str] = None
+    ALPACA_LIVE_API_SECRET: Optional[str] = None
     ALPACA_STARTUP_PROBE: bool = False
     ENABLE_FRONTEND_ERROR_INGEST: bool = True
     APP_VERSION: str = "1.0.0"
@@ -58,6 +112,16 @@ class Settings(BaseSettings):
     MAX_DAILY_NOTIONAL: float = 100000.0
     MAX_DAILY_TRADES: int = 50
     MAX_RISK_PERCENT_PER_TRADE: float = 2.0
+    MAX_LIVE_NOTIONAL_PER_TRADE: float = 500.0
+    MAX_LIVE_DAILY_NOTIONAL: float = 1500.0
+    MAX_LIVE_DAILY_TRADES: int = 3
+    MAX_LIVE_RISK_PERCENT_PER_TRADE: float = 0.5
+    MAX_LIVE_OPEN_POSITIONS: int = 1
+    MAX_LIVE_OPEN_POSITIONS_PER_SYMBOL: int = 1
+    LIVE_PILOT_MAX_PENDING_ORDERS: int = 1
+    LIVE_PILOT_ALLOWED_SYMBOLS: List[str] = ["AAPL", "SPY"]
+    LIVE_REQUIRE_MANUAL_CONFIRMATION: bool = True
+    LIVE_MANUAL_CONFIRMATION_TEXT: str = "LIVE"
     MQL5_BRIDGE_ENABLED: bool = True
     MQL5_SHARED_SECRET: Optional[str] = None
     MQL5_TERMINAL_ACTIVE_WINDOW_S: int = 180
@@ -95,6 +159,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+settings.CORS_ORIGINS = _normalize_cors_origins(settings.CORS_ORIGINS, settings.APP_ENV)
 
 if settings.DATABASE_URL is None:
     if settings.APP_ENV != "development":

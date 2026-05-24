@@ -91,6 +91,9 @@ export default function TradingSignals({ preferences }) {
     takeProfit: '',
     trailingStopPct: '',
     riskPercent: '',
+    manualConfirmation: false,
+    confirmationText: '',
+    operatorNote: '',
   });
   const [advancedOrderLoading, setAdvancedOrderLoading] = useState(false);
   const [backtestForm, setBacktestForm] = useState({
@@ -101,15 +104,22 @@ export default function TradingSignals({ preferences }) {
   });
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestResult, setBacktestResult] = useState(null);
+  const [startupHealth, setStartupHealth] = useState(null);
+  const [liveReview, setLiveReview] = useState({
+    manualConfirmation: false,
+    confirmationText: '',
+    operatorNote: '',
+  });
 
   const fetchSignals = useCallback(async () => {
     try {
-      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult] = await Promise.allSettled([
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
         tradingService.getPriceAlerts(true),
         tradingService.getOrders(),
+        tradingService.getStartupHealth(),
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -135,6 +145,7 @@ export default function TradingSignals({ preferences }) {
       setOrders(
         ordersResult.status === 'fulfilled' && Array.isArray(ordersResult.value) ? ordersResult.value : []
       );
+      setStartupHealth(startupHealthResult.status === 'fulfilled' ? startupHealthResult.value : null);
 
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
@@ -157,6 +168,10 @@ export default function TradingSignals({ preferences }) {
     const timer = setInterval(fetchSignals, 30000);
     return () => clearInterval(timer);
   }, [autoRefresh, fetchSignals]);
+
+  const isLiveMode = startupHealth?.trading?.trading_mode === 'live';
+  const liveTradingStatus = startupHealth?.live_trading;
+  const liveConfirmationPhrase = liveTradingStatus?.live_manual_confirmation_text || 'LIVE';
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -277,10 +292,30 @@ export default function TradingSignals({ preferences }) {
       previousSimilarOutcome: signal.previous_similar_outcome || recentOrderAudit.summary,
       recentOrderAudit,
     });
+    setLiveReview({
+      manualConfirmation: false,
+      confirmationText: '',
+      operatorNote: '',
+    });
   };
 
   const handleConfirmQuickTrade = async () => {
     if (!pendingQuickTrade) return;
+
+    if (isLiveMode) {
+      if (!liveReview.manualConfirmation) {
+        setAlert({ type: 'error', message: 'Live orders require manual confirmation before submit.' });
+        return;
+      }
+      if (liveReview.confirmationText.trim().toUpperCase() !== liveConfirmationPhrase.toUpperCase()) {
+        setAlert({ type: 'error', message: `Type ${liveConfirmationPhrase} to confirm this live order.` });
+        return;
+      }
+      if (!liveReview.operatorNote.trim()) {
+        setAlert({ type: 'error', message: 'Add a short operator note before sending a live order.' });
+        return;
+      }
+    }
 
     const {
       signal,
@@ -297,6 +332,9 @@ export default function TradingSignals({ preferences }) {
       const result = await tradingService.executeTrade(signal.asset, action, qty, price, {
         stop_loss: stopLoss || undefined,
         take_profit: takeProfit || undefined,
+        manual_confirmation: isLiveMode ? liveReview.manualConfirmation : undefined,
+        confirmation_text: isLiveMode ? liveReview.confirmationText.trim() : undefined,
+        operator_note: isLiveMode ? liveReview.operatorNote.trim() : undefined,
       });
       const trade = result?.trade;
       const order = result?.order;
@@ -375,6 +413,20 @@ export default function TradingSignals({ preferences }) {
       setAlert({ type: 'error', message: 'Limit/Stop orders require a valid trigger price.' });
       return;
     }
+    if (isLiveMode) {
+      if (!advancedOrder.manualConfirmation) {
+        setAlert({ type: 'error', message: 'Check the manual confirmation box before sending a live order.' });
+        return;
+      }
+      if ((advancedOrder.confirmationText || '').trim().toUpperCase() !== liveConfirmationPhrase.toUpperCase()) {
+        setAlert({ type: 'error', message: `Type ${liveConfirmationPhrase} to confirm this live order.` });
+        return;
+      }
+      if (!(advancedOrder.operatorNote || '').trim()) {
+        setAlert({ type: 'error', message: 'Add an operator note before sending a live order.' });
+        return;
+      }
+    }
 
     setAdvancedOrderLoading(true);
     try {
@@ -389,6 +441,9 @@ export default function TradingSignals({ preferences }) {
           take_profit: advancedOrder.takeProfit ? Number(advancedOrder.takeProfit) : undefined,
           trailing_stop_pct: advancedOrder.trailingStopPct ? Number(advancedOrder.trailingStopPct) : undefined,
           risk_percent: advancedOrder.riskPercent ? Number(advancedOrder.riskPercent) : undefined,
+          manual_confirmation: isLiveMode ? advancedOrder.manualConfirmation : undefined,
+          confirmation_text: isLiveMode ? advancedOrder.confirmationText.trim() : undefined,
+          operator_note: isLiveMode ? advancedOrder.operatorNote.trim() : undefined,
         }
       );
       const filledPrice = result?.trade?.price;
@@ -628,6 +683,33 @@ export default function TradingSignals({ preferences }) {
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
+      {startupHealth && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${
+          isLiveMode ? 'border-red-300 bg-red-50 text-red-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+                {isLiveMode ? 'Live Mode Active' : 'Paper Mode Active'}
+              </p>
+              <p className="mt-1">
+                Broker: <span className="font-semibold">{startupHealth?.trading?.broker_provider || 'unknown'}</span>.
+                {isLiveMode
+                  ? ` Manual confirmation, operator note, and live pilot limits are enforced.`
+                  : ' Orders stay in paper mode until live mode is explicitly enabled.'}
+              </p>
+            </div>
+            <div className="text-xs">
+              <p>Kill switch: <span className="font-semibold">{liveTradingStatus?.kill_switch_active ? 'ON' : 'OFF'}</span></p>
+              <p>Live enabled: <span className="font-semibold">{liveTradingStatus?.live_trading_enabled ? 'YES' : 'NO'}</span></p>
+            </div>
+          </div>
+          {liveTradingStatus?.reason && liveTradingStatus.reason !== 'ready' && (
+            <p className="mt-2 text-xs opacity-80">{liveTradingStatus.reason}</p>
+          )}
+        </div>
+      )}
+
       {pendingQuickTrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 px-4 py-6">
           <div
@@ -639,15 +721,19 @@ export default function TradingSignals({ preferences }) {
             <div className="rounded-t-2xl bg-gradient-to-r from-zinc-950 via-slate-900 to-amber-950 p-5 text-white">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">Paper Trade Confirmation</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">{isLiveMode ? 'Live Trade Confirmation' : 'Paper Trade Confirmation'}</p>
                   <h2 id="quick-trade-confirm-title" className="mt-1 text-2xl font-display font-bold">
                     Review {pendingQuickTrade.action} {pendingQuickTrade.signal.asset}
                   </h2>
                   <p className="mt-1 text-sm text-zinc-200">
-                    Final check before sending this paper order to the broker.
+                    {isLiveMode
+                      ? 'Final operator check before sending this live order to the broker.'
+                      : 'Final check before sending this paper order to the broker.'}
                   </p>
                 </div>
-                <span className="rounded bg-sky-100 px-2 py-1 text-xs font-bold text-sky-800">PAPER</span>
+                <span className={`rounded px-2 py-1 text-xs font-bold ${isLiveMode ? 'bg-red-100 text-red-800' : 'bg-sky-100 text-sky-800'}`}>
+                  {isLiveMode ? 'LIVE' : 'PAPER'}
+                </span>
               </div>
             </div>
 
@@ -735,22 +821,58 @@ export default function TradingSignals({ preferences }) {
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Signal Audit Trail</p>
                 <p className="mt-2">{pendingQuickTrade.previousSimilarOutcome}</p>
                 <p className="mt-2 text-zinc-600">
-                  Recent paper decisions on {pendingQuickTrade.signal.asset}: {pendingQuickTrade.recentOrderAudit.summary}
+                  Recent {isLiveMode ? 'order' : 'paper'} decisions on {pendingQuickTrade.signal.asset}: {pendingQuickTrade.recentOrderAudit.summary}
                 </p>
               </div>
 
+              {isLiveMode && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-950 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Live Order Safeguards</p>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={liveReview.manualConfirmation}
+                      onChange={(e) => setLiveReview((prev) => ({ ...prev, manualConfirmation: e.target.checked }))}
+                      className="mt-1"
+                    />
+                    <span>I have manually reviewed this live order and want to send it under supervision.</span>
+                  </label>
+                  <div>
+                    <label className="block text-xs text-red-800 mb-1">Type {liveConfirmationPhrase} to confirm</label>
+                    <input
+                      value={liveReview.confirmationText}
+                      onChange={(e) => setLiveReview((prev) => ({ ...prev, confirmationText: e.target.value }))}
+                      className="market-input rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-red-800 mb-1">Operator note</label>
+                    <textarea
+                      value={liveReview.operatorNote}
+                      onChange={(e) => setLiveReview((prev) => ({ ...prev, operatorNote: e.target.value }))}
+                      rows={3}
+                      placeholder="Why this supervised live order is allowed right now"
+                      className="market-input rounded-md px-3 py-2 text-sm w-full"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
-                  onClick={() => setPendingQuickTrade(null)}
+                  onClick={() => {
+                    setPendingQuickTrade(null);
+                    setLiveReview({ manualConfirmation: false, confirmationText: '', operatorNote: '' });
+                  }}
                   className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmQuickTrade}
-                  className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  className={`rounded-md px-4 py-2 text-sm font-semibold text-white ${isLiveMode ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                 >
-                  Confirm Paper Order
+                  {isLiveMode ? 'Confirm Live Order' : 'Confirm Paper Order'}
                 </button>
               </div>
             </div>
@@ -849,7 +971,10 @@ export default function TradingSignals({ preferences }) {
       <div className="market-panel rounded-md p-4 space-y-4">
         <div>
           <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Advanced Order Ticket</h2>
-          <p className="text-zinc-600 text-sm">Market, limit, and stop orders with optional SL/TP and trailing stop</p>
+          <p className="text-zinc-600 text-sm">
+            Market, limit, and stop orders with optional SL/TP and trailing stop.
+            {isLiveMode ? ' Live mode requires supervised confirmation and an operator note.' : ''}
+          </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
@@ -955,13 +1080,46 @@ export default function TradingSignals({ preferences }) {
               className="market-input rounded-md px-3 py-2 text-sm"
             />
           </div>
+          {isLiveMode && (
+            <>
+              <div className="md:col-span-2 rounded-md border border-red-200 bg-red-50 p-3">
+                <label className="flex items-start gap-2 text-sm text-red-950">
+                  <input
+                    type="checkbox"
+                    checked={advancedOrder.manualConfirmation}
+                    onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, manualConfirmation: e.target.checked }))}
+                    className="mt-1"
+                  />
+                  <span>I have manually reviewed this live order and will supervise it.</span>
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-600 mb-1">Type {liveConfirmationPhrase}</label>
+                <input
+                  value={advancedOrder.confirmationText}
+                  onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, confirmationText: e.target.value }))}
+                  className="market-input rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-zinc-600 mb-1">Operator Note</label>
+                <textarea
+                  value={advancedOrder.operatorNote}
+                  onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, operatorNote: e.target.value }))}
+                  rows={3}
+                  placeholder="Explain why this live order is being allowed"
+                  className="market-input rounded-md px-3 py-2 text-sm w-full"
+                />
+              </div>
+            </>
+          )}
         </div>
         <button
           onClick={handleSubmitAdvancedOrder}
           disabled={advancedOrderLoading}
-          className="market-btn-primary px-4 py-2 rounded-md font-semibold disabled:opacity-50"
+          className={`px-4 py-2 rounded-md font-semibold disabled:opacity-50 ${isLiveMode ? 'bg-red-600 text-white hover:bg-red-700' : 'market-btn-primary'}`}
         >
-          {advancedOrderLoading ? 'Placing Order...' : 'Place Advanced Order'}
+          {advancedOrderLoading ? 'Placing Order...' : isLiveMode ? 'Place Supervised Live Order' : 'Place Advanced Order'}
         </button>
       </div>
 

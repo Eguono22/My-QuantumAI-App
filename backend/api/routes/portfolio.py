@@ -19,6 +19,9 @@ class TradeRequest(BaseModel):
     take_profit: Optional[float] = None
     trailing_stop_pct: Optional[float] = None
     risk_percent: Optional[float] = None
+    manual_confirmation: bool = False
+    confirmation_text: Optional[str] = None
+    operator_note: Optional[str] = None
 
 @router.get("", response_model=List[PortfolioHolding])
 def get_portfolio(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -39,6 +42,9 @@ def execute_trade(request: TradeRequest, db: Session = Depends(get_db), current_
             take_profit=request.take_profit,
             trailing_stop_pct=request.trailing_stop_pct,
             risk_percent=request.risk_percent,
+            manual_confirmation=request.manual_confirmation,
+            confirmation_text=request.confirmation_text,
+            operator_note=request.operator_note,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

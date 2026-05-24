@@ -10,8 +10,23 @@ class BrokerExecutionError(ValueError):
     pass
 
 
+def _get_alpaca_credentials(mode: str) -> tuple[str, Optional[str], Optional[str]]:
+    resolved_mode = (mode or "paper").lower()
+    if resolved_mode == "live":
+        return (
+            settings.ALPACA_LIVE_BASE_URL,
+            settings.ALPACA_LIVE_API_KEY,
+            settings.ALPACA_LIVE_API_SECRET,
+        )
+    return (
+        settings.ALPACA_PAPER_BASE_URL or settings.ALPACA_BASE_URL,
+        settings.ALPACA_PAPER_API_KEY or settings.ALPACA_API_KEY,
+        settings.ALPACA_PAPER_API_SECRET or settings.ALPACA_API_SECRET,
+    )
+
+
 class PaperBroker:
-    """Minimal broker adapter for paper execution."""
+    """Minimal broker adapter for simulated paper execution."""
 
     name = "paper-broker"
     mode = "paper"
@@ -141,7 +156,7 @@ class PaperBroker:
         order_type = (order.get("order_type") or "MARKET").upper()
         requested_qty = float(order.get("requested_quantity") or 0.0)
         requested_price = order.get("requested_price")
-        execute_result = self.execute_order(
+        return self.execute_order(
             symbol=order.get("asset") or "",
             action=action,
             order_type=order_type,
@@ -149,7 +164,6 @@ class PaperBroker:
             market_price=float(market_price),
             requested_price=float(requested_price) if requested_price is not None else None,
         )
-        return execute_result
 
     def cancel_order(self, order: Dict) -> Dict:
         status = (order.get("status") or "").upper()
@@ -164,17 +178,29 @@ class PaperBroker:
         }
 
 
-class AlpacaPaperBroker:
-    """Real broker adapter for Alpaca paper trading."""
+class AlpacaBroker:
+    """Alpaca adapter for paper or live execution."""
 
-    name = "alpaca-paper"
-    mode = "paper"
+    def __init__(self, mode: str):
+        self.mode = (mode or "paper").lower()
+        if self.mode not in {"paper", "live"}:
+            raise BrokerExecutionError("Alpaca broker mode must be paper or live")
+        self.name = "alpaca-paper" if self.mode == "paper" else "alpaca-live"
+
+    def _credentials(self) -> tuple[str, str, str]:
+        base_url, api_key, api_secret = _get_alpaca_credentials(self.mode)
+        if not api_key or not api_secret:
+            mode_label = "live" if self.mode == "live" else "paper"
+            raise BrokerExecutionError(
+                f"Alpaca {mode_label} credentials are required for BROKER_PROVIDER=alpaca in {mode_label} mode"
+            )
+        return base_url, api_key, api_secret
 
     def _map_status(self, alpaca_status: Optional[str]) -> str:
         status = (alpaca_status or "").lower()
-        if status in {"filled"}:
+        if status == "filled":
             return "FILLED"
-        if status in {"partially_filled"}:
+        if status == "partially_filled":
             return "PARTIAL_FILL"
         if status in {
             "new",
@@ -199,11 +225,8 @@ class AlpacaPaperBroker:
     ) -> Dict:
         if quantity <= 0:
             return {"status": "REJECTED", "reason": "Quantity must be greater than 0"}
-        if not settings.ALPACA_API_KEY or not settings.ALPACA_API_SECRET:
-            raise BrokerExecutionError(
-                "ALPACA_API_KEY and ALPACA_API_SECRET are required for BROKER_PROVIDER=alpaca"
-            )
 
+        base_url, api_key, api_secret = self._credentials()
         order_type = (order_type or "MARKET").upper()
         side = action.lower()
         payload = {
@@ -223,12 +246,12 @@ class AlpacaPaperBroker:
             payload["stop_price"] = str(float(requested_price))
 
         headers = {
-            "APCA-API-KEY-ID": settings.ALPACA_API_KEY,
-            "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET,
+            "APCA-API-KEY-ID": api_key,
+            "APCA-API-SECRET-KEY": api_secret,
         }
         try:
             with httpx.Client(
-                base_url=settings.ALPACA_BASE_URL,
+                base_url=base_url,
                 timeout=settings.BROKER_REQUEST_TIMEOUT_S,
                 headers=headers,
             ) as client:
@@ -264,18 +287,15 @@ class AlpacaPaperBroker:
         broker_order_id = order.get("broker_order_id")
         if not broker_order_id:
             return {"status": "REJECTED", "reason": "Missing broker_order_id"}
-        if not settings.ALPACA_API_KEY or not settings.ALPACA_API_SECRET:
-            raise BrokerExecutionError(
-                "ALPACA_API_KEY and ALPACA_API_SECRET are required for BROKER_PROVIDER=alpaca"
-            )
 
+        base_url, api_key, api_secret = self._credentials()
         headers = {
-            "APCA-API-KEY-ID": settings.ALPACA_API_KEY,
-            "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET,
+            "APCA-API-KEY-ID": api_key,
+            "APCA-API-SECRET-KEY": api_secret,
         }
         try:
             with httpx.Client(
-                base_url=settings.ALPACA_BASE_URL,
+                base_url=base_url,
                 timeout=settings.BROKER_REQUEST_TIMEOUT_S,
                 headers=headers,
             ) as client:
@@ -303,18 +323,15 @@ class AlpacaPaperBroker:
         broker_order_id = order.get("broker_order_id")
         if not broker_order_id:
             return {"status": "REJECTED", "reason": "Missing broker_order_id"}
-        if not settings.ALPACA_API_KEY or not settings.ALPACA_API_SECRET:
-            raise BrokerExecutionError(
-                "ALPACA_API_KEY and ALPACA_API_SECRET are required for BROKER_PROVIDER=alpaca"
-            )
 
+        base_url, api_key, api_secret = self._credentials()
         headers = {
-            "APCA-API-KEY-ID": settings.ALPACA_API_KEY,
-            "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET,
+            "APCA-API-KEY-ID": api_key,
+            "APCA-API-SECRET-KEY": api_secret,
         }
         try:
             with httpx.Client(
-                base_url=settings.ALPACA_BASE_URL,
+                base_url=base_url,
                 timeout=settings.BROKER_REQUEST_TIMEOUT_S,
                 headers=headers,
             ) as client:
@@ -328,15 +345,28 @@ class AlpacaPaperBroker:
         return {"status": "CANCELED", "reason": "Order canceled by user"}
 
 
-def get_broker():
+def get_broker(mode: Optional[str] = None):
+    resolved_mode = (mode or settings.TRADING_MODE or "paper").lower()
     provider = (settings.BROKER_PROVIDER or "paper").lower()
-    mode = (settings.TRADING_MODE or "paper").lower()
-    if mode != "paper":
-        raise BrokerExecutionError("Only paper trading mode is enabled in this build.")
-    if provider == "paper":
-        return PaperBroker()
-    if provider == "alpaca":
-        return AlpacaPaperBroker()
+
+    if resolved_mode == "paper":
+        if provider == "paper":
+            return PaperBroker()
+        if provider == "alpaca":
+            return AlpacaBroker("paper")
+        raise BrokerExecutionError(
+            f"Unknown BROKER_PROVIDER '{provider}'. Supported values: paper, alpaca"
+        )
+
+    if resolved_mode == "live":
+        if not settings.LIVE_TRADING_ENABLED:
+            raise BrokerExecutionError("Live trading mode is configured but LIVE_TRADING_ENABLED is false.")
+        if settings.TRADING_KILL_SWITCH:
+            raise BrokerExecutionError("Live trading is blocked because TRADING_KILL_SWITCH is active.")
+        if provider != "alpaca":
+            raise BrokerExecutionError("Live trading currently supports BROKER_PROVIDER=alpaca only.")
+        return AlpacaBroker("live")
+
     raise BrokerExecutionError(
-        f"Unknown BROKER_PROVIDER '{provider}'. Supported values: paper, alpaca"
+        f"Unknown TRADING_MODE '{resolved_mode}'. Supported values: paper, live"
     )

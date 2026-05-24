@@ -259,7 +259,12 @@ class MQL5BridgeService:
             ],
         }
 
-    def _build_alerts(self, terminals: List[Dict], analytics: Dict) -> List[Dict]:
+    def _build_alerts(
+        self,
+        terminals: List[Dict],
+        analytics: Dict,
+        show_missing_terminal_alert: bool = True,
+    ) -> List[Dict]:
         alerts: List[Dict] = []
         overview = analytics.get("overview", {})
 
@@ -267,7 +272,7 @@ class MQL5BridgeService:
         stale_terminals = [terminal["terminal_id"] for terminal in terminals if terminal.get("status") == "STALE"]
         active_terminals = [terminal["terminal_id"] for terminal in terminals if terminal.get("status") == "ACTIVE"]
 
-        if not terminals:
+        if not terminals and show_missing_terminal_alert:
             alerts.append(
                 {
                     "code": "NO_REGISTERED_TERMINALS",
@@ -346,6 +351,16 @@ class MQL5BridgeService:
 
         severity_rank = {"ERROR": 0, "WARN": 1, "INFO": 2}
         return sorted(alerts, key=lambda alert: severity_rank.get(alert["severity"], 99))
+
+    def _user_has_mt5_history(self, db: Session, user_id: Optional[int]) -> bool:
+        if user_id is None:
+            return True
+        return (
+            db.query(MQL5BridgeEvent.id)
+            .filter(MQL5BridgeEvent.user_id == user_id)
+            .first()
+            is not None
+        )
 
     def _serialize_terminal(self, terminal: MQL5Terminal) -> Dict:
         now = datetime.now(timezone.utc)
@@ -497,7 +512,11 @@ class MQL5BridgeService:
         serialized = [self._serialize_terminal(terminal) for terminal in terminals]
         active_terminals = sum(1 for terminal in serialized if terminal["status"] == "ACTIVE")
         analytics = self._build_analytics(db, serialized, user_id=user_id)
-        alerts = self._build_alerts(serialized, analytics)
+        alerts = self._build_alerts(
+            serialized,
+            analytics,
+            show_missing_terminal_alert=self._user_has_mt5_history(db, user_id),
+        )
         telegram_delivery = (
             notification_service.dispatch_bridge_alerts(
                 db=db,
@@ -681,6 +700,9 @@ class MQL5BridgeService:
         allow_sell: bool = True,
         terminal_id: Optional[str] = None,
     ) -> Dict:
+        if (settings.TRADING_MODE or "paper").lower() == "live":
+            raise MQL5BridgeError("Automated MQL5 execution is disabled while TRADING_MODE=live")
+
         decision = self.analyze_trade(
             db=db,
             asset=asset,

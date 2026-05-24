@@ -1,11 +1,13 @@
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
 import logging
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
 import hashlib
-from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order
+from config.settings import settings
+from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order, TradeAuditEvent
 from services.market_service import market_service, MOCK_ASSETS, resolve_symbol
 from services.broker_service import get_broker, BrokerExecutionError
 from services.risk_service import RiskEngine, RiskValidationError
@@ -66,6 +68,71 @@ class TradingService:
             })
         return result
 
+    def _trading_mode(self) -> str:
+        return (settings.TRADING_MODE or "paper").strip().lower()
+
+    def _live_confirmation_required(self, mode: str) -> bool:
+        return mode == "live" and bool(settings.LIVE_REQUIRE_MANUAL_CONFIRMATION)
+
+    def _validate_sell_capacity(self, db: Session, user_id: int, asset: str, quantity: float) -> None:
+        portfolio = db.query(Portfolio).filter(
+            Portfolio.user_id == user_id,
+            Portfolio.asset == asset,
+        ).first()
+        if not portfolio or float(portfolio.quantity or 0.0) < float(quantity):
+            raise ValueError("Insufficient holdings")
+
+    def _validate_live_confirmation(
+        self,
+        *,
+        manual_confirmation: bool,
+        confirmation_text: Optional[str],
+        operator_note: Optional[str],
+    ) -> None:
+        if not manual_confirmation:
+            raise ValueError("Live orders require manual_confirmation=true")
+        expected_text = (settings.LIVE_MANUAL_CONFIRMATION_TEXT or "LIVE").strip().upper()
+        actual_text = (confirmation_text or "").strip().upper()
+        if actual_text != expected_text:
+            raise ValueError(f"Live orders require confirmation_text={expected_text}")
+        if not (operator_note or "").strip():
+            raise ValueError("Live orders require an operator_note before submission")
+
+    def _record_trade_audit_event(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        event_type: str,
+        trading_mode: str,
+        summary: str,
+        asset: Optional[str] = None,
+        action: Optional[str] = None,
+        requested_quantity: Optional[float] = None,
+        filled_quantity: Optional[float] = None,
+        broker: Optional[str] = None,
+        severity: str = "INFO",
+        order: Optional[Order] = None,
+        metadata: Optional[Dict] = None,
+    ) -> TradeAuditEvent:
+        event = TradeAuditEvent(
+            user_id=user_id,
+            order_id=order.id if order is not None else None,
+            event_type=event_type,
+            trading_mode=trading_mode,
+            broker=broker,
+            severity=severity,
+            summary=summary,
+            asset=asset,
+            action=action,
+            requested_quantity=float(requested_quantity) if requested_quantity is not None else None,
+            filled_quantity=float(filled_quantity) if filled_quantity is not None else None,
+            metadata_json=json.dumps(metadata)[:4000] if metadata else None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(event)
+        return event
+
     def _format_order(self, order: Order) -> Dict:
         return {
             "id": order.id,
@@ -83,6 +150,9 @@ class TradingService:
             "slippage_bps": float(order.slippage_bps) if order.slippage_bps is not None else None,
             "broker": order.broker,
             "mode": order.mode,
+            "manual_confirmation": bool(order.manual_confirmation),
+            "confirmation_text": order.confirmation_text,
+            "operator_note": order.operator_note,
             "broker_order_id": order.broker_order_id,
             "reason": order.reason,
             "created_at": order.created_at.isoformat(),
@@ -92,6 +162,7 @@ class TradingService:
     def _build_trade_audit(
         self,
         *,
+        trading_mode: str,
         asset: str,
         action: str,
         quantity: float,
@@ -100,6 +171,8 @@ class TradingService:
         stop_loss: Optional[float],
         take_profit: Optional[float],
         risk_check: Optional[Dict],
+        manual_confirmation: bool = False,
+        operator_note: Optional[str] = None,
         broker_reason: Optional[str] = None,
     ) -> Dict:
         estimated_notional = float(quantity) * float(reference_price)
@@ -114,8 +187,9 @@ class TradingService:
         if max_loss_at_stop is not None and potential_reward is not None and max_loss_at_stop > 0:
             risk_reward_ratio = round(potential_reward / max_loss_at_stop, 2)
 
+        mode_label = trading_mode.upper()
         accepted_reasons = [
-            "Paper mode is still active.",
+            "Paper mode is still active." if trading_mode == "paper" else "Live trading mode is active.",
             f"Broker accepted the {action.upper()} order for {asset}.",
         ]
         if stop_loss is not None and stop_loss > 0:
@@ -123,7 +197,11 @@ class TradingService:
         if take_profit is not None and take_profit > 0:
             accepted_reasons.append("A take-profit target is attached to the order.")
         if risk_check and risk_check.get("risk_passed"):
-            accepted_reasons.append("Pre-trade risk limits passed for the filled quantity.")
+            accepted_reasons.append("Pre-trade risk limits passed before the order was sent.")
+        if trading_mode == "live" and manual_confirmation:
+            accepted_reasons.append("Manual live-trade confirmation was recorded before submission.")
+        if trading_mode == "live" and operator_note:
+            accepted_reasons.append("Operator supervision note was attached to the order.")
 
         blocked_reasons = []
         if broker_reason:
@@ -137,16 +215,20 @@ class TradingService:
 
         return {
             "decision": "ACCEPTED",
+            "mode": trading_mode,
             "status": order_status,
-            "decision_summary": f"Paper order {status_phrase}.",
+            "decision_summary": f"{mode_label} order {status_phrase}.",
             "estimated_notional": round(estimated_notional, 2),
             "max_loss_at_stop": max_loss_at_stop,
             "potential_reward": potential_reward,
             "risk_reward_ratio": risk_reward_ratio,
+            "manual_confirmation_required": self._live_confirmation_required(trading_mode),
+            "manual_confirmation_recorded": bool(manual_confirmation),
+            "operator_note": operator_note,
             "accepted_reasons": accepted_reasons,
             "blocked_reasons": blocked_reasons,
             "checklist": [
-                "Confirm the order stays paper-only.",
+                "Confirm the trading mode matches the intended environment.",
                 "Confirm quantity and estimated notional match the plan.",
                 "Confirm stop-loss defines the invalidation point.",
                 "Confirm max loss is acceptable before execution.",
@@ -213,7 +295,11 @@ class TradingService:
         take_profit: Optional[float] = None,
         trailing_stop_pct: Optional[float] = None,
         risk_percent: Optional[float] = None,
+        manual_confirmation: bool = False,
+        confirmation_text: Optional[str] = None,
+        operator_note: Optional[str] = None,
     ) -> Dict:
+        trading_mode = self._trading_mode()
         asset = resolve_symbol(asset)
         action = action.lower()
         order_type = (order_type or "MARKET").upper()
@@ -229,7 +315,82 @@ class TradingService:
         if market_price is None:
             raise ValueError("Market data unavailable")
 
-        broker = get_broker()
+        if stop_loss is not None and stop_loss <= 0:
+            raise ValueError("Stop loss must be greater than 0")
+        if take_profit is not None and take_profit <= 0:
+            raise ValueError("Take profit must be greater than 0")
+        if trailing_stop_pct is not None and trailing_stop_pct <= 0:
+            raise ValueError("Trailing stop % must be greater than 0")
+        if risk_percent is not None and risk_percent <= 0:
+            raise ValueError("Risk % must be greater than 0")
+
+        if trading_mode == "live" and self._live_confirmation_required(trading_mode):
+            self._validate_live_confirmation(
+                manual_confirmation=manual_confirmation,
+                confirmation_text=confirmation_text,
+                operator_note=operator_note,
+            )
+
+        if action == "sell":
+            self._validate_sell_capacity(db, user_id, asset, quantity)
+
+        risk_check = None
+        reference_price = float(price) if price is not None else float(market_price)
+        try:
+            risk_check = risk_engine.validate_trade(
+                db=db,
+                user_id=user_id,
+                asset=asset,
+                action=action,
+                quantity=quantity,
+                execution_price=reference_price,
+                mode=trading_mode,
+                risk_percent=risk_percent,
+            )
+        except RiskValidationError as e:
+            self._record_trade_audit_event(
+                db=db,
+                user_id=user_id,
+                event_type="ORDER_BLOCKED",
+                trading_mode=trading_mode,
+                summary=str(e),
+                asset=asset,
+                action=action,
+                requested_quantity=quantity,
+                severity="WARN",
+                metadata={
+                    "order_type": order_type,
+                    "manual_confirmation": manual_confirmation,
+                    "operator_note": operator_note,
+                },
+            )
+            if commit:
+                db.commit()
+            else:
+                db.flush()
+            raise ValueError(str(e))
+
+        self._record_trade_audit_event(
+            db=db,
+            user_id=user_id,
+            event_type="ORDER_SUBMISSION_ATTEMPT",
+            trading_mode=trading_mode,
+            summary=f"{trading_mode.upper()} {action.upper()} order submitted for broker review.",
+            asset=asset,
+            action=action,
+            requested_quantity=quantity,
+            severity="INFO",
+            metadata={
+                "order_type": order_type,
+                "requested_price": price,
+                "risk_percent": risk_percent,
+                "manual_confirmation": manual_confirmation,
+                "confirmation_text": confirmation_text,
+                "operator_note": operator_note,
+            },
+        )
+
+        broker = get_broker(trading_mode)
         try:
             order_result = broker.execute_order(
                 symbol=asset,
@@ -244,6 +405,22 @@ class TradingService:
                 "trade_broker_error user_id=%s asset=%s action=%s order_type=%s",
                 user_id, asset, action, order_type
             )
+            self._record_trade_audit_event(
+                db=db,
+                user_id=user_id,
+                event_type="BROKER_ERROR",
+                trading_mode=trading_mode,
+                summary=str(e),
+                asset=asset,
+                action=action,
+                requested_quantity=quantity,
+                broker=(settings.BROKER_PROVIDER or "paper").lower(),
+                severity="ERROR",
+            )
+            if commit:
+                db.commit()
+            else:
+                db.flush()
             raise ValueError(str(e))
 
         order_status = order_result.get("status", "REJECTED")
@@ -255,16 +432,24 @@ class TradingService:
                 action,
                 order_result.get("reason"),
             )
+            self._record_trade_audit_event(
+                db=db,
+                user_id=user_id,
+                event_type="BROKER_REJECTED",
+                trading_mode=trading_mode,
+                summary=order_result.get("reason") or "Order was rejected by broker",
+                asset=asset,
+                action=action,
+                requested_quantity=quantity,
+                broker=order_result.get("broker"),
+                severity="WARN",
+                metadata=order_result,
+            )
+            if commit:
+                db.commit()
+            else:
+                db.flush()
             raise ValueError(order_result.get("reason") or "Order was rejected by broker")
-
-        if stop_loss is not None and stop_loss <= 0:
-            raise ValueError("Stop loss must be greater than 0")
-        if take_profit is not None and take_profit <= 0:
-            raise ValueError("Take profit must be greater than 0")
-        if trailing_stop_pct is not None and trailing_stop_pct <= 0:
-            raise ValueError("Trailing stop % must be greater than 0")
-        if risk_percent is not None and risk_percent <= 0:
-            raise ValueError("Risk % must be greater than 0")
 
         now = datetime.now(timezone.utc)
         order = Order(
@@ -282,7 +467,10 @@ class TradingService:
             fee_paid=float(order_result.get("fee_paid", 0.0)),
             slippage_bps=float(order_result.get("slippage_bps")) if order_result.get("slippage_bps") is not None else None,
             broker=order_result.get("broker", "paper-broker"),
-            mode=order_result.get("mode", "paper"),
+            mode=order_result.get("mode", trading_mode),
+            manual_confirmation=int(bool(manual_confirmation)),
+            confirmation_text=(confirmation_text or "").strip() or None,
+            operator_note=(operator_note or "").strip() or None,
             broker_order_id=order_result.get("broker_order_id"),
             reason=order_result.get("reason"),
             created_at=now,
@@ -291,20 +479,9 @@ class TradingService:
         db.add(order)
 
         trade = None
-        risk_check = None
         filled_quantity = float(order.filled_quantity or 0.0)
         execution_price = float(order.fill_price) if order.fill_price is not None else None
         if order_status in {"FILLED", "PARTIAL_FILL"} and filled_quantity > 0 and execution_price is not None:
-            try:
-                risk_check = risk_engine.validate_trade(
-                    db=db,
-                    user_id=user_id,
-                    quantity=filled_quantity,
-                    execution_price=execution_price,
-                    risk_percent=risk_percent,
-                )
-            except RiskValidationError as e:
-                raise ValueError(str(e))
             trade = self._apply_filled_trade(
                 db=db,
                 user_id=user_id,
@@ -322,6 +499,30 @@ class TradingService:
         else:
             db.flush()
 
+        self._record_trade_audit_event(
+            db=db,
+            user_id=user_id,
+            event_type="ORDER_ACCEPTED",
+            trading_mode=trading_mode,
+            summary=f"{trading_mode.upper()} order recorded with status {order_status}.",
+            asset=asset,
+            action=action,
+            requested_quantity=float(order.requested_quantity),
+            filled_quantity=float(order.filled_quantity or 0.0),
+            broker=order.broker,
+            severity="INFO",
+            order=order,
+            metadata={
+                "order_status": order_status,
+                "broker_order_id": order.broker_order_id,
+                "manual_confirmation": bool(order.manual_confirmation),
+                "operator_note": order.operator_note,
+            },
+        )
+        if commit:
+            db.commit()
+            db.refresh(order)
+
         trade_payload = None
         if trade and execution_price is not None:
             trade_payload = {
@@ -338,6 +539,7 @@ class TradingService:
             message = "Order accepted and pending trigger."
         reference_price = execution_price if execution_price is not None else float(order.market_price or price or 0.0)
         audit = self._build_trade_audit(
+            trading_mode=trading_mode,
             asset=asset,
             action=action,
             quantity=float(order.requested_quantity),
@@ -346,6 +548,8 @@ class TradingService:
             stop_loss=stop_loss,
             take_profit=take_profit,
             risk_check=risk_check,
+            manual_confirmation=bool(order.manual_confirmation),
+            operator_note=order.operator_note,
             broker_reason=order.reason,
         )
 
@@ -404,7 +608,6 @@ class TradingService:
         return [self._format_order(order) for order in orders]
 
     def poll_pending_orders(self, db: Session, user_id: int) -> Dict:
-        broker = get_broker()
         pending_orders = (
             db.query(Order)
             .filter(Order.user_id == user_id, Order.status == "PENDING")
@@ -420,6 +623,7 @@ class TradingService:
             if not market:
                 continue
             market_price = float(market["price"])
+            broker = get_broker(order.mode)
             try:
                 poll_result = broker.poll_order(
                     {
@@ -485,8 +689,37 @@ class TradingService:
                         order.reason = str(e)
                         rejected += 1
                         continue
+                self._record_trade_audit_event(
+                    db=db,
+                    user_id=user_id,
+                    order=order,
+                    event_type="ORDER_STATUS_UPDATE",
+                    trading_mode=order.mode,
+                    summary=f"Pending order moved to {new_status}.",
+                    asset=order.asset,
+                    action=order.action,
+                    requested_quantity=float(order.requested_quantity),
+                    filled_quantity=float(order.filled_quantity),
+                    broker=order.broker,
+                    metadata={"reason": order.reason},
+                )
                 filled += 1
             elif new_status == "REJECTED":
+                self._record_trade_audit_event(
+                    db=db,
+                    user_id=user_id,
+                    order=order,
+                    event_type="ORDER_STATUS_UPDATE",
+                    trading_mode=order.mode,
+                    summary=f"Pending order moved to {new_status}.",
+                    asset=order.asset,
+                    action=order.action,
+                    requested_quantity=float(order.requested_quantity),
+                    filled_quantity=float(order.filled_quantity),
+                    broker=order.broker,
+                    severity="WARN",
+                    metadata={"reason": order.reason},
+                )
                 rejected += 1
 
         if updated > 0:
@@ -515,7 +748,7 @@ class TradingService:
         if order.status in {"FILLED", "PARTIAL_FILL", "REJECTED", "CANCELED"}:
             raise ValueError("Only non-terminal orders can be canceled")
 
-        broker = get_broker()
+        broker = get_broker(order.mode)
         try:
             cancel_result = broker.cancel_order(
                 {
@@ -529,6 +762,20 @@ class TradingService:
         order.status = cancel_result.get("status", "CANCELED")
         order.reason = cancel_result.get("reason")
         order.updated_at = datetime.now(timezone.utc)
+        self._record_trade_audit_event(
+            db=db,
+            user_id=user_id,
+            order=order,
+            event_type="ORDER_CANCELED",
+            trading_mode=order.mode,
+            summary=order.reason or "Order canceled by user",
+            asset=order.asset,
+            action=order.action,
+            requested_quantity=float(order.requested_quantity),
+            filled_quantity=float(order.filled_quantity or 0.0),
+            broker=order.broker,
+            metadata={"broker_order_id": order.broker_order_id},
+        )
         db.commit()
         db.refresh(order)
         logger.info(
@@ -614,6 +861,8 @@ class TradingService:
         return enriched
 
     def execute_hft(self, db: Session, user_id: int, asset: str, cycles: int, quantity: float, spread_bps: float) -> Dict:
+        if self._trading_mode() == "live":
+            raise ValueError("HFT execution is disabled while TRADING_MODE=live")
         asset = resolve_symbol(asset)
         if asset not in MOCK_ASSETS:
             raise ValueError(f"Unknown asset: {asset}")

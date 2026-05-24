@@ -67,6 +67,19 @@ def ensure_sqlite_schema_compat():
             if pilot_feedback_columns and "candidate_id" not in pilot_feedback_columns:
                 conn.execute(text("ALTER TABLE pilot_feedback ADD COLUMN candidate_id INTEGER"))
                 logger.info("Added missing pilot_feedback.candidate_id column")
+
+            order_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(orders)")).fetchall()
+            }
+            if order_columns and "manual_confirmation" not in order_columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN manual_confirmation INTEGER NOT NULL DEFAULT 0"))
+                logger.info("Added missing orders.manual_confirmation column")
+            if order_columns and "confirmation_text" not in order_columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN confirmation_text TEXT"))
+                logger.info("Added missing orders.confirmation_text column")
+            if order_columns and "operator_note" not in order_columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN operator_note TEXT"))
+                logger.info("Added missing orders.operator_note column")
     except Exception:
         logger.exception("Failed to apply SQLite schema compatibility checks")
 
@@ -155,6 +168,73 @@ def get_password_reset_readiness(
         "reason": "ready" if ready else "; ".join(reasons),
     }
 
+
+def get_trading_readiness(
+    trading_mode: str | None = None,
+    provider: str | None = None,
+    live_enabled: bool | None = None,
+    kill_switch: bool | None = None,
+    alpaca_paper_key: str | None = None,
+    alpaca_paper_secret: str | None = None,
+    alpaca_live_key: str | None = None,
+    alpaca_live_secret: str | None = None,
+):
+    resolved_mode = (trading_mode or settings.TRADING_MODE or "paper").strip().lower()
+    resolved_provider = (provider or settings.BROKER_PROVIDER or "paper").strip().lower()
+    resolved_live_enabled = settings.LIVE_TRADING_ENABLED if live_enabled is None else live_enabled
+    resolved_kill_switch = settings.TRADING_KILL_SWITCH if kill_switch is None else kill_switch
+
+    paper_key = alpaca_paper_key or settings.ALPACA_PAPER_API_KEY or settings.ALPACA_API_KEY
+    paper_secret = alpaca_paper_secret or settings.ALPACA_PAPER_API_SECRET or settings.ALPACA_API_SECRET
+    live_key = alpaca_live_key or settings.ALPACA_LIVE_API_KEY
+    live_secret = alpaca_live_secret or settings.ALPACA_LIVE_API_SECRET
+
+    paper_credentials_ready = bool(paper_key and paper_secret)
+    live_credentials_ready = bool(live_key and live_secret)
+
+    ready = True
+    reasons: list[str] = []
+
+    if resolved_provider not in {"paper", "alpaca"}:
+        ready = False
+        reasons.append("BROKER_PROVIDER must be paper or alpaca")
+
+    if resolved_mode not in {"paper", "live"}:
+        ready = False
+        reasons.append("TRADING_MODE must be paper or live")
+
+    if resolved_mode == "paper":
+        if resolved_provider == "alpaca" and not paper_credentials_ready:
+            ready = False
+            reasons.append("Alpaca paper credentials are required when BROKER_PROVIDER=alpaca in paper mode")
+    elif resolved_mode == "live":
+        if not resolved_live_enabled:
+            ready = False
+            reasons.append("LIVE_TRADING_ENABLED must be true before live mode can be used")
+        if resolved_kill_switch:
+            ready = False
+            reasons.append("TRADING_KILL_SWITCH is active")
+        if resolved_provider != "alpaca":
+            ready = False
+            reasons.append("Live mode currently supports BROKER_PROVIDER=alpaca only")
+        if not live_credentials_ready:
+            ready = False
+            reasons.append("Alpaca live credentials are required when TRADING_MODE=live")
+
+    return {
+        "ready": ready,
+        "trading_mode": resolved_mode,
+        "broker_provider": resolved_provider,
+        "live_trading_enabled": bool(resolved_live_enabled),
+        "kill_switch_active": bool(resolved_kill_switch),
+        "paper_credentials_ready": paper_credentials_ready,
+        "live_credentials_ready": live_credentials_ready,
+        "manual_confirmation_required": bool(settings.LIVE_REQUIRE_MANUAL_CONFIRMATION),
+        "live_manual_confirmation_text": settings.LIVE_MANUAL_CONFIRMATION_TEXT,
+        "live_pilot_allowed_symbols": [symbol.upper() for symbol in settings.LIVE_PILOT_ALLOWED_SYMBOLS],
+        "reason": "ready" if ready else "; ".join(reasons),
+    }
+
 @app.get("/")
 def root():
     return {"message": "Quantum AI Trading Platform API", "version": "1.0.0", "status": "running"}
@@ -173,33 +253,26 @@ def health():
 def startup_health(include_probe: bool = False):
     database_ready = get_database_readiness()
     password_reset_ready = get_password_reset_readiness()
-    provider = (settings.BROKER_PROVIDER or "paper").lower()
-    trading_mode = (settings.TRADING_MODE or "paper").lower()
-    alpaca_ready = bool(settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET)
-    broker_ready = True
-    broker_reason = "ready"
-    if provider == "alpaca" and not alpaca_ready:
-        broker_ready = False
-        broker_reason = "ALPACA_API_KEY and ALPACA_API_SECRET are required when BROKER_PROVIDER=alpaca"
-    elif provider not in {"paper", "alpaca"}:
-        broker_ready = False
-        broker_reason = "BROKER_PROVIDER must be paper or alpaca"
-    elif trading_mode != "paper":
-        broker_ready = False
-        broker_reason = "Only TRADING_MODE=paper is supported in this build"
+    trading_ready = get_trading_readiness()
+    provider = trading_ready["broker_provider"]
+    trading_mode = trading_ready["trading_mode"]
+    paper_alpaca_ready = trading_ready["paper_credentials_ready"]
+    live_alpaca_ready = trading_ready["live_credentials_ready"]
+    broker_ready = trading_ready["ready"]
+    broker_reason = trading_ready["reason"]
 
     probes = {}
     should_probe = include_probe or settings.ALPACA_STARTUP_PROBE
-    if should_probe and alpaca_ready:
+    if should_probe and paper_alpaca_ready:
         headers = {
-            "APCA-API-KEY-ID": settings.ALPACA_API_KEY or "",
-            "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET or "",
+            "APCA-API-KEY-ID": settings.ALPACA_PAPER_API_KEY or settings.ALPACA_API_KEY or "",
+            "APCA-API-SECRET-KEY": settings.ALPACA_PAPER_API_SECRET or settings.ALPACA_API_SECRET or "",
         }
         probes["alpaca_account"] = {"ok": False}
         probes["alpaca_data"] = {"ok": False}
         try:
             with httpx.Client(
-                base_url=settings.ALPACA_BASE_URL,
+                base_url=settings.ALPACA_PAPER_BASE_URL or settings.ALPACA_BASE_URL,
                 timeout=settings.BROKER_REQUEST_TIMEOUT_S,
                 headers=headers,
             ) as client:
@@ -235,12 +308,15 @@ def startup_health(include_probe: bool = False):
             "broker_ready": broker_ready,
             "reason": broker_reason,
         },
+        "live_trading": trading_ready,
         "market_data": {
             "provider": (settings.MARKET_DATA_PROVIDER or "mock").lower(),
-            "alpaca_data_configured": bool(settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET),
+            "alpaca_data_configured": paper_alpaca_ready,
         },
         "credentials": {
-            "alpaca_configured": alpaca_ready,
+            "alpaca_configured": paper_alpaca_ready or live_alpaca_ready,
+            "alpaca_paper_configured": paper_alpaca_ready,
+            "alpaca_live_configured": live_alpaca_ready,
         },
         "probes": probes,
         "risk_limits": {
@@ -248,6 +324,10 @@ def startup_health(include_probe: bool = False):
             "max_daily_notional": settings.MAX_DAILY_NOTIONAL,
             "max_daily_trades": settings.MAX_DAILY_TRADES,
             "max_risk_percent_per_trade": settings.MAX_RISK_PERCENT_PER_TRADE,
+            "max_live_notional_per_trade": settings.MAX_LIVE_NOTIONAL_PER_TRADE,
+            "max_live_daily_notional": settings.MAX_LIVE_DAILY_NOTIONAL,
+            "max_live_daily_trades": settings.MAX_LIVE_DAILY_TRADES,
+            "max_live_risk_percent_per_trade": settings.MAX_LIVE_RISK_PERCENT_PER_TRADE,
         },
         "mql5_bridge": {
             "enabled": settings.MQL5_BRIDGE_ENABLED,

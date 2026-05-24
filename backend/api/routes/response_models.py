@@ -229,6 +229,9 @@ class OrderResponse(BaseModel):
     slippage_bps: Optional[float] = None
     broker: str
     mode: str
+    manual_confirmation: bool = False
+    confirmation_text: Optional[str] = None
+    operator_note: Optional[str] = None
     broker_order_id: Optional[str] = None
     reason: Optional[str] = None
     created_at: str
