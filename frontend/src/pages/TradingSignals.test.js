@@ -187,9 +187,23 @@ describe('TradingSignals', () => {
     render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
 
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
-    expect(screen.getByText('Window: 24h')).toBeInTheDocument();
+    expect(screen.getByText('Loaded: 24h')).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches')).toBeInTheDocument();
     expect(screen.getByText(/Regime drift:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
+  });
+
+  it('requests operator brief for selected time window', async () => {
+    const user = userEvent.setup();
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
+    expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
+
+    await user.selectOptions(screen.getByLabelText('Window'), '72');
+
+    await waitFor(() => {
+      expect(tradingService.getOperatorDailyBrief).toHaveBeenLastCalledWith(72);
+    });
   });
 });

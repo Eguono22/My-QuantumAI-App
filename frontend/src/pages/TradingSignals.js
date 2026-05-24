@@ -112,6 +112,7 @@ export default function TradingSignals({ preferences }) {
   const [startupHealth, setStartupHealth] = useState(null);
   const [executionMetrics, setExecutionMetrics] = useState(null);
   const [operatorBrief, setOperatorBrief] = useState(null);
+  const [operatorBriefHours, setOperatorBriefHours] = useState(24);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -124,7 +125,7 @@ export default function TradingSignals({ preferences }) {
         ? tradingService.getExecutionMetrics()
         : Promise.resolve(null);
       const operatorBriefPromise = tradingService.getOperatorDailyBrief
-        ? tradingService.getOperatorDailyBrief(24)
+        ? tradingService.getOperatorDailyBrief(operatorBriefHours)
         : Promise.resolve(null);
       const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult] = await Promise.allSettled([
         tradingService.getSignals(),
@@ -180,7 +181,7 @@ export default function TradingSignals({ preferences }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [operatorBriefHours]);
 
   useEffect(() => { fetchSignals(); }, [fetchSignals]);
 
@@ -782,7 +783,20 @@ export default function TradingSignals({ preferences }) {
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Operator Daily Brief</h2>
               <p className="text-zinc-600 text-sm">24h risk and execution control summary</p>
             </div>
-            <p className="text-xs text-zinc-500">Window: {operatorBrief.window_hours}h</p>
+            <div className="flex items-center gap-2">
+              <label htmlFor="operator-brief-hours" className="text-xs text-zinc-500">Window</label>
+              <select
+                id="operator-brief-hours"
+                value={operatorBriefHours}
+                onChange={(e) => setOperatorBriefHours(Number(e.target.value))}
+                className="market-select rounded-md px-2 py-1 text-xs"
+              >
+                <option value={24}>24h</option>
+                <option value={72}>72h</option>
+                <option value={168}>7d</option>
+              </select>
+              <p className="text-xs text-zinc-500">Loaded: {operatorBrief.window_hours}h</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
