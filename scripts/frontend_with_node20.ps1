@@ -13,7 +13,6 @@ if (!(Test-Path -LiteralPath $frontend)) {
 }
 
 $null = Get-Command nvm -ErrorAction Stop
-$null = Get-Command npm.cmd -ErrorAction Stop
 
 Push-Location $root
 try {
@@ -26,10 +25,19 @@ finally {
     Pop-Location
 }
 
+$npmCommand = $null
+if (Get-Command npm.cmd -ErrorAction SilentlyContinue) {
+    $npmCommand = "npm.cmd"
+} elseif (Get-Command npm -ErrorAction SilentlyContinue) {
+    $npmCommand = "npm"
+} else {
+    throw "Neither npm.cmd nor npm was found in PATH after switching Node with nvm"
+}
+
 Push-Location $frontend
 try {
     Write-Host "Running npm $($NpmArgs -join ' ') with Node 20.18.3"
-    & npm.cmd @NpmArgs
+    & $npmCommand @NpmArgs
 }
 finally {
     Pop-Location

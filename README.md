@@ -111,6 +111,15 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
+### Python Dependency Lock Workflow
+```powershell
+# Install exactly the locked set (recommended)
+uv pip install --python .\.venv\Scripts\python.exe -r .\requirements.lock.txt
+
+# Refresh lock file after dependency changes
+.\scripts\freeze_python_deps.ps1
+```
+
 Windows local launcher with the MT5-friendly port used in this repo:
 ```powershell
 .\scripts\start_backend_local.ps1 -Port 8011

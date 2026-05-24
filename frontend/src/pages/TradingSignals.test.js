@@ -14,6 +14,7 @@ jest.mock('../services/tradingService', () => ({
     getOrders: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
+    getStartupHealth: jest.fn(),
     addWatchlistItem: jest.fn(),
     removeWatchlistItem: jest.fn(),
     createPriceAlert: jest.fn(),
@@ -49,6 +50,10 @@ describe('TradingSignals', () => {
     tradingService.getSignals.mockResolvedValue([signal]);
     tradingService.getWatchlist.mockResolvedValue([]);
     tradingService.getPriceAlerts.mockResolvedValue([]);
+    tradingService.getStartupHealth.mockResolvedValue({
+      trading: { trading_mode: 'paper' },
+      live_trading: { enabled: false, live_manual_confirmation_text: 'LIVE' },
+    });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
       trade: {
