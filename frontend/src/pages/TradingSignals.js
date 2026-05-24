@@ -37,6 +37,46 @@ function summarizeOrderAudit(orders) {
   };
 }
 
+function summarizeQuickTradeOutcome(signal, latestTrade, recentAudit) {
+  if (!latestTrade) {
+    return null;
+  }
+
+  const status = String(latestTrade.status || '').toUpperCase();
+  const submissionNotional = Number(latestTrade.quantity || 0) * Number(latestTrade.price || 0);
+  const fillPrice = latestTrade.price ? formatCurrency(latestTrade.price) : 'N/A';
+  const maxLossAtStop = Number(latestTrade.maxLossAtStop || 0);
+  const potentialReward = Number(latestTrade.potentialReward || 0);
+  const isFilled = ['FILLED', 'PARTIAL_FILL'].includes(status);
+  const isPending = status === 'PENDING';
+
+  let outcomeLabel = status || 'SUBMITTED';
+  let outcomeSummary = latestTrade.auditSummary || recentAudit.summary;
+
+  if (!latestTrade.ok) {
+    outcomeLabel = 'BLOCKED';
+    outcomeSummary = latestTrade.error || 'The broker blocked this order before execution.';
+  } else if (isFilled) {
+    outcomeLabel = status === 'FILLED' ? 'FILLED' : 'PARTIAL FILL';
+    outcomeSummary = latestTrade.auditSummary || `Order filled at ${fillPrice} for ${signal.asset}.`;
+  } else if (isPending) {
+    outcomeLabel = 'PENDING';
+    outcomeSummary = latestTrade.auditSummary || 'Order accepted and waiting for its trigger.';
+  }
+
+  return {
+    outcomeLabel,
+    outcomeSummary,
+    status,
+    fillPrice,
+    submissionNotional,
+    maxLossAtStop,
+    potentialReward,
+    filledQuantity: Number(latestTrade.filledQuantity || 0),
+    submittedQuantity: Number(latestTrade.quantity || 0),
+  };
+}
+
 function sortedRegimes(regimeBreakdown) {
   return Object.entries(regimeBreakdown || {})
     .sort((a, b) => (b[1] || 0) - (a[1] || 0));
@@ -474,9 +514,13 @@ export default function TradingSignals({ preferences }) {
           at: new Date().toISOString(),
           ok: true,
           status: order?.status || 'FILLED',
+          filledQuantity: order?.filled_quantity ?? trade?.quantity ?? qty,
+          fillPrice: order?.fill_price ?? trade?.price ?? signal.price,
+          orderId: order?.id,
           auditSummary: audit?.decision_summary || 'Paper order accepted.',
           maxLossAtStop: audit?.max_loss_at_stop,
           potentialReward: audit?.potential_reward,
+          orderReason: order?.reason,
         },
       }));
       if (order) {
@@ -1938,6 +1982,7 @@ export default function TradingSignals({ preferences }) {
               const latestTrade = quickTradeResult[signal.asset];
               const riskRow = riskRowByAsset[signal.asset];
               const recentAudit = summarizeOrderAudit(orderAuditByAsset[signal.asset] || []);
+              const quickTradeOutcome = summarizeQuickTradeOutcome(signal, latestTrade, recentAudit);
               const qtyInput = Number(quickQty[signal.asset] ?? 0);
               const projectedOrderRisk = (riskRow?.riskPerUnit || 0) * (qtyInput > 0 ? qtyInput : 0);
               const projectedOrderHeat = (Number(riskBudget.accountSize) || 0) > 0
@@ -2040,15 +2085,23 @@ export default function TradingSignals({ preferences }) {
                     Audit trail: {recentAudit.summary}
                   </div>
 
-                  {latestTrade && (
-                    <div className={`mt-2 rounded px-2 py-1 text-[11px] border ${
+                  {quickTradeOutcome && (
+                    <div className={`mt-2 rounded border px-3 py-2 text-[11px] ${
                       latestTrade.ok
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-red-50 text-red-700 border-red-200'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border-red-200 bg-red-50 text-red-800'
                     }`}>
-                      {latestTrade.ok
-                        ? `${latestTrade.auditSummary || `Last ${latestTrade.action}: ${latestTrade.quantity} @ ${formatCurrency(latestTrade.price)}`}`
-                        : `Last ${latestTrade.action} failed: ${latestTrade.error}`}
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Post-Trade Outcome</p>
+                      <p className="mt-1 font-semibold text-zinc-900">
+                        {quickTradeOutcome.outcomeLabel} • {latestTrade.action} {quickTradeOutcome.submittedQuantity} {signal.asset}
+                      </p>
+                      <p className="mt-1 text-zinc-700">
+                        Status: {quickTradeOutcome.status || 'UNKNOWN'} | Fill price: {quickTradeOutcome.fillPrice} | Submitted notional: {formatCurrency(quickTradeOutcome.submissionNotional)}
+                      </p>
+                      <p className="mt-1 text-zinc-700">
+                        Max loss at stop: {formatCurrency(quickTradeOutcome.maxLossAtStop)} | Potential reward: {formatCurrency(quickTradeOutcome.potentialReward)}
+                      </p>
+                      <p className="mt-1 text-zinc-700">{quickTradeOutcome.outcomeSummary}</p>
                     </div>
                   )}
                 </div>

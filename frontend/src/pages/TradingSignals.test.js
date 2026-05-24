@@ -260,6 +260,10 @@ describe('TradingSignals', () => {
         take_profit: 112,
       });
     });
+    expect(await screen.findByText('Post-Trade Outcome')).toBeInTheDocument();
+    expect(screen.getByText('FILLED • BUY 1 AAPL')).toBeInTheDocument();
+    expect(screen.getByText(/Status: FILLED \| Fill price: \$100.00 \| Submitted notional: \$100.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/Max loss at stop: \$5.00 \| Potential reward: \$12.00/i)).toBeInTheDocument();
   });
 
   it('shows risk and execution health telemetry', async () => {
