@@ -106,6 +106,42 @@ function getOrderStats(orders) {
   };
 }
 
+function summarizeLatestOrderOutcome(orders) {
+  if (!orders.length) {
+    return null;
+  }
+
+  const latestOrder = orders[0];
+  const status = String(latestOrder.status || 'UNKNOWN').toUpperCase();
+  const filledQuantity = Number(latestOrder.filled_quantity || 0);
+  const requestedQuantity = Number(latestOrder.requested_quantity || filledQuantity || 0);
+  const fillPrice = Number(latestOrder.fill_price || latestOrder.market_price || 0);
+  const notional = filledQuantity > 0 ? filledQuantity * fillPrice : requestedQuantity * fillPrice;
+
+  let outcome = status;
+  if (status === 'FILLED' || status === 'PARTIAL_FILL') {
+    outcome = `${status} at ${fillPrice > 0 ? `$${fillPrice.toFixed(2)}` : 'market price'}`;
+  } else if (status === 'PENDING') {
+    outcome = 'PENDING trigger';
+  } else if (status === 'REJECTED') {
+    outcome = latestOrder.reason || 'REJECTED by broker';
+  } else if (status === 'CANCELED') {
+    outcome = latestOrder.reason || 'CANCELED before execution';
+  }
+
+  return {
+    status,
+    asset: latestOrder.asset,
+    action: latestOrder.action,
+    requestedQuantity,
+    filledQuantity,
+    fillPrice,
+    notional,
+    outcome,
+    updatedAt: latestOrder.updated_at || latestOrder.created_at || null,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -549,6 +585,7 @@ export default function Pilot() {
   };
 
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
+  const latestOrderOutcome = useMemo(() => summarizeLatestOrderOutcome(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
@@ -675,6 +712,53 @@ export default function Pilot() {
         <MetricCard label="Trust Gates" value={formatPercent(gateProgress)} hint={`${gates.filter((gate) => gate.complete).length}/${gates.length} proof points ready`} tone={gateProgress >= 80 ? 'emerald' : 'amber'} />
         <MetricCard label="Paper Orders" value={orders.length} hint={`${orderStats.filled} filled, ${orderStats.pending} pending, ${orderStats.rejected} rejected`} tone={orders.length > 0 ? 'sky' : 'zinc'} />
         <MetricCard label="Beta Pipeline" value={candidates.length} hint={`${candidateStats.SCHEDULED} scheduled, ${candidateStats.COMPLETED} completed`} tone={candidates.length >= 10 ? 'emerald' : 'amber'} />
+      </div>
+
+      <div className="market-panel rounded-md p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Latest Paper Order Outcome</h2>
+            <p className="text-sm text-zinc-600">A compact summary of the most recent order so the pilot can explain what happened after submit.</p>
+          </div>
+          <Pill tone={latestOrderOutcome?.status === 'REJECTED' ? 'red' : latestOrderOutcome?.status === 'PENDING' ? 'amber' : 'sky'}>
+            {latestOrderOutcome ? latestOrderOutcome.status : 'No orders'}
+          </Pill>
+        </div>
+
+        {latestOrderOutcome ? (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Signal</p>
+              <p className="font-semibold text-zinc-900">{latestOrderOutcome.asset} {latestOrderOutcome.action}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Status</p>
+              <p className="font-semibold text-zinc-900">{latestOrderOutcome.status}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Fill / Qty</p>
+              <p className="font-semibold text-zinc-900">
+                {latestOrderOutcome.filledQuantity > 0 ? `${latestOrderOutcome.filledQuantity}` : `${latestOrderOutcome.requestedQuantity}`}
+                {latestOrderOutcome.fillPrice > 0 ? ` @ $${latestOrderOutcome.fillPrice.toFixed(2)}` : ''}
+              </p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Notional</p>
+              <p className="font-semibold text-zinc-900">${latestOrderOutcome.notional.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-600">
+            No paper orders have been placed yet.
+          </div>
+        )}
+
+        {latestOrderOutcome && (
+          <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Outcome note</p>
+            <p className="mt-1">{latestOrderOutcome.outcome}{latestOrderOutcome.updatedAt ? ` | Updated ${formatDate(latestOrderOutcome.updatedAt)}` : ''}</p>
+          </div>
+        )}
       </div>
 
       <div className="market-panel rounded-md p-4">
