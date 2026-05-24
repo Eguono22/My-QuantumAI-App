@@ -852,6 +852,11 @@ export default function TradingSignals({ preferences }) {
                 <p className="text-xs uppercase tracking-wide text-zinc-500">{item.severity}</p>
                 <p className="font-semibold text-zinc-900">{item.title}</p>
                 <p className="text-zinc-700">{item.message}</p>
+                {item.recommended_action && (
+                  <p className="mt-2 text-zinc-600">
+                    Recommended action: <span className="font-medium text-zinc-900">{item.recommended_action}</span>
+                  </p>
+                )}
               </div>
             ))}
           </div>

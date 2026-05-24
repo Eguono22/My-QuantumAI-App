@@ -279,6 +279,7 @@ class OperatorDailyBriefAlertResponse(BaseModel):
     severity: str
     title: str
     message: str
+    recommended_action: Optional[str] = None
 
 
 class OperatorDailyBriefTrendComparisonResponse(BaseModel):

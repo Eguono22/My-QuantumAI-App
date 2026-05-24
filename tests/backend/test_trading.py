@@ -701,6 +701,7 @@ class TestTradingService:
         assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
         assert any(alert["title"] == "Execution Quality Degraded" for alert in brief["alerts"])
         assert any(alert["title"] == "Slippage Worsening" for alert in brief["alerts"])
+        assert all(alert.get("recommended_action") for alert in brief["alerts"])
 
         db.close()
 

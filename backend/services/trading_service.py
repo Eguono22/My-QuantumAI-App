@@ -288,12 +288,14 @@ class TradingService:
                 "severity": "WARN",
                 "title": "Risk Breaches Detected",
                 "message": f"{summary['risk_breaches']} risk-related order blocks in the last {hours}h.",
+                "recommended_action": "Review blocked orders, tighten position sizing, and confirm the current risk caps still match market volatility.",
             })
         if summary["broker_issues"] > 0:
             alerts.append({
                 "severity": "WARN",
                 "title": "Broker Issues Detected",
                 "message": f"{summary['broker_issues']} broker errors/rejections in the last {hours}h.",
+                "recommended_action": "Check broker connectivity, inspect rejected payloads, and pause new automation until broker health stabilizes.",
             })
         if recent_execution["orders_submitted"] >= 2 and fill_rate_delta_pct <= -20.0:
             alerts.append({
@@ -303,6 +305,7 @@ class TradingService:
                     f"Fill rate is {fill_rate_pct:.2f}% over the last {hours}h, "
                     f"down {abs(fill_rate_delta_pct):.0f}% versus the {baseline_hours}h baseline."
                 ),
+                "recommended_action": "Reduce order frequency, review venue liquidity, and keep new trades small until fills recover toward baseline.",
             })
         if recent_execution["orders_filled"] > 0 and avg_slippage_delta_pct >= 10.0:
             alerts.append({
@@ -312,6 +315,7 @@ class TradingService:
                     f"Average slippage is {avg_slippage_bps:.2f} bps over the last {hours}h, "
                     f"up {avg_slippage_delta_pct:.0f}% versus the {baseline_hours}h baseline."
                 ),
+                "recommended_action": "Widen execution tolerance, avoid thin liquidity windows, and recheck pricing assumptions before the next batch.",
             })
         if regime_drift_detected:
             alerts.append({
@@ -321,12 +325,14 @@ class TradingService:
                     f"Today's dominant regime ({today_top_regime}) differs from rolling 7d "
                     f"({rolling_7d_top_regime})."
                 ),
+                "recommended_action": "Review whether the current playbook still fits this regime before increasing trade size or frequency.",
             })
         if not alerts:
             alerts.append({
                 "severity": "INFO",
                 "title": "Operationally Stable",
                 "message": f"No major risk or broker anomalies detected in the last {hours}h.",
+                "recommended_action": "Keep sizing unchanged, continue paper execution, and log the next operator review after the current session.",
             })
 
         return {

@@ -160,7 +160,12 @@ describe('TradingSignals', () => {
           avg_slippage_delta_pct: 14.29,
         },
         alerts: [
-          { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
+          {
+            severity: 'WARN',
+            title: 'Risk Breaches Detected',
+            message: '1 risk-related order blocks in the last 24h.',
+            recommended_action: 'Review blocked orders, tighten position sizing, and confirm the current risk caps still match market volatility.',
+          },
         ],
       };
     });
@@ -230,6 +235,7 @@ describe('TradingSignals', () => {
     expect(screen.getByText(/Trend vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText(/Execution vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
+    expect(screen.getByText(/Recommended action:/i)).toBeInTheDocument();
   });
 
   it('requests operator brief for selected time window', async () => {
