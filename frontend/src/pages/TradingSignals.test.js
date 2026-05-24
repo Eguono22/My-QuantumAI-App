@@ -148,6 +148,13 @@ describe('TradingSignals', () => {
           today_top_share_pct: 60,
           rolling_7d_top_share_pct: 55,
         },
+        trend_comparison: {
+          baseline_window_hours: 168,
+          risk_breaches_per_day: 1,
+          broker_issues_per_day: 1,
+          risk_breaches_delta_pct: 600,
+          broker_issues_delta_pct: 600,
+        },
         alerts: [
           { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
         ],
@@ -216,7 +223,7 @@ describe('TradingSignals', () => {
     expect(screen.getByText('Loaded: 24h')).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches')).toBeInTheDocument();
     expect(screen.getByText(/Regime drift:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Trend vs 7d baseline:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Trend vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
   });
 
@@ -226,7 +233,6 @@ describe('TradingSignals', () => {
 
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
-    expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(168);
 
     await user.selectOptions(screen.getByLabelText('Window'), '72');
 

@@ -63,6 +63,43 @@ class TradingService:
         top_regime, top_count = max(counts.items(), key=lambda item: item[1] or 0)
         return (str(top_regime), (float(top_count) / float(total)) * 100.0)
 
+    def _summarize_operator_brief_window(self, events: List[TradeAuditEvent]) -> Dict[str, int]:
+        accepted_orders = sum(1 for event in events if event.event_type == "ORDER_ACCEPTED")
+        blocked_events = [event for event in events if event.event_type == "ORDER_BLOCKED"]
+        blocked_trades = len(blocked_events)
+        no_trade_window_blocks = 0
+        for event in blocked_events:
+            try:
+                metadata = json.loads(event.metadata_json) if event.metadata_json else {}
+            except Exception:
+                metadata = {}
+            if str(metadata.get("reason_code") or "").upper() == "NO_TRADE_WINDOW":
+                no_trade_window_blocks += 1
+
+        risk_breaches = max(0, blocked_trades - no_trade_window_blocks)
+        broker_issues = sum(
+            1
+            for event in events
+            if event.event_type in {"BROKER_ERROR", "BROKER_REJECTED"}
+        )
+
+        return {
+            "accepted_orders": accepted_orders,
+            "blocked_trades": blocked_trades,
+            "risk_breaches": risk_breaches,
+            "no_trade_window_blocks": no_trade_window_blocks,
+            "broker_issues": broker_issues,
+        }
+
+    def _per_day_rate(self, total: int, hours: int) -> float:
+        days = max(1.0, float(hours) / 24.0)
+        return float(total) / days
+
+    def _delta_pct(self, current_rate: float, baseline_rate: float) -> float:
+        if baseline_rate > 0:
+            return ((current_rate - baseline_rate) / baseline_rate) * 100.0
+        return 100.0 if current_rate > 0 else 0.0
+
     def _summarize_order_window(self, orders: List[Order], regime_breakdown: Dict[str, int]) -> Dict:
         submitted = len(orders)
         filled = 0
@@ -201,6 +238,8 @@ class TradingService:
 
         now = datetime.now(timezone.utc)
         start = now - timedelta(hours=hours)
+        baseline_hours = 168
+        baseline_start = now - timedelta(hours=baseline_hours)
         events = (
             db.query(TradeAuditEvent)
             .filter(TradeAuditEvent.user_id == user_id)
@@ -208,25 +247,9 @@ class TradingService:
             .all()
         )
         recent_events = [event for event in events if self._ensure_utc(event.created_at) >= start]
-
-        accepted_orders = sum(1 for event in recent_events if event.event_type == "ORDER_ACCEPTED")
-        blocked_events = [event for event in recent_events if event.event_type == "ORDER_BLOCKED"]
-        blocked_trades = len(blocked_events)
-        no_trade_window_blocks = 0
-        for event in blocked_events:
-            try:
-                metadata = json.loads(event.metadata_json) if event.metadata_json else {}
-            except Exception:
-                metadata = {}
-            if str(metadata.get("reason_code") or "").upper() == "NO_TRADE_WINDOW":
-                no_trade_window_blocks += 1
-
-        risk_breaches = max(0, blocked_trades - no_trade_window_blocks)
-        broker_issues = sum(
-            1
-            for event in recent_events
-            if event.event_type in {"BROKER_ERROR", "BROKER_REJECTED"}
-        )
+        baseline_events = [event for event in events if self._ensure_utc(event.created_at) >= baseline_start]
+        summary = self._summarize_operator_brief_window(recent_events)
+        baseline_summary = self._summarize_operator_brief_window(baseline_events)
 
         execution_metrics = self.get_execution_metrics(db, user_id)
         today_regimes = execution_metrics["windows"].get("today", {}).get("regime_breakdown", {})
@@ -240,17 +263,17 @@ class TradingService:
         )
 
         alerts = []
-        if risk_breaches > 0:
+        if summary["risk_breaches"] > 0:
             alerts.append({
                 "severity": "WARN",
                 "title": "Risk Breaches Detected",
-                "message": f"{risk_breaches} risk-related order blocks in the last {hours}h.",
+                "message": f"{summary['risk_breaches']} risk-related order blocks in the last {hours}h.",
             })
-        if broker_issues > 0:
+        if summary["broker_issues"] > 0:
             alerts.append({
                 "severity": "WARN",
                 "title": "Broker Issues Detected",
-                "message": f"{broker_issues} broker errors/rejections in the last {hours}h.",
+                "message": f"{summary['broker_issues']} broker errors/rejections in the last {hours}h.",
             })
         if regime_drift_detected:
             alerts.append({
@@ -268,22 +291,28 @@ class TradingService:
                 "message": f"No major risk or broker anomalies detected in the last {hours}h.",
             })
 
+        risk_breaches_per_day = self._per_day_rate(summary["risk_breaches"], hours)
+        broker_issues_per_day = self._per_day_rate(summary["broker_issues"], hours)
+        baseline_risk_per_day = self._per_day_rate(baseline_summary["risk_breaches"], baseline_hours)
+        baseline_broker_per_day = self._per_day_rate(baseline_summary["broker_issues"], baseline_hours)
+
         return {
             "generated_at": now.isoformat(),
             "window_hours": hours,
-            "summary": {
-                "accepted_orders": accepted_orders,
-                "blocked_trades": blocked_trades,
-                "risk_breaches": risk_breaches,
-                "no_trade_window_blocks": no_trade_window_blocks,
-                "broker_issues": broker_issues,
-            },
+            "summary": summary,
             "regime_drift": {
                 "detected": regime_drift_detected,
                 "today_top_regime": today_top_regime,
                 "rolling_7d_top_regime": rolling_7d_top_regime,
                 "today_top_share_pct": round(today_top_share_pct, 2),
                 "rolling_7d_top_share_pct": round(rolling_7d_top_share_pct, 2),
+            },
+            "trend_comparison": {
+                "baseline_window_hours": baseline_hours,
+                "risk_breaches_per_day": round(risk_breaches_per_day, 2),
+                "broker_issues_per_day": round(broker_issues_per_day, 2),
+                "risk_breaches_delta_pct": round(self._delta_pct(risk_breaches_per_day, baseline_risk_per_day), 2),
+                "broker_issues_delta_pct": round(self._delta_pct(broker_issues_per_day, baseline_broker_per_day), 2),
             },
             "alerts": alerts,
         }

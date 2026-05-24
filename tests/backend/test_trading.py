@@ -613,6 +613,11 @@ class TestTradingService:
         assert brief["regime_drift"]["detected"] is True
         assert brief["regime_drift"]["today_top_regime"] == "TRENDING"
         assert brief["regime_drift"]["rolling_7d_top_regime"] == "RANGING"
+        assert brief["trend_comparison"]["baseline_window_hours"] == 168
+        assert brief["trend_comparison"]["risk_breaches_per_day"] == pytest.approx(1.0)
+        assert brief["trend_comparison"]["broker_issues_per_day"] == pytest.approx(1.0)
+        assert brief["trend_comparison"]["risk_breaches_delta_pct"] == pytest.approx(600.0)
+        assert brief["trend_comparison"]["broker_issues_delta_pct"] == pytest.approx(600.0)
         assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
 
         db.close()

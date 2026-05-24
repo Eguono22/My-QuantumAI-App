@@ -112,7 +112,6 @@ export default function TradingSignals({ preferences }) {
   const [startupHealth, setStartupHealth] = useState(null);
   const [executionMetrics, setExecutionMetrics] = useState(null);
   const [operatorBrief, setOperatorBrief] = useState(null);
-  const [operatorBrief7d, setOperatorBrief7d] = useState(null);
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
@@ -128,10 +127,7 @@ export default function TradingSignals({ preferences }) {
       const operatorBriefPromise = tradingService.getOperatorDailyBrief
         ? tradingService.getOperatorDailyBrief(operatorBriefHours)
         : Promise.resolve(null);
-      const operatorBrief7dPromise = tradingService.getOperatorDailyBrief
-        ? tradingService.getOperatorDailyBrief(168)
-        : Promise.resolve(null);
-      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult, operatorBrief7dResult] = await Promise.allSettled([
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
@@ -140,7 +136,6 @@ export default function TradingSignals({ preferences }) {
         tradingService.getStartupHealth(),
         executionMetricsPromise,
         operatorBriefPromise,
-        operatorBrief7dPromise,
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -173,9 +168,6 @@ export default function TradingSignals({ preferences }) {
       setOperatorBrief(
         operatorBriefResult.status === 'fulfilled' ? operatorBriefResult.value : null
       );
-      setOperatorBrief7d(
-        operatorBrief7dResult.status === 'fulfilled' ? operatorBrief7dResult.value : null
-      );
 
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
@@ -205,18 +197,7 @@ export default function TradingSignals({ preferences }) {
   const executionToday = executionMetrics?.windows?.today || {};
   const execution7d = executionMetrics?.windows?.rolling_7d || {};
   const execution30d = executionMetrics?.windows?.rolling_30d || {};
-  const selectedWindowDays = Math.max(1, (Number(operatorBrief?.window_hours) || operatorBriefHours) / 24);
-  const baseline7dDays = Math.max(1, (Number(operatorBrief7d?.window_hours) || 168) / 24);
-  const selectedRiskDaily = (Number(operatorBrief?.summary?.risk_breaches) || 0) / selectedWindowDays;
-  const baselineRiskDaily = (Number(operatorBrief7d?.summary?.risk_breaches) || 0) / baseline7dDays;
-  const selectedBrokerDaily = (Number(operatorBrief?.summary?.broker_issues) || 0) / selectedWindowDays;
-  const baselineBrokerDaily = (Number(operatorBrief7d?.summary?.broker_issues) || 0) / baseline7dDays;
-  const riskDeltaPct = baselineRiskDaily > 0
-    ? ((selectedRiskDaily - baselineRiskDaily) / baselineRiskDaily) * 100
-    : (selectedRiskDaily > 0 ? 100 : 0);
-  const brokerDeltaPct = baselineBrokerDaily > 0
-    ? ((selectedBrokerDaily - baselineBrokerDaily) / baselineBrokerDaily) * 100
-    : (selectedBrokerDaily > 0 ? 100 : 0);
+  const trendComparison = operatorBrief?.trend_comparison || null;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -847,10 +828,12 @@ export default function TradingSignals({ preferences }) {
               Regime drift: <span className="font-semibold">{operatorBrief.regime_drift.detected ? 'Detected' : 'Stable'}</span>
               {' '}({operatorBrief.regime_drift.today_top_regime} today vs {operatorBrief.regime_drift.rolling_7d_top_regime} rolling 7d)
             </p>
-            {operatorBrief7d && (
+            {trendComparison && (
               <p className="mt-2 text-zinc-600">
-                Trend vs 7d baseline: Risk breaches/day {selectedRiskDaily.toFixed(2)} ({riskDeltaPct >= 0 ? '+' : ''}{riskDeltaPct.toFixed(0)}%),
-                {' '}Broker issues/day {selectedBrokerDaily.toFixed(2)} ({brokerDeltaPct >= 0 ? '+' : ''}{brokerDeltaPct.toFixed(0)}%).
+                Trend vs {trendComparison.baseline_window_hours}h baseline: Risk breaches/day {trendComparison.risk_breaches_per_day.toFixed(2)}
+                {' '}({trendComparison.risk_breaches_delta_pct >= 0 ? '+' : ''}{trendComparison.risk_breaches_delta_pct.toFixed(0)}%),
+                {' '}Broker issues/day {trendComparison.broker_issues_per_day.toFixed(2)}
+                {' '}({trendComparison.broker_issues_delta_pct >= 0 ? '+' : ''}{trendComparison.broker_issues_delta_pct.toFixed(0)}%).
               </p>
             )}
           </div>

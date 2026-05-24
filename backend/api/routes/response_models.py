@@ -281,11 +281,20 @@ class OperatorDailyBriefAlertResponse(BaseModel):
     message: str
 
 
+class OperatorDailyBriefTrendComparisonResponse(BaseModel):
+    baseline_window_hours: int
+    risk_breaches_per_day: float
+    broker_issues_per_day: float
+    risk_breaches_delta_pct: float
+    broker_issues_delta_pct: float
+
+
 class OperatorDailyBriefResponse(BaseModel):
     generated_at: str
     window_hours: int
     summary: OperatorDailyBriefSummaryResponse
     regime_drift: OperatorDailyBriefRegimeDriftResponse
+    trend_comparison: OperatorDailyBriefTrendComparisonResponse
     alerts: List[OperatorDailyBriefAlertResponse]
 
 
