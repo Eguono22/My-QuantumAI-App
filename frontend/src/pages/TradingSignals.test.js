@@ -5,6 +5,8 @@ import TradingSignals from './TradingSignals';
 import { tradingService } from '../services/tradingService';
 import { marketService } from '../services/marketService';
 
+const operatorBriefAlertStateKey = 'quantumai_operator_brief_alert_state';
+
 jest.mock('../services/tradingService', () => ({
   tradingService: {
     getSignals: jest.fn(),
@@ -49,6 +51,7 @@ const signal = {
 describe('TradingSignals', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     tradingService.getSignals.mockResolvedValue([signal]);
     tradingService.getWatchlist.mockResolvedValue([]);
     tradingService.getPriceAlerts.mockResolvedValue([]);
@@ -236,6 +239,8 @@ describe('TradingSignals', () => {
     expect(screen.getByText(/Execution vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
     expect(screen.getByText(/Recommended action:/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
 
   it('requests operator brief for selected time window', async () => {
@@ -251,5 +256,28 @@ describe('TradingSignals', () => {
       const calledWith72 = tradingService.getOperatorDailyBrief.mock.calls.some((args) => args[0] === 72);
       expect(calledWith72).toBe(true);
     });
+  });
+
+  it('acknowledges and dismisses operator brief alerts with persistence', async () => {
+    const user = userEvent.setup();
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Risk Breaches Detected')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Acknowledge' }));
+    expect(screen.getByText('Acknowledged')).toBeInTheDocument();
+
+    const storedAfterAck = JSON.parse(localStorage.getItem(operatorBriefAlertStateKey) || '{}');
+    expect(Object.values(storedAfterAck).some((entry) => entry?.acknowledged === true)).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Risk Breaches Detected')).not.toBeInTheDocument();
+      expect(screen.getByText('All brief alerts for this window have been dismissed.')).toBeInTheDocument();
+    });
+
+    const storedAfterDismiss = JSON.parse(localStorage.getItem(operatorBriefAlertStateKey) || '{}');
+    expect(Object.values(storedAfterDismiss).some((entry) => entry?.dismissed === true)).toBe(true);
   });
 });
