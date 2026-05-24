@@ -313,9 +313,58 @@ describe('TradingSignals', () => {
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh Brief' })).toBeInTheDocument();
 
+    let resolveRefreshBrief;
+    const refreshBriefPromise = new Promise((resolve) => {
+      resolveRefreshBrief = resolve;
+    });
+    tradingService.getOperatorDailyBrief.mockImplementationOnce(async () => refreshBriefPromise);
+
     await user.click(screen.getByRole('button', { name: 'Refresh Brief' }));
 
     expect(screen.getByRole('button', { name: 'Refreshing...' })).toBeDisabled();
+
+    resolveRefreshBrief({
+      generated_at: '2026-05-24T12:00:00Z',
+      window_hours: 24,
+      summary: {
+        accepted_orders: 5,
+        blocked_trades: 2,
+        risk_breaches: 1,
+        no_trade_window_blocks: 1,
+        broker_issues: 1,
+      },
+      regime_drift: {
+        detected: true,
+        today_top_regime: 'TRENDING',
+        rolling_7d_top_regime: 'RANGING',
+        today_top_share_pct: 60,
+        rolling_7d_top_share_pct: 55,
+      },
+      trend_comparison: {
+        baseline_window_hours: 168,
+        risk_breaches_per_day: 1,
+        broker_issues_per_day: 1,
+        risk_breaches_delta_pct: 600,
+        broker_issues_delta_pct: 600,
+        fill_rate_pct: 50,
+        fill_rate_delta_pct: -33.33,
+        avg_slippage_bps: 2,
+        avg_slippage_delta_pct: 14.29,
+      },
+      alerts: [
+        {
+          alert_key: 'brief-24-risk-breach',
+          severity: 'WARN',
+          title: 'Risk Breaches Detected',
+          message: '1 risk-related order blocks in the last 24h.',
+          recommended_action: 'Review blocked orders, tighten position sizing, and confirm the current risk caps still match market volatility.',
+          acknowledged: false,
+          dismissed: false,
+          acknowledged_at: null,
+          dismissed_at: null,
+        },
+      ],
+    });
 
     await waitFor(() => {
       expect(tradingService.getOperatorDailyBrief.mock.calls.length).toBeGreaterThan(1);
