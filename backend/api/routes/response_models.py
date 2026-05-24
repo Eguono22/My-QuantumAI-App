@@ -251,6 +251,7 @@ class ExecutionMetricsWindowResponse(BaseModel):
     avg_slippage_bps: float
     manual_confirmation_orders: int
     live_mode_orders: int
+    regime_breakdown: dict[str, int]
 
 
 class ExecutionMetricsResponse(BaseModel):

@@ -112,6 +112,7 @@ class Settings(BaseSettings):
     MAX_DAILY_NOTIONAL: float = 100000.0
     MAX_DAILY_TRADES: int = 50
     MAX_RISK_PERCENT_PER_TRADE: float = 2.0
+    NO_TRADE_UTC_HOURS: List[int] = []
     MAX_LIVE_NOTIONAL_PER_TRADE: float = 500.0
     MAX_LIVE_DAILY_NOTIONAL: float = 1500.0
     MAX_LIVE_DAILY_TRADES: int = 3

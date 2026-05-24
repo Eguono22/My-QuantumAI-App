@@ -2,6 +2,7 @@ import pytest
 import sys
 import os
 import datetime
+import json
 from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
@@ -382,6 +383,121 @@ class TestTradingService:
         assert lifetime["filled_notional"] == 243.0
         assert lifetime["fees_paid"] == 0.35
         assert lifetime["avg_slippage_bps"] == pytest.approx(2.0)
+
+        db.close()
+
+    def test_execution_metrics_includes_regime_breakdown(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, Order, TradeAuditEvent
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="metricsregime",
+            email="regime@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        order = Order(
+            user_id=user.id,
+            asset="BTC",
+            action="buy",
+            order_type="MARKET",
+            status="FILLED",
+            requested_quantity=1.0,
+            filled_quantity=1.0,
+            requested_price=100.0,
+            fill_price=101.0,
+            fee_paid=0.1,
+            slippage_bps=1.0,
+            broker="paper-broker",
+            mode="paper",
+            manual_confirmation=0,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        db.add_all(
+            [
+                TradeAuditEvent(
+                    user_id=user.id,
+                    order_id=order.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Accepted with regime",
+                    asset="BTC",
+                    action="buy",
+                    metadata_json=json.dumps({"market_regime": "TRENDING"}),
+                    created_at=now,
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    order_id=order.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Accepted with no metadata",
+                    asset="BTC",
+                    action="buy",
+                    metadata_json=None,
+                    created_at=now,
+                ),
+            ]
+        )
+        db.commit()
+
+        lifetime = self.service.get_execution_metrics(db, user.id)["windows"]["lifetime"]
+        assert lifetime["regime_breakdown"]["TRENDING"] == 1
+        assert lifetime["regime_breakdown"]["UNKNOWN"] == 1
+
+        db.close()
+
+    def test_execute_trade_blocked_during_no_trade_window(self, monkeypatch):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, TradeAuditEvent
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="notradewindow",
+            email="notrade@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        blocked_hour = datetime.datetime.now(datetime.timezone.utc).hour
+        monkeypatch.setattr(settings, "NO_TRADE_UTC_HOURS", [blocked_hour])
+
+        with pytest.raises(ValueError, match="no-trade UTC hours"):
+            self.service.execute_trade(db, user.id, "BTC", "buy", 0.01)
+
+        blocked = (
+            db.query(TradeAuditEvent)
+            .filter(TradeAuditEvent.user_id == user.id, TradeAuditEvent.event_type == "ORDER_BLOCKED")
+            .all()
+        )
+        assert len(blocked) == 1
+        assert "no-trade UTC hours" in blocked[0].summary
 
         db.close()
 

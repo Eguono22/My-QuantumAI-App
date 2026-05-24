@@ -18,12 +18,45 @@ risk_engine = RiskEngine()
 logger = logging.getLogger("quantumai.trading")
 
 class TradingService:
+    def _current_utc_hour(self) -> int:
+        return datetime.now(timezone.utc).hour
+
     def _ensure_utc(self, value: datetime) -> datetime:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
 
-    def _summarize_order_window(self, orders: List[Order]) -> Dict:
+    def _is_no_trade_hour(self) -> bool:
+        blocked_hours = []
+        for raw in list(settings.NO_TRADE_UTC_HOURS or []):
+            try:
+                hour = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= hour <= 23 and hour not in blocked_hours:
+                blocked_hours.append(hour)
+        return self._current_utc_hour() in blocked_hours
+
+    def _extract_market_regime(self, event: TradeAuditEvent) -> str:
+        if not event.metadata_json:
+            return "UNKNOWN"
+        try:
+            metadata = json.loads(event.metadata_json)
+        except Exception:
+            return "UNKNOWN"
+        regime = str(metadata.get("market_regime") or "UNKNOWN").strip().upper()
+        return regime or "UNKNOWN"
+
+    def _regime_breakdown_for_window(self, events: List[TradeAuditEvent]) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for event in events:
+            regime = self._extract_market_regime(event)
+            counts[regime] = counts.get(regime, 0) + 1
+        if not counts:
+            counts["UNKNOWN"] = 0
+        return counts
+
+    def _summarize_order_window(self, orders: List[Order], regime_breakdown: Dict[str, int]) -> Dict:
         submitted = len(orders)
         filled = 0
         pending = 0
@@ -87,6 +120,7 @@ class TradingService:
             "avg_slippage_bps": avg_slippage_bps,
             "manual_confirmation_orders": manual_confirmations,
             "live_mode_orders": live_mode_orders,
+            "regime_breakdown": regime_breakdown,
         }
 
     def get_execution_metrics(self, db: Session, user_id: int) -> Dict:
@@ -101,6 +135,15 @@ class TradingService:
             .order_by(Order.created_at.desc())
             .all()
         )
+        accepted_events = (
+            db.query(TradeAuditEvent)
+            .filter(
+                TradeAuditEvent.user_id == user_id,
+                TradeAuditEvent.event_type == "ORDER_ACCEPTED",
+            )
+            .order_by(TradeAuditEvent.created_at.desc())
+            .all()
+        )
 
         def in_window(start: Optional[datetime]) -> List[Order]:
             if start is None:
@@ -111,11 +154,32 @@ class TradingService:
                 if self._ensure_utc(order.created_at) >= start
             ]
 
+        def events_in_window(start: Optional[datetime]) -> List[TradeAuditEvent]:
+            if start is None:
+                return accepted_events
+            return [
+                event
+                for event in accepted_events
+                if self._ensure_utc(event.created_at) >= start
+            ]
+
         windows = {
-            "today": self._summarize_order_window(in_window(today_start)),
-            "rolling_7d": self._summarize_order_window(in_window(seven_days_ago)),
-            "rolling_30d": self._summarize_order_window(in_window(thirty_days_ago)),
-            "lifetime": self._summarize_order_window(in_window(None)),
+            "today": self._summarize_order_window(
+                in_window(today_start),
+                self._regime_breakdown_for_window(events_in_window(today_start)),
+            ),
+            "rolling_7d": self._summarize_order_window(
+                in_window(seven_days_ago),
+                self._regime_breakdown_for_window(events_in_window(seven_days_ago)),
+            ),
+            "rolling_30d": self._summarize_order_window(
+                in_window(thirty_days_ago),
+                self._regime_breakdown_for_window(events_in_window(thirty_days_ago)),
+            ),
+            "lifetime": self._summarize_order_window(
+                in_window(None),
+                self._regime_breakdown_for_window(events_in_window(None)),
+            ),
         }
 
         return {
@@ -279,6 +343,7 @@ class TradingService:
         manual_confirmation: bool = False,
         operator_note: Optional[str] = None,
         broker_reason: Optional[str] = None,
+        market_regime: Optional[str] = None,
     ) -> Dict:
         estimated_notional = float(quantity) * float(reference_price)
         max_loss_at_stop = None
@@ -330,6 +395,7 @@ class TradingService:
             "manual_confirmation_required": self._live_confirmation_required(trading_mode),
             "manual_confirmation_recorded": bool(manual_confirmation),
             "operator_note": operator_note,
+            "market_regime": market_regime or "UNKNOWN",
             "accepted_reasons": accepted_reasons,
             "blocked_reasons": blocked_reasons,
             "checklist": [
@@ -415,10 +481,40 @@ class TradingService:
         if quantity <= 0:
             raise ValueError("Quantity must be greater than 0")
 
+        if self._is_no_trade_hour():
+            no_trade_message = "Trading is disabled during configured no-trade UTC hours."
+            self._record_trade_audit_event(
+                db=db,
+                user_id=user_id,
+                event_type="ORDER_BLOCKED",
+                trading_mode=trading_mode,
+                summary=no_trade_message,
+                asset=asset,
+                action=action,
+                requested_quantity=quantity,
+                severity="WARN",
+                metadata={
+                    "reason_code": "NO_TRADE_WINDOW",
+                    "blocked_hour_utc": self._current_utc_hour(),
+                    "blocked_hours_utc": list(settings.NO_TRADE_UTC_HOURS or []),
+                },
+            )
+            if commit:
+                db.commit()
+            else:
+                db.flush()
+            raise ValueError(no_trade_message)
+
         asset_data = market_service.get_asset(asset)
         market_price = asset_data["price"] if asset_data else None
         if market_price is None:
             raise ValueError("Market data unavailable")
+
+        try:
+            signal_analytics = self._build_signal_analytics(asset)
+            market_regime = str(signal_analytics.get("market_regime") or "UNKNOWN").strip().upper()
+        except Exception:
+            market_regime = "UNKNOWN"
 
         if stop_loss is not None and stop_loss <= 0:
             raise ValueError("Stop loss must be greater than 0")
@@ -492,6 +588,7 @@ class TradingService:
                 "manual_confirmation": manual_confirmation,
                 "confirmation_text": confirmation_text,
                 "operator_note": operator_note,
+                "market_regime": market_regime,
             },
         )
 
@@ -622,6 +719,7 @@ class TradingService:
                 "broker_order_id": order.broker_order_id,
                 "manual_confirmation": bool(order.manual_confirmation),
                 "operator_note": order.operator_note,
+                "market_regime": market_regime,
             },
         )
         if commit:
@@ -656,6 +754,7 @@ class TradingService:
             manual_confirmation=bool(order.manual_confirmation),
             operator_note=order.operator_note,
             broker_reason=order.reason,
+            market_regime=market_regime,
         )
 
         logger.info(
