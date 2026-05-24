@@ -14,6 +14,7 @@ jest.mock('../services/tradingService', () => ({
     getOrders: jest.fn(),
     getExecutionMetrics: jest.fn(),
     getOperatorDailyBrief: jest.fn(),
+    getOperatorBriefAlertHistory: jest.fn(),
     acknowledgeOperatorBriefAlert: jest.fn(),
     dismissOperatorBriefAlert: jest.fn(),
     restoreOperatorBriefAlert: jest.fn(),
@@ -177,6 +178,21 @@ describe('TradingSignals', () => {
         ],
       };
     });
+    tradingService.getOperatorBriefAlertHistory.mockResolvedValue([
+      {
+        alert_key: 'brief-72-broker-issue',
+        window_hours: 72,
+        severity: 'WARN',
+        title: 'Broker Issues Detected',
+        message: '3 broker errors/rejections in the last 72h.',
+        recommended_action: 'Check broker connectivity and pause automation until health stabilizes.',
+        acknowledged: true,
+        dismissed: false,
+        acknowledged_at: '2026-05-24T09:00:00Z',
+        dismissed_at: null,
+        updated_at: '2026-05-24T09:00:00Z',
+      },
+    ]);
     tradingService.acknowledgeOperatorBriefAlert.mockResolvedValue({
       alert_key: 'brief-24-risk-breach',
       acknowledged: true,
@@ -265,6 +281,8 @@ describe('TradingSignals', () => {
     expect(screen.getByText(/Execution vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
     expect(screen.getByText(/Recommended action:/i)).toBeInTheDocument();
+    expect(screen.getByText('Alert History')).toBeInTheDocument();
+    expect(screen.getByText('Broker Issues Detected')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
@@ -275,6 +293,7 @@ describe('TradingSignals', () => {
 
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
+    expect(tradingService.getOperatorBriefAlertHistory).toHaveBeenCalledWith(10);
 
     await user.selectOptions(screen.getByLabelText('Window'), '72');
 
@@ -293,18 +312,17 @@ describe('TradingSignals', () => {
     await user.click(screen.getByRole('button', { name: 'Acknowledge' }));
 
     await waitFor(() => {
-      expect(tradingService.acknowledgeOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
+      expect(tradingService.acknowledgeOperatorBriefAlert).toHaveBeenCalledWith(expect.objectContaining({ alert_key: 'brief-24-risk-breach' }));
     });
-    expect(screen.getByText('Acknowledged')).toBeInTheDocument();
+    expect(screen.getAllByText('Acknowledged').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
 
     await waitFor(() => {
-      expect(tradingService.dismissOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
+      expect(tradingService.dismissOperatorBriefAlert).toHaveBeenCalledWith(expect.objectContaining({ alert_key: 'brief-24-risk-breach' }));
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('Risk Breaches Detected')).not.toBeInTheDocument();
       expect(screen.getByText('All brief alerts for this window have been dismissed.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Restore dismissed (1)' })).toBeInTheDocument();
     });
@@ -312,8 +330,8 @@ describe('TradingSignals', () => {
     await user.click(screen.getByRole('button', { name: 'Restore dismissed (1)' }));
 
     await waitFor(() => {
-      expect(tradingService.restoreOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
-      expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
+      expect(tradingService.restoreOperatorBriefAlert).toHaveBeenCalledWith(expect.objectContaining({ alert_key: 'brief-24-risk-breach' }));
+      expect(screen.getAllByText('Risk Breaches Detected').length).toBeGreaterThan(0);
     });
   });
 });

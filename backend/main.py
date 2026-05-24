@@ -80,6 +80,25 @@ def ensure_sqlite_schema_compat():
             if order_columns and "operator_note" not in order_columns:
                 conn.execute(text("ALTER TABLE orders ADD COLUMN operator_note TEXT"))
                 logger.info("Added missing orders.operator_note column")
+
+            brief_alert_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(operator_brief_alert_states)")).fetchall()
+            }
+            if brief_alert_columns and "window_hours" not in brief_alert_columns:
+                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN window_hours INTEGER"))
+                logger.info("Added missing operator_brief_alert_states.window_hours column")
+            if brief_alert_columns and "severity" not in brief_alert_columns:
+                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN severity TEXT"))
+                logger.info("Added missing operator_brief_alert_states.severity column")
+            if brief_alert_columns and "title" not in brief_alert_columns:
+                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN title TEXT"))
+                logger.info("Added missing operator_brief_alert_states.title column")
+            if brief_alert_columns and "message" not in brief_alert_columns:
+                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN message TEXT"))
+                logger.info("Added missing operator_brief_alert_states.message column")
+            if brief_alert_columns and "recommended_action" not in brief_alert_columns:
+                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN recommended_action TEXT"))
+                logger.info("Added missing operator_brief_alert_states.recommended_action column")
     except Exception:
         logger.exception("Failed to apply SQLite schema compatibility checks")
 

@@ -95,16 +95,41 @@ export const tradingService = {
     const response = await api.get(`/trading/metrics/daily-brief?hours=${hours}`);
     return response.data;
   },
-  acknowledgeOperatorBriefAlert: async (alertKey) => {
-    const response = await api.post('/trading/metrics/daily-brief/alerts/acknowledge', { alert_key: alertKey });
+  getOperatorBriefAlertHistory: async (limit = 10) => {
+    const response = await api.get(`/trading/metrics/daily-brief/alerts/history?limit=${limit}`);
     return response.data;
   },
-  dismissOperatorBriefAlert: async (alertKey) => {
-    const response = await api.post('/trading/metrics/daily-brief/alerts/dismiss', { alert_key: alertKey });
+  acknowledgeOperatorBriefAlert: async (alert) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/acknowledge', {
+      alert_key: alert.alert_key,
+      window_hours: alert.window_hours,
+      severity: alert.severity,
+      title: alert.title,
+      message: alert.message,
+      recommended_action: alert.recommended_action,
+    });
     return response.data;
   },
-  restoreOperatorBriefAlert: async (alertKey) => {
-    const response = await api.post('/trading/metrics/daily-brief/alerts/restore', { alert_key: alertKey });
+  dismissOperatorBriefAlert: async (alert) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/dismiss', {
+      alert_key: alert.alert_key,
+      window_hours: alert.window_hours,
+      severity: alert.severity,
+      title: alert.title,
+      message: alert.message,
+      recommended_action: alert.recommended_action,
+    });
+    return response.data;
+  },
+  restoreOperatorBriefAlert: async (alert) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/restore', {
+      alert_key: alert.alert_key,
+      window_hours: alert.window_hours,
+      severity: alert.severity,
+      title: alert.title,
+      message: alert.message,
+      recommended_action: alert.recommended_action,
+    });
     return response.data;
   },
   pollOrders: async () => {

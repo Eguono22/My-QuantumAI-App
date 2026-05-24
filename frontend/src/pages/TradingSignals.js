@@ -112,6 +112,7 @@ export default function TradingSignals({ preferences }) {
   const [startupHealth, setStartupHealth] = useState(null);
   const [executionMetrics, setExecutionMetrics] = useState(null);
   const [operatorBrief, setOperatorBrief] = useState(null);
+  const [operatorBriefAlertHistory, setOperatorBriefAlertHistory] = useState([]);
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
@@ -127,7 +128,10 @@ export default function TradingSignals({ preferences }) {
       const operatorBriefPromise = tradingService.getOperatorDailyBrief
         ? tradingService.getOperatorDailyBrief(operatorBriefHours)
         : Promise.resolve(null);
-      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult] = await Promise.allSettled([
+      const operatorBriefHistoryPromise = tradingService.getOperatorBriefAlertHistory
+        ? tradingService.getOperatorBriefAlertHistory(10)
+        : Promise.resolve([]);
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult, operatorBriefHistoryResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
@@ -136,6 +140,7 @@ export default function TradingSignals({ preferences }) {
         tradingService.getStartupHealth(),
         executionMetricsPromise,
         operatorBriefPromise,
+        operatorBriefHistoryPromise,
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -167,6 +172,11 @@ export default function TradingSignals({ preferences }) {
       );
       setOperatorBrief(
         operatorBriefResult.status === 'fulfilled' ? operatorBriefResult.value : null
+      );
+      setOperatorBriefAlertHistory(
+        operatorBriefHistoryResult.status === 'fulfilled' && Array.isArray(operatorBriefHistoryResult.value)
+          ? operatorBriefHistoryResult.value
+          : []
       );
 
       if (symbols.length > 0) {
@@ -205,34 +215,44 @@ export default function TradingSignals({ preferences }) {
     return (operatorBrief?.alerts || []).filter((item) => item.dismissed === true);
   }, [operatorBrief]);
 
-  const acknowledgeOperatorBriefAlert = useCallback(async (alertKey) => {
+  const acknowledgeOperatorBriefAlert = useCallback(async (alertItem) => {
     try {
-      const nextState = await tradingService.acknowledgeOperatorBriefAlert(alertKey);
+      const nextState = await tradingService.acknowledgeOperatorBriefAlert(alertItem);
       setOperatorBrief((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           alerts: (prev.alerts || []).map((item) => (
-            item.alert_key === alertKey ? { ...item, ...nextState } : item
+            item.alert_key === alertItem.alert_key ? { ...item, ...nextState } : item
           )),
         };
+      });
+      setOperatorBriefAlertHistory((prev) => {
+        const merged = { ...alertItem, ...nextState };
+        const filtered = prev.filter((item) => item.alert_key !== alertItem.alert_key);
+        return [merged, ...filtered].slice(0, 10);
       });
     } catch (err) {
       setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to acknowledge brief alert.' });
     }
   }, []);
 
-  const dismissOperatorBriefAlert = useCallback(async (alertKey) => {
+  const dismissOperatorBriefAlert = useCallback(async (alertItem) => {
     try {
-      const nextState = await tradingService.dismissOperatorBriefAlert(alertKey);
+      const nextState = await tradingService.dismissOperatorBriefAlert(alertItem);
       setOperatorBrief((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           alerts: (prev.alerts || []).map((item) => (
-            item.alert_key === alertKey ? { ...item, ...nextState } : item
+            item.alert_key === alertItem.alert_key ? { ...item, ...nextState } : item
           )),
         };
+      });
+      setOperatorBriefAlertHistory((prev) => {
+        const merged = { ...alertItem, ...nextState };
+        const filtered = prev.filter((item) => item.alert_key !== alertItem.alert_key);
+        return [merged, ...filtered].slice(0, 10);
       });
     } catch (err) {
       setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to dismiss brief alert.' });
@@ -245,7 +265,7 @@ export default function TradingSignals({ preferences }) {
     }
     try {
       const restoredStates = await Promise.all(
-        dismissedOperatorBriefAlerts.map((item) => tradingService.restoreOperatorBriefAlert(item.alert_key))
+        dismissedOperatorBriefAlerts.map((item) => tradingService.restoreOperatorBriefAlert(item))
       );
       const nextByKey = Object.fromEntries(restoredStates.map((item) => [item.alert_key, item]));
       setOperatorBrief((prev) => {
@@ -257,6 +277,9 @@ export default function TradingSignals({ preferences }) {
           )),
         };
       });
+      setOperatorBriefAlertHistory((prev) => prev.map((item) => (
+        nextByKey[item.alert_key] ? { ...item, ...nextByKey[item.alert_key] } : item
+      )));
     } catch (err) {
       setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to restore dismissed brief alerts.' });
     }
@@ -938,14 +961,14 @@ export default function TradingSignals({ preferences }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {!item.acknowledged && (
                     <button
-                      onClick={() => acknowledgeOperatorBriefAlert(item.alert_key)}
+                      onClick={() => acknowledgeOperatorBriefAlert(item)}
                       className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                     >
                       Acknowledge
                     </button>
                   )}
                   <button
-                    onClick={() => dismissOperatorBriefAlert(item.alert_key)}
+                    onClick={() => dismissOperatorBriefAlert(item)}
                     className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                   >
                     Dismiss
@@ -959,6 +982,34 @@ export default function TradingSignals({ preferences }) {
               </div>
             )}
           </div>
+
+          {!!operatorBriefAlertHistory.length && (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 space-y-3">
+              <div>
+                <h3 className="text-sm font-display font-bold text-zinc-900 uppercase">Alert History</h3>
+                <p className="text-xs text-zinc-500">Recent acknowledged or dismissed operator issues across sessions.</p>
+              </div>
+              <div className="space-y-2">
+                {operatorBriefAlertHistory.map((item) => (
+                  <div key={`history-${item.alert_key}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-zinc-900">{item.title || 'Operator alert'}</p>
+                        <p className="text-zinc-700">{item.message || 'No message captured.'}</p>
+                      </div>
+                      <span className="rounded bg-zinc-100 px-2 py-1 text-[11px] font-semibold text-zinc-700 uppercase">
+                        {item.dismissed ? 'Dismissed' : item.acknowledged ? 'Acknowledged' : 'Tracked'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-500">
+                      Window: {item.window_hours || 'N/A'}h
+                      {item.updated_at ? ` | Updated ${new Date(item.updated_at).toLocaleString()}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

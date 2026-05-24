@@ -295,6 +295,20 @@ class OperatorDailyBriefAlertStateResponse(BaseModel):
     dismissed_at: Optional[str] = None
 
 
+class OperatorBriefAlertHistoryItemResponse(BaseModel):
+    alert_key: str
+    window_hours: Optional[int] = None
+    severity: Optional[str] = None
+    title: Optional[str] = None
+    message: Optional[str] = None
+    recommended_action: Optional[str] = None
+    acknowledged: bool
+    dismissed: bool
+    acknowledged_at: Optional[str] = None
+    dismissed_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class OperatorDailyBriefTrendComparisonResponse(BaseModel):
     baseline_window_hours: int
     risk_breaches_per_day: float

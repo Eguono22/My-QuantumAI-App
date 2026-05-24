@@ -15,6 +15,7 @@ from api.routes.response_models import (
     ExecutionMetricsResponse,
     OperatorDailyBriefResponse,
     OperatorDailyBriefAlertStateResponse,
+    OperatorBriefAlertHistoryItemResponse,
     NotificationDeliveryLogResponse,
     TelegramNotificationPreferenceResponse,
     TelegramNotificationDeliveryResponse,
@@ -57,6 +58,11 @@ class TelegramNotificationPreferenceRequest(BaseModel):
 
 class OperatorBriefAlertStateRequest(BaseModel):
     alert_key: str
+    window_hours: int | None = None
+    severity: str | None = None
+    title: str | None = None
+    message: str | None = None
+    recommended_action: str | None = None
 
 
 @router.get("/signals", response_model=List[SignalResponse])
@@ -240,6 +246,7 @@ def acknowledge_operator_daily_brief_alert(
             current_user.id,
             alert_key=request.alert_key,
             acknowledged=True,
+            alert_payload=request.model_dump(),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -257,6 +264,7 @@ def dismiss_operator_daily_brief_alert(
             current_user.id,
             alert_key=request.alert_key,
             dismissed=True,
+            alert_payload=request.model_dump(),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -274,7 +282,20 @@ def restore_operator_daily_brief_alert(
             current_user.id,
             alert_key=request.alert_key,
             dismissed=False,
+            alert_payload=request.model_dump(),
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/metrics/daily-brief/alerts/history", response_model=List[OperatorBriefAlertHistoryItemResponse])
+def get_operator_daily_brief_alert_history(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return trading_service.get_operator_brief_alert_history(db, current_user.id, limit=limit)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

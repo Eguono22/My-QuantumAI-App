@@ -51,6 +51,21 @@ class TradingService:
             "dismissed_at": self._ensure_utc(state.dismissed_at).isoformat() if state.dismissed_at else None,
         }
 
+    def _serialize_operator_brief_alert_history_item(self, state: OperatorBriefAlertState) -> Dict:
+        return {
+            "alert_key": state.alert_key,
+            "window_hours": state.window_hours,
+            "severity": state.severity,
+            "title": state.title,
+            "message": state.message,
+            "recommended_action": state.recommended_action,
+            "acknowledged": bool(state.acknowledged),
+            "dismissed": bool(state.dismissed),
+            "acknowledged_at": self._ensure_utc(state.acknowledged_at).isoformat() if state.acknowledged_at else None,
+            "dismissed_at": self._ensure_utc(state.dismissed_at).isoformat() if state.dismissed_at else None,
+            "updated_at": self._ensure_utc(state.updated_at).isoformat() if state.updated_at else None,
+        }
+
     def _current_utc_hour(self) -> int:
         return datetime.now(timezone.utc).hour
 
@@ -420,6 +435,7 @@ class TradingService:
         alert_key: str,
         acknowledged: Optional[bool] = None,
         dismissed: Optional[bool] = None,
+        alert_payload: Optional[Dict] = None,
     ) -> Dict:
         alert_key = str(alert_key or "").strip()
         if not alert_key:
@@ -443,6 +459,18 @@ class TradingService:
             )
             db.add(state)
 
+        payload = alert_payload or {}
+        if payload.get("window_hours") is not None:
+            state.window_hours = int(payload.get("window_hours"))
+        if payload.get("severity") is not None:
+            state.severity = str(payload.get("severity"))
+        if payload.get("title") is not None:
+            state.title = str(payload.get("title"))
+        if payload.get("message") is not None:
+            state.message = str(payload.get("message"))
+        if payload.get("recommended_action") is not None:
+            state.recommended_action = str(payload.get("recommended_action"))
+
         if acknowledged is not None:
             state.acknowledged = 1 if acknowledged else 0
             state.acknowledged_at = now if acknowledged else None
@@ -453,6 +481,23 @@ class TradingService:
         db.commit()
         db.refresh(state)
         return self._serialize_operator_brief_alert_state(state)
+
+    def get_operator_brief_alert_history(self, db: Session, user_id: int, limit: int = 10) -> List[Dict]:
+        limit = int(limit or 10)
+        if limit < 1 or limit > 100:
+            raise ValueError("limit must be between 1 and 100")
+
+        rows = (
+            db.query(OperatorBriefAlertState)
+            .filter(
+                OperatorBriefAlertState.user_id == user_id,
+                (OperatorBriefAlertState.acknowledged == 1) | (OperatorBriefAlertState.dismissed == 1),
+            )
+            .order_by(OperatorBriefAlertState.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [self._serialize_operator_brief_alert_history_item(row) for row in rows]
 
     def _fallback_signal(self, asset: str) -> Dict:
         asset_data = market_service.get_asset(asset)
