@@ -15,10 +15,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       
@@ -36,10 +36,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20.18.3'
           cache: 'npm'
@@ -64,7 +64,7 @@ jobs:
       contents: read
     needs: [backend-tests, frontend-build]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Build backend Docker image
         run: docker build -f docker/backend.Dockerfile -t quantumai-backend .
