@@ -142,6 +142,39 @@ function summarizeLatestOrderOutcome(orders) {
   };
 }
 
+function summarizeRecentOrderOutcomes(orders, limit = 3) {
+  return orders.slice(0, limit).map((order) => {
+    const status = String(order.status || 'UNKNOWN').toUpperCase();
+    const filledQuantity = Number(order.filled_quantity || 0);
+    const requestedQuantity = Number(order.requested_quantity || filledQuantity || 0);
+    const fillPrice = Number(order.fill_price || order.market_price || 0);
+    const notional = filledQuantity > 0 ? filledQuantity * fillPrice : requestedQuantity * fillPrice;
+
+    let outcome = status;
+    if (status === 'FILLED' || status === 'PARTIAL_FILL') {
+      outcome = `${status} at ${fillPrice > 0 ? `$${fillPrice.toFixed(2)}` : 'market price'}`;
+    } else if (status === 'PENDING') {
+      outcome = 'PENDING trigger';
+    } else if (status === 'REJECTED') {
+      outcome = order.reason || 'REJECTED by broker';
+    } else if (status === 'CANCELED') {
+      outcome = order.reason || 'CANCELED before execution';
+    }
+
+    return {
+      status,
+      asset: order.asset,
+      action: order.action,
+      requestedQuantity,
+      filledQuantity,
+      fillPrice,
+      notional,
+      outcome,
+      updatedAt: order.updated_at || order.created_at || null,
+    };
+  });
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -295,6 +328,10 @@ function buildPilotReport({
   const frictions = feedbackSummary?.recent_frictions?.length
     ? feedbackSummary.recent_frictions.map((item) => `- ${item}`).join('\n')
     : '- None logged yet';
+  const recentOutcomes = summarizeRecentOrderOutcomes(orders);
+  const outcomesText = recentOutcomes.length
+    ? recentOutcomes.map((item) => `- ${item.asset} ${item.action} ${item.status}: ${item.outcome}`).join('\n')
+    : '- None yet';
 
   return [
     '# QuantumAI 14-Day Trust Pilot Report',
@@ -324,6 +361,8 @@ function buildPilotReport({
     `Pending: ${orderStats.pending}`,
     `Rejected: ${orderStats.rejected}`,
     `Filled notional: ${orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+    'Recent outcomes:',
+    outcomesText,
     '',
     '## Recommendation',
     `${recommendation.label}: ${recommendation.title}`,
@@ -586,6 +625,7 @@ export default function Pilot() {
 
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
   const latestOrderOutcome = useMemo(() => summarizeLatestOrderOutcome(orders), [orders]);
+  const recentOrderOutcomes = useMemo(() => summarizeRecentOrderOutcomes(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
@@ -757,6 +797,29 @@ export default function Pilot() {
           <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Outcome note</p>
             <p className="mt-1">{latestOrderOutcome.outcome}{latestOrderOutcome.updatedAt ? ` | Updated ${formatDate(latestOrderOutcome.updatedAt)}` : ''}</p>
+          </div>
+        )}
+
+        {!!recentOrderOutcomes.length && (
+          <div className="mt-3 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Recent Outcomes</p>
+            <div className="mt-2 space-y-2">
+              {recentOrderOutcomes.map((item, index) => (
+                <div key={`${item.asset}-${item.status}-${index}`} className="rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-zinc-900">{item.asset} {item.action}</p>
+                    <Pill tone={item.status === 'REJECTED' ? 'red' : item.status === 'PENDING' ? 'amber' : 'sky'}>{item.status}</Pill>
+                  </div>
+                  <p className="mt-1 text-zinc-700">{item.outcome}</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Qty {item.filledQuantity > 0 ? item.filledQuantity : item.requestedQuantity}
+                    {item.fillPrice > 0 ? ` | Fill ${formatCurrency(item.fillPrice)}` : ''}
+                    {item.notional > 0 ? ` | Notional ${formatCurrency(item.notional)}` : ''}
+                    {item.updatedAt ? ` | ${formatDate(item.updatedAt)}` : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
