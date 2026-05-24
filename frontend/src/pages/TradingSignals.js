@@ -116,6 +116,7 @@ export default function TradingSignals({ preferences }) {
   const [operatorBriefHistoryStatus, setOperatorBriefHistoryStatus] = useState('all');
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
   const [operatorBriefLastUpdated, setOperatorBriefLastUpdated] = useState(null);
+  const [operatorBriefRefreshing, setOperatorBriefRefreshing] = useState(false);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -289,8 +290,14 @@ export default function TradingSignals({ preferences }) {
   }, [dismissedOperatorBriefAlerts]);
 
   const refreshOperatorBrief = useCallback(() => {
-    fetchSignals();
-  }, [fetchSignals]);
+    if (operatorBriefRefreshing) {
+      return;
+    }
+    setOperatorBriefRefreshing(true);
+    fetchSignals().finally(() => {
+      setOperatorBriefRefreshing(false);
+    });
+  }, [fetchSignals, operatorBriefRefreshing]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -892,9 +899,10 @@ export default function TradingSignals({ preferences }) {
               <p className="text-xs text-zinc-500">Loaded: {operatorBrief.window_hours}h</p>
               <button
                 onClick={refreshOperatorBrief}
-                className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100"
+                disabled={operatorBriefRefreshing}
+                className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Refresh Brief
+                {operatorBriefRefreshing ? 'Refreshing...' : 'Refresh Brief'}
               </button>
               {dismissedOperatorBriefAlerts.length > 0 && (
                 <button

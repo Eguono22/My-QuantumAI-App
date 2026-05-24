@@ -315,6 +315,8 @@ describe('TradingSignals', () => {
 
     await user.click(screen.getByRole('button', { name: 'Refresh Brief' }));
 
+    expect(screen.getByRole('button', { name: 'Refreshing...' })).toBeDisabled();
+
     await waitFor(() => {
       expect(tradingService.getOperatorDailyBrief.mock.calls.length).toBeGreaterThan(1);
       expect(tradingService.getOperatorBriefAlertHistory.mock.calls.length).toBeGreaterThan(1);
