@@ -483,7 +483,9 @@ class TradingService:
         return self._serialize_operator_brief_alert_state(state)
 
     def get_operator_brief_alert_history(self, db: Session, user_id: int, limit: int = 10) -> List[Dict]:
-        limit = int(limit or 10)
+        if limit is None:
+            limit = 10
+        limit = int(limit)
         if limit < 1 or limit > 100:
             raise ValueError("limit must be between 1 and 100")
 

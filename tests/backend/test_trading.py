@@ -778,6 +778,114 @@ class TestTradingService:
 
         db.close()
 
+    def test_operator_brief_alert_history_orders_by_recent_update_and_applies_limit(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, OperatorBriefAlertState
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefhistory",
+            email="briefhistory@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-first",
+            acknowledged=True,
+            alert_payload={
+                "window_hours": 24,
+                "severity": "WARN",
+                "title": "First Alert",
+                "message": "First message",
+                "recommended_action": "First action",
+            },
+        )
+        self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-second",
+            dismissed=True,
+            alert_payload={
+                "window_hours": 24,
+                "severity": "CRIT",
+                "title": "Second Alert",
+                "message": "Second message",
+                "recommended_action": "Second action",
+            },
+        )
+        # This one should never appear in history because it is neither acknowledged nor dismissed.
+        self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-hidden",
+            alert_payload={
+                "window_hours": 24,
+                "severity": "INFO",
+                "title": "Hidden Alert",
+                "message": "Hidden message",
+                "recommended_action": "Hidden action",
+            },
+        )
+
+        oldest = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2)
+        newest = datetime.datetime.now(datetime.timezone.utc)
+        first_state = db.query(OperatorBriefAlertState).filter(OperatorBriefAlertState.alert_key == "brief-24-first").one()
+        second_state = db.query(OperatorBriefAlertState).filter(OperatorBriefAlertState.alert_key == "brief-24-second").one()
+        first_state.updated_at = oldest
+        second_state.updated_at = newest
+        db.commit()
+
+        history = self.service.get_operator_brief_alert_history(db, user.id, limit=2)
+
+        assert len(history) == 2
+        assert history[0]["alert_key"] == "brief-24-second"
+        assert history[0]["dismissed"] is True
+        assert history[0]["severity"] == "CRIT"
+        assert history[1]["alert_key"] == "brief-24-first"
+        assert history[1]["acknowledged"] is True
+        assert all(item["alert_key"] != "brief-24-hidden" for item in history)
+
+        db.close()
+
+    def test_operator_brief_alert_history_rejects_invalid_limit(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefhistorylimit",
+            email="briefhistorylimit@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        with pytest.raises(ValueError, match="between 1 and 100"):
+            self.service.get_operator_brief_alert_history(db, user.id, limit=0)
+
+        with pytest.raises(ValueError, match="between 1 and 100"):
+            self.service.get_operator_brief_alert_history(db, user.id, limit=101)
+
+        db.close()
+
     def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
