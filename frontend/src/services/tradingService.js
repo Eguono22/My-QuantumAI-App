@@ -91,6 +91,10 @@ export const tradingService = {
     const response = await api.get('/trading/metrics/execution');
     return response.data;
   },
+  getOperatorDailyBrief: async (hours = 24) => {
+    const response = await api.get(`/trading/metrics/daily-brief?hours=${hours}`);
+    return response.data;
+  },
   pollOrders: async () => {
     const response = await api.post('/trading/orders/poll', {});
     return response.data;

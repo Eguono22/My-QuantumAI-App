@@ -13,6 +13,7 @@ jest.mock('../services/tradingService', () => ({
     executeHFT: jest.fn(),
     getOrders: jest.fn(),
     getExecutionMetrics: jest.fn(),
+    getOperatorDailyBrief: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
     getStartupHealth: jest.fn(),
@@ -105,6 +106,27 @@ describe('TradingSignals', () => {
         },
       },
     });
+    tradingService.getOperatorDailyBrief.mockResolvedValue({
+      generated_at: '2026-05-24T12:00:00Z',
+      window_hours: 24,
+      summary: {
+        accepted_orders: 5,
+        blocked_trades: 2,
+        risk_breaches: 1,
+        no_trade_window_blocks: 1,
+        broker_issues: 1,
+      },
+      regime_drift: {
+        detected: true,
+        today_top_regime: 'TRENDING',
+        rolling_7d_top_regime: 'RANGING',
+        today_top_share_pct: 60,
+        rolling_7d_top_share_pct: 55,
+      },
+      alerts: [
+        { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
+      ],
+    });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
       trade: {
@@ -159,5 +181,15 @@ describe('TradingSignals', () => {
     expect(screen.getByText('Today Fill Rate')).toBeInTheDocument();
     expect(screen.getByText('50.00%')).toBeInTheDocument();
     expect(screen.getByText('TRENDING: 1')).toBeInTheDocument();
+  });
+
+  it('shows operator daily brief telemetry', async () => {
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
+    expect(screen.getByText('Window: 24h')).toBeInTheDocument();
+    expect(screen.getByText('Risk Breaches')).toBeInTheDocument();
+    expect(screen.getByText(/Regime drift:/i)).toBeInTheDocument();
+    expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
   });
 });

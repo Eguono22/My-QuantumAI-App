@@ -56,6 +56,13 @@ class TradingService:
             counts["UNKNOWN"] = 0
         return counts
 
+    def _top_regime(self, counts: Dict[str, int]) -> tuple[str, float]:
+        total = sum(max(0, int(value or 0)) for value in counts.values())
+        if total <= 0:
+            return ("UNKNOWN", 0.0)
+        top_regime, top_count = max(counts.items(), key=lambda item: item[1] or 0)
+        return (str(top_regime), (float(top_count) / float(total)) * 100.0)
+
     def _summarize_order_window(self, orders: List[Order], regime_breakdown: Dict[str, int]) -> Dict:
         submitted = len(orders)
         filled = 0
@@ -185,6 +192,100 @@ class TradingService:
         return {
             "generated_at": now.isoformat(),
             "windows": windows,
+        }
+
+    def get_operator_daily_brief(self, db: Session, user_id: int, hours: int = 24) -> Dict:
+        hours = 24 if hours is None else int(hours)
+        if hours < 1 or hours > 168:
+            raise ValueError("hours must be between 1 and 168")
+
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(hours=hours)
+        events = (
+            db.query(TradeAuditEvent)
+            .filter(TradeAuditEvent.user_id == user_id)
+            .order_by(TradeAuditEvent.created_at.desc())
+            .all()
+        )
+        recent_events = [event for event in events if self._ensure_utc(event.created_at) >= start]
+
+        accepted_orders = sum(1 for event in recent_events if event.event_type == "ORDER_ACCEPTED")
+        blocked_events = [event for event in recent_events if event.event_type == "ORDER_BLOCKED"]
+        blocked_trades = len(blocked_events)
+        no_trade_window_blocks = 0
+        for event in blocked_events:
+            try:
+                metadata = json.loads(event.metadata_json) if event.metadata_json else {}
+            except Exception:
+                metadata = {}
+            if str(metadata.get("reason_code") or "").upper() == "NO_TRADE_WINDOW":
+                no_trade_window_blocks += 1
+
+        risk_breaches = max(0, blocked_trades - no_trade_window_blocks)
+        broker_issues = sum(
+            1
+            for event in recent_events
+            if event.event_type in {"BROKER_ERROR", "BROKER_REJECTED"}
+        )
+
+        execution_metrics = self.get_execution_metrics(db, user_id)
+        today_regimes = execution_metrics["windows"].get("today", {}).get("regime_breakdown", {})
+        rolling_7d_regimes = execution_metrics["windows"].get("rolling_7d", {}).get("regime_breakdown", {})
+        today_top_regime, today_top_share_pct = self._top_regime(today_regimes)
+        rolling_7d_top_regime, rolling_7d_top_share_pct = self._top_regime(rolling_7d_regimes)
+        regime_drift_detected = (
+            today_top_share_pct > 0
+            and rolling_7d_top_share_pct > 0
+            and today_top_regime != rolling_7d_top_regime
+        )
+
+        alerts = []
+        if risk_breaches > 0:
+            alerts.append({
+                "severity": "WARN",
+                "title": "Risk Breaches Detected",
+                "message": f"{risk_breaches} risk-related order blocks in the last {hours}h.",
+            })
+        if broker_issues > 0:
+            alerts.append({
+                "severity": "WARN",
+                "title": "Broker Issues Detected",
+                "message": f"{broker_issues} broker errors/rejections in the last {hours}h.",
+            })
+        if regime_drift_detected:
+            alerts.append({
+                "severity": "INFO",
+                "title": "Regime Drift",
+                "message": (
+                    f"Today's dominant regime ({today_top_regime}) differs from rolling 7d "
+                    f"({rolling_7d_top_regime})."
+                ),
+            })
+        if not alerts:
+            alerts.append({
+                "severity": "INFO",
+                "title": "Operationally Stable",
+                "message": f"No major risk or broker anomalies detected in the last {hours}h.",
+            })
+
+        return {
+            "generated_at": now.isoformat(),
+            "window_hours": hours,
+            "summary": {
+                "accepted_orders": accepted_orders,
+                "blocked_trades": blocked_trades,
+                "risk_breaches": risk_breaches,
+                "no_trade_window_blocks": no_trade_window_blocks,
+                "broker_issues": broker_issues,
+            },
+            "regime_drift": {
+                "detected": regime_drift_detected,
+                "today_top_regime": today_top_regime,
+                "rolling_7d_top_regime": rolling_7d_top_regime,
+                "today_top_share_pct": round(today_top_share_pct, 2),
+                "rolling_7d_top_share_pct": round(rolling_7d_top_share_pct, 2),
+            },
+            "alerts": alerts,
         }
 
     def _fallback_signal(self, asset: str) -> Dict:

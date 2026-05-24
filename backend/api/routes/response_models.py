@@ -259,6 +259,36 @@ class ExecutionMetricsResponse(BaseModel):
     windows: dict[str, ExecutionMetricsWindowResponse]
 
 
+class OperatorDailyBriefSummaryResponse(BaseModel):
+    accepted_orders: int
+    blocked_trades: int
+    risk_breaches: int
+    no_trade_window_blocks: int
+    broker_issues: int
+
+
+class OperatorDailyBriefRegimeDriftResponse(BaseModel):
+    detected: bool
+    today_top_regime: str
+    rolling_7d_top_regime: str
+    today_top_share_pct: float
+    rolling_7d_top_share_pct: float
+
+
+class OperatorDailyBriefAlertResponse(BaseModel):
+    severity: str
+    title: str
+    message: str
+
+
+class OperatorDailyBriefResponse(BaseModel):
+    generated_at: str
+    window_hours: int
+    summary: OperatorDailyBriefSummaryResponse
+    regime_drift: OperatorDailyBriefRegimeDriftResponse
+    alerts: List[OperatorDailyBriefAlertResponse]
+
+
 class MQL5TerminalResponse(BaseModel):
     terminal_id: str
     user_id: Optional[int] = None

@@ -501,6 +501,147 @@ class TestTradingService:
 
         db.close()
 
+    def test_operator_daily_brief_summarizes_controls_and_regime_drift(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, TradeAuditEvent
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefuser",
+            email="brief@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        db.add_all(
+            [
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Accepted trade",
+                    asset="BTC",
+                    action="buy",
+                    metadata_json=json.dumps({"market_regime": "TRENDING"}),
+                    created_at=now - datetime.timedelta(hours=1),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_BLOCKED",
+                    trading_mode="paper",
+                    severity="WARN",
+                    summary="Risk limit exceeded",
+                    asset="BTC",
+                    action="buy",
+                    metadata_json=json.dumps({"reason_code": "RISK_LIMIT"}),
+                    created_at=now - datetime.timedelta(hours=2),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_BLOCKED",
+                    trading_mode="paper",
+                    severity="WARN",
+                    summary="No-trade window active",
+                    asset="BTC",
+                    action="buy",
+                    metadata_json=json.dumps({"reason_code": "NO_TRADE_WINDOW"}),
+                    created_at=now - datetime.timedelta(hours=3),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="BROKER_ERROR",
+                    trading_mode="paper",
+                    severity="ERROR",
+                    summary="Broker timeout",
+                    asset="BTC",
+                    action="buy",
+                    created_at=now - datetime.timedelta(hours=2),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Older accepted trade",
+                    asset="ETH",
+                    action="buy",
+                    metadata_json=json.dumps({"market_regime": "RANGING"}),
+                    created_at=now - datetime.timedelta(days=2),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Older accepted trade",
+                    asset="ETH",
+                    action="buy",
+                    metadata_json=json.dumps({"market_regime": "RANGING"}),
+                    created_at=now - datetime.timedelta(days=3),
+                ),
+                TradeAuditEvent(
+                    user_id=user.id,
+                    event_type="ORDER_ACCEPTED",
+                    trading_mode="paper",
+                    severity="INFO",
+                    summary="Older accepted trade",
+                    asset="ETH",
+                    action="buy",
+                    metadata_json=json.dumps({"market_regime": "RANGING"}),
+                    created_at=now - datetime.timedelta(days=4),
+                ),
+            ]
+        )
+        db.commit()
+
+        brief = self.service.get_operator_daily_brief(db, user.id, hours=24)
+        assert brief["summary"]["accepted_orders"] == 1
+        assert brief["summary"]["blocked_trades"] == 2
+        assert brief["summary"]["risk_breaches"] == 1
+        assert brief["summary"]["no_trade_window_blocks"] == 1
+        assert brief["summary"]["broker_issues"] == 1
+        assert brief["regime_drift"]["detected"] is True
+        assert brief["regime_drift"]["today_top_regime"] == "TRENDING"
+        assert brief["regime_drift"]["rolling_7d_top_regime"] == "RANGING"
+        assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
+
+        db.close()
+
+    def test_operator_daily_brief_rejects_invalid_hours(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefhours",
+            email="briefhours@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        with pytest.raises(ValueError, match="between 1 and 168"):
+            self.service.get_operator_daily_brief(db, user.id, hours=0)
+
+        db.close()
+
     def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

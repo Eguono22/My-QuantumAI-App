@@ -111,6 +111,7 @@ export default function TradingSignals({ preferences }) {
   const [backtestResult, setBacktestResult] = useState(null);
   const [startupHealth, setStartupHealth] = useState(null);
   const [executionMetrics, setExecutionMetrics] = useState(null);
+  const [operatorBrief, setOperatorBrief] = useState(null);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -122,7 +123,10 @@ export default function TradingSignals({ preferences }) {
       const executionMetricsPromise = tradingService.getExecutionMetrics
         ? tradingService.getExecutionMetrics()
         : Promise.resolve(null);
-      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult] = await Promise.allSettled([
+      const operatorBriefPromise = tradingService.getOperatorDailyBrief
+        ? tradingService.getOperatorDailyBrief(24)
+        : Promise.resolve(null);
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
@@ -130,6 +134,7 @@ export default function TradingSignals({ preferences }) {
         tradingService.getOrders(),
         tradingService.getStartupHealth(),
         executionMetricsPromise,
+        operatorBriefPromise,
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -158,6 +163,9 @@ export default function TradingSignals({ preferences }) {
       setStartupHealth(startupHealthResult.status === 'fulfilled' ? startupHealthResult.value : null);
       setExecutionMetrics(
         executionMetricsResult.status === 'fulfilled' ? executionMetricsResult.value : null
+      );
+      setOperatorBrief(
+        operatorBriefResult.status === 'fulfilled' ? operatorBriefResult.value : null
       );
 
       if (symbols.length > 0) {
@@ -763,6 +771,58 @@ export default function TradingSignals({ preferences }) {
                 </span>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {operatorBrief && (
+        <div className="market-panel rounded-md p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Operator Daily Brief</h2>
+              <p className="text-zinc-600 text-sm">24h risk and execution control summary</p>
+            </div>
+            <p className="text-xs text-zinc-500">Window: {operatorBrief.window_hours}h</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Accepted</p>
+              <p className="font-semibold text-zinc-900">{operatorBrief.summary.accepted_orders}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Blocked</p>
+              <p className="font-semibold text-zinc-900">{operatorBrief.summary.blocked_trades}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Risk Breaches</p>
+              <p className="font-semibold text-zinc-900">{operatorBrief.summary.risk_breaches}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">No-Trade Blocks</p>
+              <p className="font-semibold text-zinc-900">{operatorBrief.summary.no_trade_window_blocks}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Broker Issues</p>
+              <p className="font-semibold text-zinc-900">{operatorBrief.summary.broker_issues}</p>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+            <p>
+              Regime drift: <span className="font-semibold">{operatorBrief.regime_drift.detected ? 'Detected' : 'Stable'}</span>
+              {' '}({operatorBrief.regime_drift.today_top_regime} today vs {operatorBrief.regime_drift.rolling_7d_top_regime} rolling 7d)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {operatorBrief.alerts.map((item, index) => (
+              <div key={`brief-alert-${index}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">{item.severity}</p>
+                <p className="font-semibold text-zinc-900">{item.title}</p>
+                <p className="text-zinc-700">{item.message}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
