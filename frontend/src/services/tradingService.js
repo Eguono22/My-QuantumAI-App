@@ -103,6 +103,10 @@ export const tradingService = {
     const response = await api.post('/trading/metrics/daily-brief/alerts/dismiss', { alert_key: alertKey });
     return response.data;
   },
+  restoreOperatorBriefAlert: async (alertKey) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/restore', { alert_key: alertKey });
+    return response.data;
+  },
   pollOrders: async () => {
     const response = await api.post('/trading/orders/poll', {});
     return response.data;

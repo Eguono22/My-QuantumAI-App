@@ -16,6 +16,7 @@ jest.mock('../services/tradingService', () => ({
     getOperatorDailyBrief: jest.fn(),
     acknowledgeOperatorBriefAlert: jest.fn(),
     dismissOperatorBriefAlert: jest.fn(),
+    restoreOperatorBriefAlert: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
     getStartupHealth: jest.fn(),
@@ -190,6 +191,13 @@ describe('TradingSignals', () => {
       acknowledged_at: '2026-05-24T12:15:00Z',
       dismissed_at: '2026-05-24T12:16:00Z',
     });
+    tradingService.restoreOperatorBriefAlert.mockResolvedValue({
+      alert_key: 'brief-24-risk-breach',
+      acknowledged: true,
+      dismissed: false,
+      acknowledged_at: '2026-05-24T12:15:00Z',
+      dismissed_at: null,
+    });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
       trade: {
@@ -298,6 +306,14 @@ describe('TradingSignals', () => {
     await waitFor(() => {
       expect(screen.queryByText('Risk Breaches Detected')).not.toBeInTheDocument();
       expect(screen.getByText('All brief alerts for this window have been dismissed.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Restore dismissed (1)' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Restore dismissed (1)' }));
+
+    await waitFor(() => {
+      expect(tradingService.restoreOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
+      expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
     });
   });
 });

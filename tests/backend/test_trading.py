@@ -766,6 +766,16 @@ class TestTradingService:
         assert state["acknowledged_at"] is not None
         assert state["dismissed_at"] is not None
 
+        restored = self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-sample",
+            dismissed=False,
+        )
+        assert restored["acknowledged"] is True
+        assert restored["dismissed"] is False
+        assert restored["dismissed_at"] is None
+
         db.close()
 
     def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):

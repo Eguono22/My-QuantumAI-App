@@ -201,6 +201,9 @@ export default function TradingSignals({ preferences }) {
   const operatorBriefAlerts = useMemo(() => {
     return (operatorBrief?.alerts || []).filter((item) => item.dismissed !== true);
   }, [operatorBrief]);
+  const dismissedOperatorBriefAlerts = useMemo(() => {
+    return (operatorBrief?.alerts || []).filter((item) => item.dismissed === true);
+  }, [operatorBrief]);
 
   const acknowledgeOperatorBriefAlert = useCallback(async (alertKey) => {
     try {
@@ -235,6 +238,29 @@ export default function TradingSignals({ preferences }) {
       setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to dismiss brief alert.' });
     }
   }, []);
+
+  const restoreDismissedOperatorBriefAlerts = useCallback(async () => {
+    if (!dismissedOperatorBriefAlerts.length) {
+      return;
+    }
+    try {
+      const restoredStates = await Promise.all(
+        dismissedOperatorBriefAlerts.map((item) => tradingService.restoreOperatorBriefAlert(item.alert_key))
+      );
+      const nextByKey = Object.fromEntries(restoredStates.map((item) => [item.alert_key, item]));
+      setOperatorBrief((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          alerts: (prev.alerts || []).map((item) => (
+            nextByKey[item.alert_key] ? { ...item, ...nextByKey[item.alert_key] } : item
+          )),
+        };
+      });
+    } catch (err) {
+      setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to restore dismissed brief alerts.' });
+    }
+  }, [dismissedOperatorBriefAlerts]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -834,6 +860,14 @@ export default function TradingSignals({ preferences }) {
                 <option value={168}>7d</option>
               </select>
               <p className="text-xs text-zinc-500">Loaded: {operatorBrief.window_hours}h</p>
+              {dismissedOperatorBriefAlerts.length > 0 && (
+                <button
+                  onClick={restoreDismissedOperatorBriefAlerts}
+                  className="rounded-md border border-zinc-300 bg-zinc-50 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                >
+                  Restore dismissed ({dismissedOperatorBriefAlerts.length})
+                </button>
+              )}
             </div>
           </div>
 

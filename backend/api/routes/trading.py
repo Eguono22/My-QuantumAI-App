@@ -262,6 +262,23 @@ def dismiss_operator_daily_brief_alert(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/metrics/daily-brief/alerts/restore", response_model=OperatorDailyBriefAlertStateResponse)
+def restore_operator_daily_brief_alert(
+    request: OperatorBriefAlertStateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return trading_service.set_operator_brief_alert_state(
+            db,
+            current_user.id,
+            alert_key=request.alert_key,
+            dismissed=False,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/orders/poll")
 def poll_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
