@@ -699,6 +699,8 @@ class TestTradingService:
         assert brief["trend_comparison"]["avg_slippage_bps"] == pytest.approx(2.0)
         assert brief["trend_comparison"]["avg_slippage_delta_pct"] == pytest.approx(14.29)
         assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
+        assert any(alert["title"] == "Execution Quality Degraded" for alert in brief["alerts"])
+        assert any(alert["title"] == "Slippage Worsening" for alert in brief["alerts"])
 
         db.close()
 

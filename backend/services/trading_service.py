@@ -260,6 +260,16 @@ class TradingService:
         baseline_summary = self._summarize_operator_brief_window(baseline_events)
         recent_execution = self._summarize_order_window(recent_orders, {})
         baseline_execution = self._summarize_order_window(baseline_orders, {})
+        risk_breaches_per_day = self._per_day_rate(summary["risk_breaches"], hours)
+        broker_issues_per_day = self._per_day_rate(summary["broker_issues"], hours)
+        baseline_risk_per_day = self._per_day_rate(baseline_summary["risk_breaches"], baseline_hours)
+        baseline_broker_per_day = self._per_day_rate(baseline_summary["broker_issues"], baseline_hours)
+        fill_rate_pct = float(recent_execution["fill_rate_pct"])
+        baseline_fill_rate_pct = float(baseline_execution["fill_rate_pct"])
+        fill_rate_delta_pct = self._delta_pct(fill_rate_pct, baseline_fill_rate_pct)
+        avg_slippage_bps = float(recent_execution["avg_slippage_bps"])
+        baseline_slippage_bps = float(baseline_execution["avg_slippage_bps"])
+        avg_slippage_delta_pct = self._delta_pct(avg_slippage_bps, baseline_slippage_bps)
 
         execution_metrics = self.get_execution_metrics(db, user_id)
         today_regimes = execution_metrics["windows"].get("today", {}).get("regime_breakdown", {})
@@ -285,6 +295,24 @@ class TradingService:
                 "title": "Broker Issues Detected",
                 "message": f"{summary['broker_issues']} broker errors/rejections in the last {hours}h.",
             })
+        if recent_execution["orders_submitted"] >= 2 and fill_rate_delta_pct <= -20.0:
+            alerts.append({
+                "severity": "WARN",
+                "title": "Execution Quality Degraded",
+                "message": (
+                    f"Fill rate is {fill_rate_pct:.2f}% over the last {hours}h, "
+                    f"down {abs(fill_rate_delta_pct):.0f}% versus the {baseline_hours}h baseline."
+                ),
+            })
+        if recent_execution["orders_filled"] > 0 and avg_slippage_delta_pct >= 10.0:
+            alerts.append({
+                "severity": "WARN",
+                "title": "Slippage Worsening",
+                "message": (
+                    f"Average slippage is {avg_slippage_bps:.2f} bps over the last {hours}h, "
+                    f"up {avg_slippage_delta_pct:.0f}% versus the {baseline_hours}h baseline."
+                ),
+            })
         if regime_drift_detected:
             alerts.append({
                 "severity": "INFO",
@@ -300,11 +328,6 @@ class TradingService:
                 "title": "Operationally Stable",
                 "message": f"No major risk or broker anomalies detected in the last {hours}h.",
             })
-
-        risk_breaches_per_day = self._per_day_rate(summary["risk_breaches"], hours)
-        broker_issues_per_day = self._per_day_rate(summary["broker_issues"], hours)
-        baseline_risk_per_day = self._per_day_rate(baseline_summary["risk_breaches"], baseline_hours)
-        baseline_broker_per_day = self._per_day_rate(baseline_summary["broker_issues"], baseline_hours)
 
         return {
             "generated_at": now.isoformat(),
@@ -323,22 +346,10 @@ class TradingService:
                 "broker_issues_per_day": round(broker_issues_per_day, 2),
                 "risk_breaches_delta_pct": round(self._delta_pct(risk_breaches_per_day, baseline_risk_per_day), 2),
                 "broker_issues_delta_pct": round(self._delta_pct(broker_issues_per_day, baseline_broker_per_day), 2),
-                "fill_rate_pct": round(float(recent_execution["fill_rate_pct"]), 2),
-                "fill_rate_delta_pct": round(
-                    self._delta_pct(
-                        float(recent_execution["fill_rate_pct"]),
-                        float(baseline_execution["fill_rate_pct"]),
-                    ),
-                    2,
-                ),
-                "avg_slippage_bps": round(float(recent_execution["avg_slippage_bps"]), 2),
-                "avg_slippage_delta_pct": round(
-                    self._delta_pct(
-                        float(recent_execution["avg_slippage_bps"]),
-                        float(baseline_execution["avg_slippage_bps"]),
-                    ),
-                    2,
-                ),
+                "fill_rate_pct": round(fill_rate_pct, 2),
+                "fill_rate_delta_pct": round(fill_rate_delta_pct, 2),
+                "avg_slippage_bps": round(avg_slippage_bps, 2),
+                "avg_slippage_delta_pct": round(avg_slippage_delta_pct, 2),
             },
             "alerts": alerts,
         }
