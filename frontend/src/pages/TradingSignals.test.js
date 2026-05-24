@@ -306,6 +306,22 @@ describe('TradingSignals', () => {
     expect(await screen.findByText('72h risk and execution control summary')).toBeInTheDocument();
   });
 
+  it('refreshes the operator brief on demand', async () => {
+    const user = userEvent.setup();
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh Brief' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Refresh Brief' }));
+
+    await waitFor(() => {
+      expect(tradingService.getOperatorDailyBrief.mock.calls.length).toBeGreaterThan(1);
+      expect(tradingService.getOperatorBriefAlertHistory.mock.calls.length).toBeGreaterThan(1);
+    });
+    expect(screen.getByText(/Last updated:/i)).toBeInTheDocument();
+  });
+
   it('filters operator brief alert history by status', async () => {
     const user = userEvent.setup();
     tradingService.getOperatorBriefAlertHistory.mockImplementation(async (limit, status) => {

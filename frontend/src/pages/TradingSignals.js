@@ -115,6 +115,7 @@ export default function TradingSignals({ preferences }) {
   const [operatorBriefAlertHistory, setOperatorBriefAlertHistory] = useState([]);
   const [operatorBriefHistoryStatus, setOperatorBriefHistoryStatus] = useState('all');
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
+  const [operatorBriefLastUpdated, setOperatorBriefLastUpdated] = useState(null);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -179,6 +180,7 @@ export default function TradingSignals({ preferences }) {
           ? operatorBriefHistoryResult.value
           : []
       );
+      setOperatorBriefLastUpdated(new Date().toISOString());
 
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
@@ -285,6 +287,10 @@ export default function TradingSignals({ preferences }) {
       setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to restore dismissed brief alerts.' });
     }
   }, [dismissedOperatorBriefAlerts]);
+
+  const refreshOperatorBrief = useCallback(() => {
+    fetchSignals();
+  }, [fetchSignals]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -884,6 +890,12 @@ export default function TradingSignals({ preferences }) {
                 <option value={168}>7d</option>
               </select>
               <p className="text-xs text-zinc-500">Loaded: {operatorBrief.window_hours}h</p>
+              <button
+                onClick={refreshOperatorBrief}
+                className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100"
+              >
+                Refresh Brief
+              </button>
               {dismissedOperatorBriefAlerts.length > 0 && (
                 <button
                   onClick={restoreDismissedOperatorBriefAlerts}
@@ -894,6 +906,7 @@ export default function TradingSignals({ preferences }) {
               )}
             </div>
           </div>
+          <p className="text-xs text-zinc-500">Last updated: {operatorBriefLastUpdated ? new Date(operatorBriefLastUpdated).toLocaleString() : 'just now'}</p>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
             <div className="market-panel-soft rounded-md p-3">
