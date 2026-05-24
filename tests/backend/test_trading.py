@@ -886,6 +886,84 @@ class TestTradingService:
 
         db.close()
 
+    def test_operator_brief_alert_history_filters_by_status(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefhistorystatus",
+            email="briefhistorystatus@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-ack-only",
+            acknowledged=True,
+        )
+        self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-dismiss-only",
+            dismissed=True,
+        )
+
+        acknowledged = self.service.get_operator_brief_alert_history(
+            db,
+            user.id,
+            limit=10,
+            status="acknowledged",
+        )
+        dismissed = self.service.get_operator_brief_alert_history(
+            db,
+            user.id,
+            limit=10,
+            status="dismissed",
+        )
+
+        assert any(item["alert_key"] == "brief-24-ack-only" for item in acknowledged)
+        assert all(item["dismissed"] is False for item in acknowledged)
+        assert any(item["alert_key"] == "brief-24-dismiss-only" for item in dismissed)
+        assert all(item["dismissed"] is True for item in dismissed)
+
+        db.close()
+
+    def test_operator_brief_alert_history_rejects_invalid_status(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefhistorystatusinvalid",
+            email="briefhistorystatusinvalid@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        with pytest.raises(ValueError, match="status must be one of"):
+            self.service.get_operator_brief_alert_history(db, user.id, limit=10, status="unknown")
+
+        db.close()
+
     def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

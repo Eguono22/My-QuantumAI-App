@@ -482,19 +482,35 @@ class TradingService:
         db.refresh(state)
         return self._serialize_operator_brief_alert_state(state)
 
-    def get_operator_brief_alert_history(self, db: Session, user_id: int, limit: int = 10) -> List[Dict]:
+    def get_operator_brief_alert_history(
+        self,
+        db: Session,
+        user_id: int,
+        limit: int = 10,
+        status: str = "all",
+    ) -> List[Dict]:
         if limit is None:
             limit = 10
         limit = int(limit)
         if limit < 1 or limit > 100:
             raise ValueError("limit must be between 1 and 100")
 
-        rows = (
-            db.query(OperatorBriefAlertState)
-            .filter(
-                OperatorBriefAlertState.user_id == user_id,
-                (OperatorBriefAlertState.acknowledged == 1) | (OperatorBriefAlertState.dismissed == 1),
+        status_value = str(status or "all").strip().lower()
+        if status_value not in {"all", "acknowledged", "dismissed"}:
+            raise ValueError("status must be one of: all, acknowledged, dismissed")
+
+        query = db.query(OperatorBriefAlertState).filter(OperatorBriefAlertState.user_id == user_id)
+        if status_value == "acknowledged":
+            query = query.filter(OperatorBriefAlertState.acknowledged == 1)
+        elif status_value == "dismissed":
+            query = query.filter(OperatorBriefAlertState.dismissed == 1)
+        else:
+            query = query.filter(
+                (OperatorBriefAlertState.acknowledged == 1) | (OperatorBriefAlertState.dismissed == 1)
             )
+
+        rows = (
+            query
             .order_by(OperatorBriefAlertState.updated_at.desc())
             .limit(limit)
             .all()

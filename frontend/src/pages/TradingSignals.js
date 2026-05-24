@@ -113,6 +113,7 @@ export default function TradingSignals({ preferences }) {
   const [executionMetrics, setExecutionMetrics] = useState(null);
   const [operatorBrief, setOperatorBrief] = useState(null);
   const [operatorBriefAlertHistory, setOperatorBriefAlertHistory] = useState([]);
+  const [operatorBriefHistoryStatus, setOperatorBriefHistoryStatus] = useState('all');
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
@@ -129,7 +130,7 @@ export default function TradingSignals({ preferences }) {
         ? tradingService.getOperatorDailyBrief(operatorBriefHours)
         : Promise.resolve(null);
       const operatorBriefHistoryPromise = tradingService.getOperatorBriefAlertHistory
-        ? tradingService.getOperatorBriefAlertHistory(10)
+        ? tradingService.getOperatorBriefAlertHistory(10, operatorBriefHistoryStatus)
         : Promise.resolve([]);
       const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult, operatorBriefResult, operatorBriefHistoryResult] = await Promise.allSettled([
         tradingService.getSignals(),
@@ -191,7 +192,7 @@ export default function TradingSignals({ preferences }) {
     } finally {
       setLoading(false);
     }
-  }, [operatorBriefHours]);
+  }, [operatorBriefHours, operatorBriefHistoryStatus]);
 
   useEffect(() => { fetchSignals(); }, [fetchSignals]);
 
@@ -988,6 +989,17 @@ export default function TradingSignals({ preferences }) {
               <div>
                 <h3 className="text-sm font-display font-bold text-zinc-900 uppercase">Alert History</h3>
                 <p className="text-xs text-zinc-500">Recent acknowledged or dismissed operator issues across sessions.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[{ key: 'all', label: 'All' }, { key: 'acknowledged', label: 'Acknowledged' }, { key: 'dismissed', label: 'Dismissed' }].map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setOperatorBriefHistoryStatus(option.key)}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${operatorBriefHistoryStatus === option.key ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
               <div className="space-y-2">
                 {operatorBriefAlertHistory.map((item) => (

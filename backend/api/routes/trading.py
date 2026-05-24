@@ -291,11 +291,12 @@ def restore_operator_daily_brief_alert(
 @router.get("/metrics/daily-brief/alerts/history", response_model=List[OperatorBriefAlertHistoryItemResponse])
 def get_operator_daily_brief_alert_history(
     limit: int = 10,
+    status: str = "all",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return trading_service.get_operator_brief_alert_history(db, current_user.id, limit=limit)
+        return trading_service.get_operator_brief_alert_history(db, current_user.id, limit=limit, status=status)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

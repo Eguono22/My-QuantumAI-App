@@ -293,13 +293,30 @@ describe('TradingSignals', () => {
 
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
-    expect(tradingService.getOperatorBriefAlertHistory).toHaveBeenCalledWith(10);
+    expect(tradingService.getOperatorBriefAlertHistory).toHaveBeenCalledWith(10, 'all');
 
     await user.selectOptions(screen.getByLabelText('Window'), '72');
 
     await waitFor(() => {
       const calledWith72 = tradingService.getOperatorDailyBrief.mock.calls.some((args) => args[0] === 72);
       expect(calledWith72).toBe(true);
+    });
+  });
+
+  it('filters operator brief alert history by status', async () => {
+    const user = userEvent.setup();
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Alert History')).toBeInTheDocument();
+    expect(tradingService.getOperatorBriefAlertHistory).toHaveBeenCalledWith(10, 'all');
+
+    await user.click(screen.getByRole('button', { name: 'Dismissed' }));
+
+    await waitFor(() => {
+      const calledDismissed = tradingService.getOperatorBriefAlertHistory.mock.calls.some(
+        (args) => args[0] === 10 && args[1] === 'dismissed'
+      );
+      expect(calledDismissed).toBe(true);
     });
   });
 

@@ -95,8 +95,8 @@ export const tradingService = {
     const response = await api.get(`/trading/metrics/daily-brief?hours=${hours}`);
     return response.data;
   },
-  getOperatorBriefAlertHistory: async (limit = 10) => {
-    const response = await api.get(`/trading/metrics/daily-brief/alerts/history?limit=${limit}`);
+  getOperatorBriefAlertHistory: async (limit = 10, status = 'all') => {
+    const response = await api.get(`/trading/metrics/daily-brief/alerts/history?limit=${limit}&status=${status}`);
     return response.data;
   },
   acknowledgeOperatorBriefAlert: async (alert) => {
