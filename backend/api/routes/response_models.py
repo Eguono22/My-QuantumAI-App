@@ -238,6 +238,26 @@ class OrderResponse(BaseModel):
     updated_at: str
 
 
+class ExecutionMetricsWindowResponse(BaseModel):
+    orders_submitted: int
+    orders_filled: int
+    orders_pending: int
+    orders_rejected: int
+    orders_canceled: int
+    fill_rate_pct: float
+    requested_notional: float
+    filled_notional: float
+    fees_paid: float
+    avg_slippage_bps: float
+    manual_confirmation_orders: int
+    live_mode_orders: int
+
+
+class ExecutionMetricsResponse(BaseModel):
+    generated_at: str
+    windows: dict[str, ExecutionMetricsWindowResponse]
+
+
 class MQL5TerminalResponse(BaseModel):
     terminal_id: str
     user_id: Optional[int] = None

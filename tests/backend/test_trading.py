@@ -219,6 +219,172 @@ class TestTradingService:
 
         db.close()
 
+    def test_execution_metrics_rollup_windows(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, Order
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="metricsuser1",
+            email="metrics1@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        db.add_all(
+            [
+                Order(
+                    user_id=user.id,
+                    asset="BTC",
+                    action="buy",
+                    order_type="MARKET",
+                    status="FILLED",
+                    requested_quantity=1.0,
+                    filled_quantity=1.0,
+                    fill_price=100.0,
+                    requested_price=99.0,
+                    fee_paid=0.12,
+                    slippage_bps=2.5,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(hours=2),
+                    updated_at=now - datetime.timedelta(hours=2),
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="ETH",
+                    action="sell",
+                    order_type="LIMIT",
+                    status="PENDING",
+                    requested_quantity=2.0,
+                    filled_quantity=0.0,
+                    requested_price=50.0,
+                    fee_paid=0.0,
+                    slippage_bps=None,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(days=3),
+                    updated_at=now - datetime.timedelta(days=3),
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="AAPL",
+                    action="buy",
+                    order_type="MARKET",
+                    status="REJECTED",
+                    requested_quantity=1.0,
+                    filled_quantity=0.0,
+                    requested_price=25.0,
+                    fee_paid=0.0,
+                    slippage_bps=None,
+                    broker="alpaca-paper",
+                    mode="live",
+                    manual_confirmation=1,
+                    created_at=now - datetime.timedelta(days=10),
+                    updated_at=now - datetime.timedelta(days=10),
+                ),
+            ]
+        )
+        db.commit()
+
+        metrics = self.service.get_execution_metrics(db, user.id)
+
+        assert "generated_at" in metrics
+        assert metrics["windows"]["today"]["orders_submitted"] == 1
+        assert metrics["windows"]["today"]["orders_filled"] == 1
+        assert metrics["windows"]["rolling_7d"]["orders_submitted"] == 2
+        assert metrics["windows"]["rolling_30d"]["orders_submitted"] == 3
+        assert metrics["windows"]["lifetime"]["orders_rejected"] == 1
+        assert metrics["windows"]["lifetime"]["manual_confirmation_orders"] == 1
+        assert metrics["windows"]["lifetime"]["live_mode_orders"] == 1
+
+        db.close()
+
+    def test_execution_metrics_aggregates_notional_fees_and_slippage(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User, Order
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="metricsuser2",
+            email="metrics2@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        db.add_all(
+            [
+                Order(
+                    user_id=user.id,
+                    asset="BTC",
+                    action="buy",
+                    order_type="MARKET",
+                    status="FILLED",
+                    requested_quantity=2.0,
+                    filled_quantity=2.0,
+                    requested_price=100.0,
+                    fill_price=101.0,
+                    fee_paid=0.25,
+                    slippage_bps=1.5,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now,
+                    updated_at=now,
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="ETH",
+                    action="buy",
+                    order_type="MARKET",
+                    status="PARTIAL_FILL",
+                    requested_quantity=1.0,
+                    filled_quantity=0.5,
+                    requested_price=80.0,
+                    fill_price=82.0,
+                    fee_paid=0.1,
+                    slippage_bps=2.5,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now,
+                    updated_at=now,
+                ),
+            ]
+        )
+        db.commit()
+
+        lifetime = self.service.get_execution_metrics(db, user.id)["windows"]["lifetime"]
+        assert lifetime["orders_submitted"] == 2
+        assert lifetime["orders_filled"] == 2
+        assert lifetime["fill_rate_pct"] == 100.0
+        assert lifetime["requested_notional"] == 280.0
+        assert lifetime["filled_notional"] == 243.0
+        assert lifetime["fees_paid"] == 0.35
+        assert lifetime["avg_slippage_bps"] == pytest.approx(2.0)
+
+        db.close()
+
     def test_trade_audit_includes_max_loss_and_reward_when_protection_is_present(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

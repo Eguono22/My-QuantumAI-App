@@ -12,6 +12,7 @@ from api.routes.response_models import (
     PriceAlertResponse,
     StrategyBacktestResponse,
     OrderResponse,
+    ExecutionMetricsResponse,
     NotificationDeliveryLogResponse,
     TelegramNotificationPreferenceResponse,
     TelegramNotificationDeliveryResponse,
@@ -202,6 +203,11 @@ def run_backtest(request: BacktestRequest, current_user: User = Depends(get_curr
 @router.get("/orders", response_model=List[OrderResponse])
 def get_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return trading_service.get_orders(db, current_user.id)
+
+
+@router.get("/metrics/execution", response_model=ExecutionMetricsResponse)
+def get_execution_metrics(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return trading_service.get_execution_metrics(db, current_user.id)
 
 
 @router.post("/orders/poll")

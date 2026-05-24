@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import json
 from sqlalchemy.orm import Session
@@ -18,6 +18,111 @@ risk_engine = RiskEngine()
 logger = logging.getLogger("quantumai.trading")
 
 class TradingService:
+    def _ensure_utc(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _summarize_order_window(self, orders: List[Order]) -> Dict:
+        submitted = len(orders)
+        filled = 0
+        pending = 0
+        rejected = 0
+        canceled = 0
+        requested_notional = 0.0
+        filled_notional = 0.0
+        fees_paid = 0.0
+        slippage_values = []
+        manual_confirmations = 0
+        live_mode_orders = 0
+
+        for order in orders:
+            status = (order.status or "").upper()
+            if status in {"FILLED", "PARTIAL_FILL"}:
+                filled += 1
+            elif status == "PENDING":
+                pending += 1
+            elif status == "REJECTED":
+                rejected += 1
+            elif status == "CANCELED":
+                canceled += 1
+
+            requested_qty = float(order.requested_quantity or 0.0)
+            filled_qty = float(order.filled_quantity or 0.0)
+            pricing_ref = (
+                float(order.requested_price)
+                if order.requested_price is not None
+                else float(order.market_price)
+                if order.market_price is not None
+                else float(order.fill_price)
+                if order.fill_price is not None
+                else 0.0
+            )
+
+            requested_notional += requested_qty * pricing_ref
+            if order.fill_price is not None and filled_qty > 0:
+                filled_notional += filled_qty * float(order.fill_price)
+
+            fees_paid += float(order.fee_paid or 0.0)
+            if order.slippage_bps is not None:
+                slippage_values.append(float(order.slippage_bps))
+            if bool(order.manual_confirmation):
+                manual_confirmations += 1
+            if (order.mode or "paper").strip().lower() == "live":
+                live_mode_orders += 1
+
+        fill_rate_pct = round((filled / submitted * 100) if submitted > 0 else 0.0, 2)
+        avg_slippage_bps = round(float(np.mean(slippage_values)), 4) if slippage_values else 0.0
+
+        return {
+            "orders_submitted": submitted,
+            "orders_filled": filled,
+            "orders_pending": pending,
+            "orders_rejected": rejected,
+            "orders_canceled": canceled,
+            "fill_rate_pct": fill_rate_pct,
+            "requested_notional": round(requested_notional, 2),
+            "filled_notional": round(filled_notional, 2),
+            "fees_paid": round(fees_paid, 4),
+            "avg_slippage_bps": avg_slippage_bps,
+            "manual_confirmation_orders": manual_confirmations,
+            "live_mode_orders": live_mode_orders,
+        }
+
+    def get_execution_metrics(self, db: Session, user_id: int) -> Dict:
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
+
+        all_orders = (
+            db.query(Order)
+            .filter(Order.user_id == user_id)
+            .order_by(Order.created_at.desc())
+            .all()
+        )
+
+        def in_window(start: Optional[datetime]) -> List[Order]:
+            if start is None:
+                return all_orders
+            return [
+                order
+                for order in all_orders
+                if self._ensure_utc(order.created_at) >= start
+            ]
+
+        windows = {
+            "today": self._summarize_order_window(in_window(today_start)),
+            "rolling_7d": self._summarize_order_window(in_window(seven_days_ago)),
+            "rolling_30d": self._summarize_order_window(in_window(thirty_days_ago)),
+            "lifetime": self._summarize_order_window(in_window(None)),
+        }
+
+        return {
+            "generated_at": now.isoformat(),
+            "windows": windows,
+        }
+
     def _fallback_signal(self, asset: str) -> Dict:
         asset_data = market_service.get_asset(asset)
         fallback_price = float(asset_data["price"]) if asset_data else 0.0
