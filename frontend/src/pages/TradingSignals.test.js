@@ -12,6 +12,7 @@ jest.mock('../services/tradingService', () => ({
     executeTrade: jest.fn(),
     executeHFT: jest.fn(),
     getOrders: jest.fn(),
+    getExecutionMetrics: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
     getStartupHealth: jest.fn(),
@@ -53,6 +54,56 @@ describe('TradingSignals', () => {
     tradingService.getStartupHealth.mockResolvedValue({
       trading: { trading_mode: 'paper' },
       live_trading: { enabled: false, live_manual_confirmation_text: 'LIVE' },
+    });
+    tradingService.getExecutionMetrics.mockResolvedValue({
+      generated_at: '2026-05-24T12:00:00Z',
+      windows: {
+        today: {
+          orders_submitted: 2,
+          orders_filled: 1,
+          orders_pending: 1,
+          orders_rejected: 0,
+          orders_canceled: 0,
+          fill_rate_pct: 50,
+          requested_notional: 200,
+          filled_notional: 100,
+          fees_paid: 0.5,
+          avg_slippage_bps: 1.2,
+          manual_confirmation_orders: 0,
+          live_mode_orders: 0,
+          regime_breakdown: { TRENDING: 1, UNKNOWN: 0 },
+        },
+        rolling_7d: {
+          orders_submitted: 2,
+          orders_filled: 1,
+          orders_pending: 1,
+          orders_rejected: 0,
+          orders_canceled: 0,
+          fill_rate_pct: 50,
+          requested_notional: 200,
+          filled_notional: 100,
+          fees_paid: 0.5,
+          avg_slippage_bps: 1.2,
+          manual_confirmation_orders: 0,
+          live_mode_orders: 0,
+          regime_breakdown: { TRENDING: 1, UNKNOWN: 0 },
+        },
+        rolling_30d: {
+          orders_submitted: 2,
+          orders_filled: 1,
+          orders_pending: 1,
+          orders_rejected: 0,
+          orders_canceled: 0,
+          fill_rate_pct: 50,
+          requested_notional: 200,
+          filled_notional: 100,
+          fees_paid: 0.5,
+          avg_slippage_bps: 1.2,
+          manual_confirmation_orders: 0,
+          live_mode_orders: 0,
+          regime_breakdown: { TRENDING: 1, UNKNOWN: 0 },
+        },
+      },
     });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
@@ -99,5 +150,14 @@ describe('TradingSignals', () => {
         take_profit: 112,
       });
     });
+  });
+
+  it('shows risk and execution health telemetry', async () => {
+    render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
+
+    expect(await screen.findByText('Risk & Execution Health')).toBeInTheDocument();
+    expect(screen.getByText('Today Fill Rate')).toBeInTheDocument();
+    expect(screen.getByText('50.00%')).toBeInTheDocument();
+    expect(screen.getByText('TRENDING: 1')).toBeInTheDocument();
   });
 });

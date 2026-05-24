@@ -37,6 +37,11 @@ function summarizeOrderAudit(orders) {
   };
 }
 
+function sortedRegimes(regimeBreakdown) {
+  return Object.entries(regimeBreakdown || {})
+    .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+}
+
 export default function TradingSignals({ preferences }) {
   const RISK_PRESETS = {
     CONSERVATIVE: { riskPerTradePct: 0.5, maxPortfolioHeatPct: 3 },
@@ -105,6 +110,7 @@ export default function TradingSignals({ preferences }) {
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestResult, setBacktestResult] = useState(null);
   const [startupHealth, setStartupHealth] = useState(null);
+  const [executionMetrics, setExecutionMetrics] = useState(null);
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -113,13 +119,17 @@ export default function TradingSignals({ preferences }) {
 
   const fetchSignals = useCallback(async () => {
     try {
-      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult] = await Promise.allSettled([
+      const executionMetricsPromise = tradingService.getExecutionMetrics
+        ? tradingService.getExecutionMetrics()
+        : Promise.resolve(null);
+      const [signalsResult, overviewResult, watchResult, alertsResult, ordersResult, startupHealthResult, executionMetricsResult] = await Promise.allSettled([
         tradingService.getSignals(),
         marketService.getOverview(),
         tradingService.getWatchlist(),
         tradingService.getPriceAlerts(true),
         tradingService.getOrders(),
         tradingService.getStartupHealth(),
+        executionMetricsPromise,
       ]);
 
       if (signalsResult.status !== 'fulfilled') {
@@ -146,6 +156,9 @@ export default function TradingSignals({ preferences }) {
         ordersResult.status === 'fulfilled' && Array.isArray(ordersResult.value) ? ordersResult.value : []
       );
       setStartupHealth(startupHealthResult.status === 'fulfilled' ? startupHealthResult.value : null);
+      setExecutionMetrics(
+        executionMetricsResult.status === 'fulfilled' ? executionMetricsResult.value : null
+      );
 
       if (symbols.length > 0) {
         setHftForm(prev => (symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }));
@@ -172,6 +185,9 @@ export default function TradingSignals({ preferences }) {
   const isLiveMode = startupHealth?.trading?.trading_mode === 'live';
   const liveTradingStatus = startupHealth?.live_trading;
   const liveConfirmationPhrase = liveTradingStatus?.live_manual_confirmation_text || 'LIVE';
+  const executionToday = executionMetrics?.windows?.today || {};
+  const execution7d = executionMetrics?.windows?.rolling_7d || {};
+  const execution30d = executionMetrics?.windows?.rolling_30d || {};
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -707,6 +723,47 @@ export default function TradingSignals({ preferences }) {
           {liveTradingStatus?.reason && liveTradingStatus.reason !== 'ready' && (
             <p className="mt-2 text-xs opacity-80">{liveTradingStatus.reason}</p>
           )}
+        </div>
+      )}
+
+      {executionMetrics && (
+        <div className="market-panel rounded-md p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Risk & Execution Health</h2>
+              <p className="text-zinc-600 text-sm">Live telemetry from submitted orders and broker outcomes</p>
+            </div>
+            <p className="text-xs text-zinc-500">Updated {new Date(executionMetrics.generated_at).toLocaleString()}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">Today Fill Rate</p>
+              <p className="font-semibold text-zinc-900">{(executionToday.fill_rate_pct || 0).toFixed(2)}%</p>
+              <p className="text-xs text-zinc-500 mt-1">{executionToday.orders_filled || 0}/{executionToday.orders_submitted || 0} filled</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">7D Requested Notional</p>
+              <p className="font-semibold text-zinc-900">{formatCurrency(execution7d.requested_notional || 0)}</p>
+              <p className="text-xs text-zinc-500 mt-1">Fees {formatCurrency(execution7d.fees_paid || 0)}</p>
+            </div>
+            <div className="market-panel-soft rounded-md p-3">
+              <p className="text-zinc-500">30D Avg Slippage</p>
+              <p className="font-semibold text-zinc-900">{(execution30d.avg_slippage_bps || 0).toFixed(2)} bps</p>
+              <p className="text-xs text-zinc-500 mt-1">Live orders {execution30d.live_mode_orders || 0}</p>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Today Regime Mix</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {sortedRegimes(executionToday.regime_breakdown).map(([regime, count]) => (
+                <span key={`regime-${regime}`} className="px-2 py-1 rounded bg-white border border-zinc-300 text-zinc-700">
+                  {regime}: {count}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

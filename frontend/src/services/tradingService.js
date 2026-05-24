@@ -87,6 +87,10 @@ export const tradingService = {
     const response = await api.get('/trading/orders');
     return response.data;
   },
+  getExecutionMetrics: async () => {
+    const response = await api.get('/trading/metrics/execution');
+    return response.data;
+  },
   pollOrders: async () => {
     const response = await api.post('/trading/orders/poll', {});
     return response.data;
