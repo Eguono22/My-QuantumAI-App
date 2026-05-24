@@ -305,6 +305,26 @@ describe('TradingSignals', () => {
 
   it('filters operator brief alert history by status', async () => {
     const user = userEvent.setup();
+    tradingService.getOperatorBriefAlertHistory.mockImplementation(async (limit, status) => {
+      if (status === 'dismissed') {
+        return [];
+      }
+      return [
+        {
+          alert_key: 'brief-72-broker-issue',
+          window_hours: 72,
+          severity: 'WARN',
+          title: 'Broker Issues Detected',
+          message: '3 broker errors/rejections in the last 72h.',
+          recommended_action: 'Check broker connectivity and pause automation until health stabilizes.',
+          acknowledged: true,
+          dismissed: false,
+          acknowledged_at: '2026-05-24T09:00:00Z',
+          dismissed_at: null,
+          updated_at: '2026-05-24T09:00:00Z',
+        },
+      ];
+    });
     render(<TradingSignals preferences={{ layout: 'trader-pro', aiModel: 'quantum-core-v1' }} />);
 
     expect(await screen.findByText('Alert History')).toBeInTheDocument();
@@ -318,6 +338,8 @@ describe('TradingSignals', () => {
       );
       expect(calledDismissed).toBe(true);
     });
+    expect(screen.getByText('No history items for the selected filter yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
   });
 
   it('acknowledges and dismisses operator brief alerts with persistence', async () => {

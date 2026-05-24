@@ -984,44 +984,47 @@ export default function TradingSignals({ preferences }) {
             )}
           </div>
 
-          {!!operatorBriefAlertHistory.length && (
-            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 space-y-3">
-              <div>
-                <h3 className="text-sm font-display font-bold text-zinc-900 uppercase">Alert History</h3>
-                <p className="text-xs text-zinc-500">Recent acknowledged or dismissed operator issues across sessions.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[{ key: 'all', label: 'All' }, { key: 'acknowledged', label: 'Acknowledged' }, { key: 'dismissed', label: 'Dismissed' }].map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => setOperatorBriefHistoryStatus(option.key)}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${operatorBriefHistoryStatus === option.key ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100'}`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              <div className="space-y-2">
-                {operatorBriefAlertHistory.map((item) => (
-                  <div key={`history-${item.alert_key}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-zinc-900">{item.title || 'Operator alert'}</p>
-                        <p className="text-zinc-700">{item.message || 'No message captured.'}</p>
-                      </div>
-                      <span className="rounded bg-zinc-100 px-2 py-1 text-[11px] font-semibold text-zinc-700 uppercase">
-                        {item.dismissed ? 'Dismissed' : item.acknowledged ? 'Acknowledged' : 'Tracked'}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-zinc-500">
-                      Window: {item.window_hours || 'N/A'}h
-                      {item.updated_at ? ` | Updated ${new Date(item.updated_at).toLocaleString()}` : ''}
-                    </p>
-                  </div>
-                ))}
-              </div>
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 space-y-3">
+            <div>
+              <h3 className="text-sm font-display font-bold text-zinc-900 uppercase">Alert History</h3>
+              <p className="text-xs text-zinc-500">Recent acknowledged or dismissed operator issues across sessions.</p>
             </div>
-          )}
+            <div className="flex flex-wrap gap-2">
+              {[{ key: 'all', label: 'All' }, { key: 'acknowledged', label: 'Acknowledged' }, { key: 'dismissed', label: 'Dismissed' }].map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setOperatorBriefHistoryStatus(option.key)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${operatorBriefHistoryStatus === option.key ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100'}`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {operatorBriefAlertHistory.map((item) => (
+                <div key={`history-${item.alert_key}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.title || 'Operator alert'}</p>
+                      <p className="text-zinc-700">{item.message || 'No message captured.'}</p>
+                    </div>
+                    <span className="rounded bg-zinc-100 px-2 py-1 text-[11px] font-semibold text-zinc-700 uppercase">
+                      {item.dismissed ? 'Dismissed' : item.acknowledged ? 'Acknowledged' : 'Tracked'}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Window: {item.window_hours || 'N/A'}h
+                    {item.updated_at ? ` | Updated ${new Date(item.updated_at).toLocaleString()}` : ''}
+                  </p>
+                </div>
+              ))}
+              {!operatorBriefAlertHistory.length && (
+                <div className="rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-600">
+                  No history items for the selected filter yet.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
