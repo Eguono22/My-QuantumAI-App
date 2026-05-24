@@ -106,26 +106,52 @@ describe('TradingSignals', () => {
         },
       },
     });
-    tradingService.getOperatorDailyBrief.mockResolvedValue({
-      generated_at: '2026-05-24T12:00:00Z',
-      window_hours: 24,
-      summary: {
-        accepted_orders: 5,
-        blocked_trades: 2,
-        risk_breaches: 1,
-        no_trade_window_blocks: 1,
-        broker_issues: 1,
-      },
-      regime_drift: {
-        detected: true,
-        today_top_regime: 'TRENDING',
-        rolling_7d_top_regime: 'RANGING',
-        today_top_share_pct: 60,
-        rolling_7d_top_share_pct: 55,
-      },
-      alerts: [
-        { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
-      ],
+    tradingService.getOperatorDailyBrief.mockImplementation(async (hours = 24) => {
+      if (Number(hours) === 168) {
+        return {
+          generated_at: '2026-05-24T12:00:00Z',
+          window_hours: 168,
+          summary: {
+            accepted_orders: 28,
+            blocked_trades: 9,
+            risk_breaches: 7,
+            no_trade_window_blocks: 2,
+            broker_issues: 7,
+          },
+          regime_drift: {
+            detected: false,
+            today_top_regime: 'RANGING',
+            rolling_7d_top_regime: 'RANGING',
+            today_top_share_pct: 50,
+            rolling_7d_top_share_pct: 52,
+          },
+          alerts: [
+            { severity: 'INFO', title: 'Operationally Stable', message: 'No major risk or broker anomalies detected in the last 168h.' },
+          ],
+        };
+      }
+
+      return {
+        generated_at: '2026-05-24T12:00:00Z',
+        window_hours: 24,
+        summary: {
+          accepted_orders: 5,
+          blocked_trades: 2,
+          risk_breaches: 1,
+          no_trade_window_blocks: 1,
+          broker_issues: 1,
+        },
+        regime_drift: {
+          detected: true,
+          today_top_regime: 'TRENDING',
+          rolling_7d_top_regime: 'RANGING',
+          today_top_share_pct: 60,
+          rolling_7d_top_share_pct: 55,
+        },
+        alerts: [
+          { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
+        ],
+      };
     });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
@@ -190,6 +216,7 @@ describe('TradingSignals', () => {
     expect(screen.getByText('Loaded: 24h')).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches')).toBeInTheDocument();
     expect(screen.getByText(/Regime drift:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Trend vs 7d baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
   });
 
@@ -199,11 +226,13 @@ describe('TradingSignals', () => {
 
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
+    expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(168);
 
     await user.selectOptions(screen.getByLabelText('Window'), '72');
 
     await waitFor(() => {
-      expect(tradingService.getOperatorDailyBrief).toHaveBeenLastCalledWith(72);
+      const calledWith72 = tradingService.getOperatorDailyBrief.mock.calls.some((args) => args[0] === 72);
+      expect(calledWith72).toBe(true);
     });
   });
 });
