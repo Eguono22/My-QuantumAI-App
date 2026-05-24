@@ -287,6 +287,10 @@ class OperatorDailyBriefTrendComparisonResponse(BaseModel):
     broker_issues_per_day: float
     risk_breaches_delta_pct: float
     broker_issues_delta_pct: float
+    fill_rate_pct: float
+    fill_rate_delta_pct: float
+    avg_slippage_bps: float
+    avg_slippage_delta_pct: float
 
 
 class OperatorDailyBriefResponse(BaseModel):

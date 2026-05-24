@@ -154,6 +154,10 @@ describe('TradingSignals', () => {
           broker_issues_per_day: 1,
           risk_breaches_delta_pct: 600,
           broker_issues_delta_pct: 600,
+          fill_rate_pct: 50,
+          fill_rate_delta_pct: -33.33,
+          avg_slippage_bps: 2,
+          avg_slippage_delta_pct: 14.29,
         },
         alerts: [
           { severity: 'WARN', title: 'Risk Breaches Detected', message: '1 risk-related order blocks in the last 24h.' },
@@ -224,6 +228,7 @@ describe('TradingSignals', () => {
     expect(screen.getByText('Risk Breaches')).toBeInTheDocument();
     expect(screen.getByText(/Regime drift:/i)).toBeInTheDocument();
     expect(screen.getByText(/Trend vs 168h baseline:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Execution vs 168h baseline:/i)).toBeInTheDocument();
     expect(screen.getByText('Risk Breaches Detected')).toBeInTheDocument();
   });
 

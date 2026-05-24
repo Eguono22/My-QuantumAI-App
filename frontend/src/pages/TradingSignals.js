@@ -829,12 +829,20 @@ export default function TradingSignals({ preferences }) {
               {' '}({operatorBrief.regime_drift.today_top_regime} today vs {operatorBrief.regime_drift.rolling_7d_top_regime} rolling 7d)
             </p>
             {trendComparison && (
-              <p className="mt-2 text-zinc-600">
-                Trend vs {trendComparison.baseline_window_hours}h baseline: Risk breaches/day {trendComparison.risk_breaches_per_day.toFixed(2)}
-                {' '}({trendComparison.risk_breaches_delta_pct >= 0 ? '+' : ''}{trendComparison.risk_breaches_delta_pct.toFixed(0)}%),
-                {' '}Broker issues/day {trendComparison.broker_issues_per_day.toFixed(2)}
-                {' '}({trendComparison.broker_issues_delta_pct >= 0 ? '+' : ''}{trendComparison.broker_issues_delta_pct.toFixed(0)}%).
-              </p>
+              <div className="mt-2 space-y-1 text-zinc-600">
+                <p>
+                  Trend vs {trendComparison.baseline_window_hours}h baseline: Risk breaches/day {trendComparison.risk_breaches_per_day.toFixed(2)}
+                  {' '}({trendComparison.risk_breaches_delta_pct >= 0 ? '+' : ''}{trendComparison.risk_breaches_delta_pct.toFixed(0)}%),
+                  {' '}Broker issues/day {trendComparison.broker_issues_per_day.toFixed(2)}
+                  {' '}({trendComparison.broker_issues_delta_pct >= 0 ? '+' : ''}{trendComparison.broker_issues_delta_pct.toFixed(0)}%).
+                </p>
+                <p>
+                  Execution vs {trendComparison.baseline_window_hours}h baseline: Fill rate {trendComparison.fill_rate_pct.toFixed(2)}%
+                  {' '}({trendComparison.fill_rate_delta_pct >= 0 ? '+' : ''}{trendComparison.fill_rate_delta_pct.toFixed(0)}%),
+                  {' '}Avg slippage {trendComparison.avg_slippage_bps.toFixed(2)} bps
+                  {' '}({trendComparison.avg_slippage_delta_pct >= 0 ? '+' : ''}{trendComparison.avg_slippage_delta_pct.toFixed(0)}%).
+                </p>
+              </div>
             )}
           </div>
 

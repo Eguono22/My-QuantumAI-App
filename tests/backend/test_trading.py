@@ -468,7 +468,7 @@ class TestTradingService:
     def test_execute_trade_blocked_during_no_trade_window(self, monkeypatch):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from models.database import Base, User, TradeAuditEvent
+        from models.database import Base, User, TradeAuditEvent, Order
         import datetime
 
         engine = create_engine("sqlite:///:memory:")
@@ -504,7 +504,7 @@ class TestTradingService:
     def test_operator_daily_brief_summarizes_controls_and_regime_drift(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from models.database import Base, User, TradeAuditEvent
+        from models.database import Base, User, TradeAuditEvent, Order
         import datetime
 
         engine = create_engine("sqlite:///:memory:")
@@ -602,6 +602,82 @@ class TestTradingService:
                 ),
             ]
         )
+        db.add_all(
+            [
+                Order(
+                    user_id=user.id,
+                    asset="BTC",
+                    action="buy",
+                    order_type="MARKET",
+                    status="FILLED",
+                    requested_quantity=1.0,
+                    filled_quantity=1.0,
+                    requested_price=100.0,
+                    fill_price=101.0,
+                    fee_paid=0.1,
+                    slippage_bps=1.0,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(hours=1),
+                    updated_at=now - datetime.timedelta(hours=1),
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="ETH",
+                    action="buy",
+                    order_type="MARKET",
+                    status="PENDING",
+                    requested_quantity=1.0,
+                    filled_quantity=0.0,
+                    requested_price=200.0,
+                    fill_price=None,
+                    fee_paid=0.0,
+                    slippage_bps=3.0,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(hours=3),
+                    updated_at=now - datetime.timedelta(hours=3),
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="ETH",
+                    action="buy",
+                    order_type="MARKET",
+                    status="FILLED",
+                    requested_quantity=1.0,
+                    filled_quantity=1.0,
+                    requested_price=150.0,
+                    fill_price=151.0,
+                    fee_paid=0.1,
+                    slippage_bps=2.0,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(days=2),
+                    updated_at=now - datetime.timedelta(days=2),
+                ),
+                Order(
+                    user_id=user.id,
+                    asset="SOL",
+                    action="buy",
+                    order_type="MARKET",
+                    status="FILLED",
+                    requested_quantity=1.0,
+                    filled_quantity=1.0,
+                    requested_price=50.0,
+                    fill_price=50.0,
+                    fee_paid=0.05,
+                    slippage_bps=1.0,
+                    broker="paper-broker",
+                    mode="paper",
+                    manual_confirmation=0,
+                    created_at=now - datetime.timedelta(days=4),
+                    updated_at=now - datetime.timedelta(days=4),
+                ),
+            ]
+        )
         db.commit()
 
         brief = self.service.get_operator_daily_brief(db, user.id, hours=24)
@@ -618,6 +694,10 @@ class TestTradingService:
         assert brief["trend_comparison"]["broker_issues_per_day"] == pytest.approx(1.0)
         assert brief["trend_comparison"]["risk_breaches_delta_pct"] == pytest.approx(600.0)
         assert brief["trend_comparison"]["broker_issues_delta_pct"] == pytest.approx(600.0)
+        assert brief["trend_comparison"]["fill_rate_pct"] == pytest.approx(50.0)
+        assert brief["trend_comparison"]["fill_rate_delta_pct"] == pytest.approx(-33.33)
+        assert brief["trend_comparison"]["avg_slippage_bps"] == pytest.approx(2.0)
+        assert brief["trend_comparison"]["avg_slippage_delta_pct"] == pytest.approx(14.29)
         assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
 
         db.close()

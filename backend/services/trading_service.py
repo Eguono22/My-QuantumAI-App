@@ -246,10 +246,20 @@ class TradingService:
             .order_by(TradeAuditEvent.created_at.desc())
             .all()
         )
+        orders = (
+            db.query(Order)
+            .filter(Order.user_id == user_id)
+            .order_by(Order.created_at.desc())
+            .all()
+        )
         recent_events = [event for event in events if self._ensure_utc(event.created_at) >= start]
         baseline_events = [event for event in events if self._ensure_utc(event.created_at) >= baseline_start]
+        recent_orders = [order for order in orders if self._ensure_utc(order.created_at) >= start]
+        baseline_orders = [order for order in orders if self._ensure_utc(order.created_at) >= baseline_start]
         summary = self._summarize_operator_brief_window(recent_events)
         baseline_summary = self._summarize_operator_brief_window(baseline_events)
+        recent_execution = self._summarize_order_window(recent_orders, {})
+        baseline_execution = self._summarize_order_window(baseline_orders, {})
 
         execution_metrics = self.get_execution_metrics(db, user_id)
         today_regimes = execution_metrics["windows"].get("today", {}).get("regime_breakdown", {})
@@ -313,6 +323,22 @@ class TradingService:
                 "broker_issues_per_day": round(broker_issues_per_day, 2),
                 "risk_breaches_delta_pct": round(self._delta_pct(risk_breaches_per_day, baseline_risk_per_day), 2),
                 "broker_issues_delta_pct": round(self._delta_pct(broker_issues_per_day, baseline_broker_per_day), 2),
+                "fill_rate_pct": round(float(recent_execution["fill_rate_pct"]), 2),
+                "fill_rate_delta_pct": round(
+                    self._delta_pct(
+                        float(recent_execution["fill_rate_pct"]),
+                        float(baseline_execution["fill_rate_pct"]),
+                    ),
+                    2,
+                ),
+                "avg_slippage_bps": round(float(recent_execution["avg_slippage_bps"]), 2),
+                "avg_slippage_delta_pct": round(
+                    self._delta_pct(
+                        float(recent_execution["avg_slippage_bps"]),
+                        float(baseline_execution["avg_slippage_bps"]),
+                    ),
+                    2,
+                ),
             },
             "alerts": alerts,
         }
