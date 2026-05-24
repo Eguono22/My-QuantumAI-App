@@ -135,9 +135,10 @@ describe('TradingSignals', () => {
         };
       }
 
+      const requestedHours = Number(hours) || 24;
       return {
         generated_at: '2026-05-24T12:00:00Z',
-        window_hours: 24,
+        window_hours: requestedHours,
         summary: {
           accepted_orders: 5,
           blocked_trades: 2,
@@ -294,6 +295,7 @@ describe('TradingSignals', () => {
     expect(await screen.findByText('Operator Daily Brief')).toBeInTheDocument();
     expect(tradingService.getOperatorDailyBrief).toHaveBeenCalledWith(24);
     expect(tradingService.getOperatorBriefAlertHistory).toHaveBeenCalledWith(10, 'all');
+    expect(screen.getByText('24h risk and execution control summary')).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Window'), '72');
 
@@ -301,6 +303,7 @@ describe('TradingSignals', () => {
       const calledWith72 = tradingService.getOperatorDailyBrief.mock.calls.some((args) => args[0] === 72);
       expect(calledWith72).toBe(true);
     });
+    expect(await screen.findByText('72h risk and execution control summary')).toBeInTheDocument();
   });
 
   it('filters operator brief alert history by status', async () => {

@@ -869,7 +869,7 @@ export default function TradingSignals({ preferences }) {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Operator Daily Brief</h2>
-              <p className="text-zinc-600 text-sm">24h risk and execution control summary</p>
+              <p className="text-zinc-600 text-sm">{operatorBrief.window_hours}h risk and execution control summary</p>
             </div>
             <div className="flex items-center gap-2">
               <label htmlFor="operator-brief-hours" className="text-xs text-zinc-500">Window</label>
