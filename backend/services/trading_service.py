@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import numpy as np
 import hashlib
 from config.settings import settings
-from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order, TradeAuditEvent
+from models.database import Portfolio, Trade, TradingSignal, WatchlistItem, PriceAlert, Order, TradeAuditEvent, OperatorBriefAlertState
 from services.market_service import market_service, MOCK_ASSETS, resolve_symbol
 from services.broker_service import get_broker, BrokerExecutionError
 from services.risk_service import RiskEngine, RiskValidationError
@@ -18,6 +18,39 @@ risk_engine = RiskEngine()
 logger = logging.getLogger("quantumai.trading")
 
 class TradingService:
+    def _build_operator_brief_alert_key(self, hours: int, alert: Dict) -> str:
+        digest = hashlib.sha256(
+            "::".join([
+                str(hours),
+                str(alert.get("severity") or "INFO"),
+                str(alert.get("title") or ""),
+                str(alert.get("message") or ""),
+            ]).encode("utf-8")
+        ).hexdigest()
+        return f"brief-{hours}-{digest[:16]}"
+
+    def _get_operator_brief_alert_state_map(self, db: Session, user_id: int, alert_keys: List[str]) -> Dict[str, OperatorBriefAlertState]:
+        if not alert_keys:
+            return {}
+        rows = (
+            db.query(OperatorBriefAlertState)
+            .filter(
+                OperatorBriefAlertState.user_id == user_id,
+                OperatorBriefAlertState.alert_key.in_(alert_keys),
+            )
+            .all()
+        )
+        return {row.alert_key: row for row in rows}
+
+    def _serialize_operator_brief_alert_state(self, state: OperatorBriefAlertState) -> Dict:
+        return {
+            "alert_key": state.alert_key,
+            "acknowledged": bool(state.acknowledged),
+            "dismissed": bool(state.dismissed),
+            "acknowledged_at": self._ensure_utc(state.acknowledged_at).isoformat() if state.acknowledged_at else None,
+            "dismissed_at": self._ensure_utc(state.dismissed_at).isoformat() if state.dismissed_at else None,
+        }
+
     def _current_utc_hour(self) -> int:
         return datetime.now(timezone.utc).hour
 
@@ -335,6 +368,26 @@ class TradingService:
                 "recommended_action": "Keep sizing unchanged, continue paper execution, and log the next operator review after the current session.",
             })
 
+        keyed_alerts = []
+        alert_keys = []
+        for alert in alerts:
+            alert_key = self._build_operator_brief_alert_key(hours, alert)
+            keyed_alert = {**alert, "alert_key": alert_key}
+            keyed_alerts.append(keyed_alert)
+            alert_keys.append(alert_key)
+
+        alert_state_map = self._get_operator_brief_alert_state_map(db, user_id, alert_keys)
+        serialized_alerts = []
+        for alert in keyed_alerts:
+            state = alert_state_map.get(alert["alert_key"])
+            serialized_alerts.append({
+                **alert,
+                "acknowledged": bool(state.acknowledged) if state else False,
+                "dismissed": bool(state.dismissed) if state else False,
+                "acknowledged_at": self._ensure_utc(state.acknowledged_at).isoformat() if state and state.acknowledged_at else None,
+                "dismissed_at": self._ensure_utc(state.dismissed_at).isoformat() if state and state.dismissed_at else None,
+            })
+
         return {
             "generated_at": now.isoformat(),
             "window_hours": hours,
@@ -357,8 +410,49 @@ class TradingService:
                 "avg_slippage_bps": round(avg_slippage_bps, 2),
                 "avg_slippage_delta_pct": round(avg_slippage_delta_pct, 2),
             },
-            "alerts": alerts,
+            "alerts": serialized_alerts,
         }
+
+    def set_operator_brief_alert_state(
+        self,
+        db: Session,
+        user_id: int,
+        alert_key: str,
+        acknowledged: Optional[bool] = None,
+        dismissed: Optional[bool] = None,
+    ) -> Dict:
+        alert_key = str(alert_key or "").strip()
+        if not alert_key:
+            raise ValueError("alert_key is required")
+
+        state = (
+            db.query(OperatorBriefAlertState)
+            .filter(
+                OperatorBriefAlertState.user_id == user_id,
+                OperatorBriefAlertState.alert_key == alert_key,
+            )
+            .first()
+        )
+        now = datetime.now(timezone.utc)
+        if state is None:
+            state = OperatorBriefAlertState(
+                user_id=user_id,
+                alert_key=alert_key,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(state)
+
+        if acknowledged is not None:
+            state.acknowledged = 1 if acknowledged else 0
+            state.acknowledged_at = now if acknowledged else None
+        if dismissed is not None:
+            state.dismissed = 1 if dismissed else 0
+            state.dismissed_at = now if dismissed else None
+        state.updated_at = now
+        db.commit()
+        db.refresh(state)
+        return self._serialize_operator_brief_alert_state(state)
 
     def _fallback_signal(self, asset: str) -> Dict:
         asset_data = market_service.get_asset(asset)

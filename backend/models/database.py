@@ -30,6 +30,7 @@ class User(Base):
     billing_customer = relationship("BillingCustomer", back_populates="user", uselist=False)
     pilot_feedback = relationship("PilotFeedback", back_populates="user")
     pilot_candidates = relationship("PilotCandidate", back_populates="user")
+    operator_brief_alert_states = relationship("OperatorBriefAlertState", back_populates="user")
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -244,6 +245,20 @@ class BillingCustomer(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="billing_customer")
+
+
+class OperatorBriefAlertState(Base):
+    __tablename__ = "operator_brief_alert_states"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    alert_key = Column(String, nullable=False, index=True)
+    acknowledged = Column(Integer, nullable=False, default=0)
+    dismissed = Column(Integer, nullable=False, default=0)
+    acknowledged_at = Column(DateTime, nullable=True)
+    dismissed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="operator_brief_alert_states")
 
 def get_db():
     db = SessionLocal()

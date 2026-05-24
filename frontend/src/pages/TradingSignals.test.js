@@ -5,8 +5,6 @@ import TradingSignals from './TradingSignals';
 import { tradingService } from '../services/tradingService';
 import { marketService } from '../services/marketService';
 
-const operatorBriefAlertStateKey = 'quantumai_operator_brief_alert_state';
-
 jest.mock('../services/tradingService', () => ({
   tradingService: {
     getSignals: jest.fn(),
@@ -16,6 +14,8 @@ jest.mock('../services/tradingService', () => ({
     getOrders: jest.fn(),
     getExecutionMetrics: jest.fn(),
     getOperatorDailyBrief: jest.fn(),
+    acknowledgeOperatorBriefAlert: jest.fn(),
+    dismissOperatorBriefAlert: jest.fn(),
     getWatchlist: jest.fn(),
     getPriceAlerts: jest.fn(),
     getStartupHealth: jest.fn(),
@@ -51,7 +51,6 @@ const signal = {
 describe('TradingSignals', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    localStorage.clear();
     tradingService.getSignals.mockResolvedValue([signal]);
     tradingService.getWatchlist.mockResolvedValue([]);
     tradingService.getPriceAlerts.mockResolvedValue([]);
@@ -164,13 +163,32 @@ describe('TradingSignals', () => {
         },
         alerts: [
           {
+            alert_key: 'brief-24-risk-breach',
             severity: 'WARN',
             title: 'Risk Breaches Detected',
             message: '1 risk-related order blocks in the last 24h.',
             recommended_action: 'Review blocked orders, tighten position sizing, and confirm the current risk caps still match market volatility.',
+            acknowledged: false,
+            dismissed: false,
+            acknowledged_at: null,
+            dismissed_at: null,
           },
         ],
       };
+    });
+    tradingService.acknowledgeOperatorBriefAlert.mockResolvedValue({
+      alert_key: 'brief-24-risk-breach',
+      acknowledged: true,
+      dismissed: false,
+      acknowledged_at: '2026-05-24T12:15:00Z',
+      dismissed_at: null,
+    });
+    tradingService.dismissOperatorBriefAlert.mockResolvedValue({
+      alert_key: 'brief-24-risk-breach',
+      acknowledged: true,
+      dismissed: true,
+      acknowledged_at: '2026-05-24T12:15:00Z',
+      dismissed_at: '2026-05-24T12:16:00Z',
     });
     tradingService.getOrders.mockResolvedValue([]);
     tradingService.executeTrade.mockResolvedValue({
@@ -265,19 +283,21 @@ describe('TradingSignals', () => {
     expect(await screen.findByText('Risk Breaches Detected')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Acknowledge' }));
+
+    await waitFor(() => {
+      expect(tradingService.acknowledgeOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
+    });
     expect(screen.getByText('Acknowledged')).toBeInTheDocument();
 
-    const storedAfterAck = JSON.parse(localStorage.getItem(operatorBriefAlertStateKey) || '{}');
-    expect(Object.values(storedAfterAck).some((entry) => entry?.acknowledged === true)).toBe(true);
-
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    await waitFor(() => {
+      expect(tradingService.dismissOperatorBriefAlert).toHaveBeenCalledWith('brief-24-risk-breach');
+    });
 
     await waitFor(() => {
       expect(screen.queryByText('Risk Breaches Detected')).not.toBeInTheDocument();
       expect(screen.getByText('All brief alerts for this window have been dismissed.')).toBeInTheDocument();
     });
-
-    const storedAfterDismiss = JSON.parse(localStorage.getItem(operatorBriefAlertStateKey) || '{}');
-    expect(Object.values(storedAfterDismiss).some((entry) => entry?.dismissed === true)).toBe(true);
   });
 });

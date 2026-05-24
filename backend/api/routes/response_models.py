@@ -276,10 +276,23 @@ class OperatorDailyBriefRegimeDriftResponse(BaseModel):
 
 
 class OperatorDailyBriefAlertResponse(BaseModel):
+    alert_key: str
     severity: str
     title: str
     message: str
     recommended_action: Optional[str] = None
+    acknowledged: bool = False
+    dismissed: bool = False
+    acknowledged_at: Optional[str] = None
+    dismissed_at: Optional[str] = None
+
+
+class OperatorDailyBriefAlertStateResponse(BaseModel):
+    alert_key: str
+    acknowledged: bool
+    dismissed: bool
+    acknowledged_at: Optional[str] = None
+    dismissed_at: Optional[str] = None
 
 
 class OperatorDailyBriefTrendComparisonResponse(BaseModel):

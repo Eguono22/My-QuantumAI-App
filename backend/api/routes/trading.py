@@ -14,6 +14,7 @@ from api.routes.response_models import (
     OrderResponse,
     ExecutionMetricsResponse,
     OperatorDailyBriefResponse,
+    OperatorDailyBriefAlertStateResponse,
     NotificationDeliveryLogResponse,
     TelegramNotificationPreferenceResponse,
     TelegramNotificationDeliveryResponse,
@@ -52,6 +53,10 @@ class TelegramNotificationPreferenceRequest(BaseModel):
     telegram_chat_id: str | None = None
     telegram_alert_severities: List[str] = ["ERROR", "WARN"]
     telegram_cooldown_seconds: int = 900
+
+
+class OperatorBriefAlertStateRequest(BaseModel):
+    alert_key: str
 
 
 @router.get("/signals", response_model=List[SignalResponse])
@@ -219,6 +224,40 @@ def get_operator_daily_brief(
 ):
     try:
         return trading_service.get_operator_daily_brief(db, current_user.id, hours=hours)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/metrics/daily-brief/alerts/acknowledge", response_model=OperatorDailyBriefAlertStateResponse)
+def acknowledge_operator_daily_brief_alert(
+    request: OperatorBriefAlertStateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return trading_service.set_operator_brief_alert_state(
+            db,
+            current_user.id,
+            alert_key=request.alert_key,
+            acknowledged=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/metrics/daily-brief/alerts/dismiss", response_model=OperatorDailyBriefAlertStateResponse)
+def dismiss_operator_daily_brief_alert(
+    request: OperatorBriefAlertStateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return trading_service.set_operator_brief_alert_state(
+            db,
+            current_user.id,
+            alert_key=request.alert_key,
+            dismissed=True,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

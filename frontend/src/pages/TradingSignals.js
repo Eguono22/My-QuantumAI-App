@@ -6,8 +6,6 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
-const operatorBriefAlertStateKey = 'quantumai_operator_brief_alert_state';
-
 function summarizeOrderAudit(orders) {
   if (!orders.length) {
     return {
@@ -42,26 +40,6 @@ function summarizeOrderAudit(orders) {
 function sortedRegimes(regimeBreakdown) {
   return Object.entries(regimeBreakdown || {})
     .sort((a, b) => (b[1] || 0) - (a[1] || 0));
-}
-
-function buildOperatorBriefAlertKey(windowHours, alert) {
-  return [
-    'brief',
-    windowHours || 'unknown',
-    alert?.severity || 'info',
-    alert?.title || 'untitled',
-    alert?.message || '',
-  ].join('::');
-}
-
-function loadOperatorBriefAlertState() {
-  try {
-    const raw = localStorage.getItem(operatorBriefAlertStateKey);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
 }
 
 export default function TradingSignals({ preferences }) {
@@ -135,7 +113,6 @@ export default function TradingSignals({ preferences }) {
   const [executionMetrics, setExecutionMetrics] = useState(null);
   const [operatorBrief, setOperatorBrief] = useState(null);
   const [operatorBriefHours, setOperatorBriefHours] = useState(24);
-  const [operatorBriefAlertState, setOperatorBriefAlertState] = useState(() => loadOperatorBriefAlertState());
   const [liveReview, setLiveReview] = useState({
     manualConfirmation: false,
     confirmationText: '',
@@ -214,14 +191,6 @@ export default function TradingSignals({ preferences }) {
     return () => clearInterval(timer);
   }, [autoRefresh, fetchSignals]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(operatorBriefAlertStateKey, JSON.stringify(operatorBriefAlertState));
-    } catch (_error) {
-      // Ignore storage failures and keep alerts functional for this session.
-    }
-  }, [operatorBriefAlertState]);
-
   const isLiveMode = startupHealth?.trading?.trading_mode === 'live';
   const liveTradingStatus = startupHealth?.live_trading;
   const liveConfirmationPhrase = liveTradingStatus?.live_manual_confirmation_text || 'LIVE';
@@ -230,41 +199,41 @@ export default function TradingSignals({ preferences }) {
   const execution30d = executionMetrics?.windows?.rolling_30d || {};
   const trendComparison = operatorBrief?.trend_comparison || null;
   const operatorBriefAlerts = useMemo(() => {
-    if (!operatorBrief?.alerts?.length) {
-      return [];
-    }
+    return (operatorBrief?.alerts || []).filter((item) => item.dismissed !== true);
+  }, [operatorBrief]);
 
-    return operatorBrief.alerts
-      .map((item, index) => {
-        const key = buildOperatorBriefAlertKey(operatorBrief.window_hours, item);
+  const acknowledgeOperatorBriefAlert = useCallback(async (alertKey) => {
+    try {
+      const nextState = await tradingService.acknowledgeOperatorBriefAlert(alertKey);
+      setOperatorBrief((prev) => {
+        if (!prev) return prev;
         return {
-          ...item,
-          key,
-          localState: operatorBriefAlertState[key] || null,
-          fallbackIndex: index,
+          ...prev,
+          alerts: (prev.alerts || []).map((item) => (
+            item.alert_key === alertKey ? { ...item, ...nextState } : item
+          )),
         };
-      })
-      .filter((item) => item.localState?.dismissed !== true);
-  }, [operatorBrief, operatorBriefAlertState]);
-
-  const acknowledgeOperatorBriefAlert = useCallback((alertKey) => {
-    setOperatorBriefAlertState((prev) => ({
-      ...prev,
-      [alertKey]: {
-        ...(prev[alertKey] || {}),
-        acknowledged: true,
-      },
-    }));
+      });
+    } catch (err) {
+      setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to acknowledge brief alert.' });
+    }
   }, []);
 
-  const dismissOperatorBriefAlert = useCallback((alertKey) => {
-    setOperatorBriefAlertState((prev) => ({
-      ...prev,
-      [alertKey]: {
-        ...(prev[alertKey] || {}),
-        dismissed: true,
-      },
-    }));
+  const dismissOperatorBriefAlert = useCallback(async (alertKey) => {
+    try {
+      const nextState = await tradingService.dismissOperatorBriefAlert(alertKey);
+      setOperatorBrief((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          alerts: (prev.alerts || []).map((item) => (
+            item.alert_key === alertKey ? { ...item, ...nextState } : item
+          )),
+        };
+      });
+    } catch (err) {
+      setAlert({ type: 'error', message: err?.response?.data?.detail || 'Failed to dismiss brief alert.' });
+    }
   }, []);
 
   const handleGenerate = async () => {
@@ -916,11 +885,11 @@ export default function TradingSignals({ preferences }) {
 
           <div className="space-y-2">
             {operatorBriefAlerts.map((item, index) => (
-              <div key={item.key || `brief-alert-${index}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+              <div key={item.alert_key || `brief-alert-${index}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">{item.severity}</p>
                 <div className="mt-1 flex items-start justify-between gap-3">
                   <p className="font-semibold text-zinc-900">{item.title}</p>
-                  {item.localState?.acknowledged && (
+                  {item.acknowledged && (
                     <span className="rounded bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-800">
                       Acknowledged
                     </span>
@@ -933,16 +902,16 @@ export default function TradingSignals({ preferences }) {
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {!item.localState?.acknowledged && (
+                  {!item.acknowledged && (
                     <button
-                      onClick={() => acknowledgeOperatorBriefAlert(item.key)}
+                      onClick={() => acknowledgeOperatorBriefAlert(item.alert_key)}
                       className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                     >
                       Acknowledge
                     </button>
                   )}
                   <button
-                    onClick={() => dismissOperatorBriefAlert(item.key)}
+                    onClick={() => dismissOperatorBriefAlert(item.alert_key)}
                     className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                   >
                     Dismiss

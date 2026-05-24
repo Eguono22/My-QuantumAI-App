@@ -698,6 +698,9 @@ class TestTradingService:
         assert brief["trend_comparison"]["fill_rate_delta_pct"] == pytest.approx(-33.33)
         assert brief["trend_comparison"]["avg_slippage_bps"] == pytest.approx(2.0)
         assert brief["trend_comparison"]["avg_slippage_delta_pct"] == pytest.approx(14.29)
+        assert all(alert.get("alert_key") for alert in brief["alerts"])
+        assert all(alert.get("acknowledged") is False for alert in brief["alerts"])
+        assert all(alert.get("dismissed") is False for alert in brief["alerts"])
         assert any(alert["title"] == "Risk Breaches Detected" for alert in brief["alerts"])
         assert any(alert["title"] == "Execution Quality Degraded" for alert in brief["alerts"])
         assert any(alert["title"] == "Slippage Worsening" for alert in brief["alerts"])
@@ -727,6 +730,41 @@ class TestTradingService:
 
         with pytest.raises(ValueError, match="between 1 and 168"):
             self.service.get_operator_daily_brief(db, user.id, hours=0)
+
+        db.close()
+
+    def test_operator_daily_brief_alert_state_persists(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(
+            username="briefstate",
+            email="briefstate@test.com",
+            hashed_password="hashed",
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+
+        state = self.service.set_operator_brief_alert_state(
+            db,
+            user.id,
+            alert_key="brief-24-sample",
+            acknowledged=True,
+            dismissed=True,
+        )
+        assert state["alert_key"] == "brief-24-sample"
+        assert state["acknowledged"] is True
+        assert state["dismissed"] is True
+        assert state["acknowledged_at"] is not None
+        assert state["dismissed_at"] is not None
 
         db.close()
 

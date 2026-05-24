@@ -95,6 +95,14 @@ export const tradingService = {
     const response = await api.get(`/trading/metrics/daily-brief?hours=${hours}`);
     return response.data;
   },
+  acknowledgeOperatorBriefAlert: async (alertKey) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/acknowledge', { alert_key: alertKey });
+    return response.data;
+  },
+  dismissOperatorBriefAlert: async (alertKey) => {
+    const response = await api.post('/trading/metrics/daily-brief/alerts/dismiss', { alert_key: alertKey });
+    return response.data;
+  },
   pollOrders: async () => {
     const response = await api.post('/trading/orders/poll', {});
     return response.data;
