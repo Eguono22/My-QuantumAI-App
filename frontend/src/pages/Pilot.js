@@ -175,6 +175,35 @@ function summarizeRecentOrderOutcomes(orders, limit = 3) {
   });
 }
 
+function getOutcomeConsistency(orders, limit = 7) {
+  const recent = orders.slice(0, limit);
+  const total = recent.length;
+
+  if (!total) {
+    return {
+      sampleSize: 0,
+      filled: 0,
+      pending: 0,
+      rejected: 0,
+      fillRate: 0,
+      rejectRate: 0,
+    };
+  }
+
+  const filled = recent.filter((order) => ['FILLED', 'PARTIAL_FILL'].includes(String(order.status || '').toUpperCase())).length;
+  const pending = recent.filter((order) => String(order.status || '').toUpperCase() === 'PENDING').length;
+  const rejected = recent.filter((order) => String(order.status || '').toUpperCase() === 'REJECTED').length;
+
+  return {
+    sampleSize: total,
+    filled,
+    pending,
+    rejected,
+    fillRate: (filled / total) * 100,
+    rejectRate: (rejected / total) * 100,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -329,6 +358,7 @@ function buildPilotReport({
     ? feedbackSummary.recent_frictions.map((item) => `- ${item}`).join('\n')
     : '- None logged yet';
   const recentOutcomes = summarizeRecentOrderOutcomes(orders);
+  const outcomeConsistency = getOutcomeConsistency(orders);
   const outcomesText = recentOutcomes.length
     ? recentOutcomes.map((item) => `- ${item.asset} ${item.action} ${item.status}: ${item.outcome}`).join('\n')
     : '- None yet';
@@ -360,6 +390,8 @@ function buildPilotReport({
     `Filled: ${orderStats.filled}`,
     `Pending: ${orderStats.pending}`,
     `Rejected: ${orderStats.rejected}`,
+    `Recent fill rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.fillRate.toFixed(0)}%`,
+    `Recent reject rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.rejectRate.toFixed(0)}%`,
     `Filled notional: ${orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
     'Recent outcomes:',
     outcomesText,
@@ -626,6 +658,7 @@ export default function Pilot() {
   const orderStats = useMemo(() => getOrderStats(orders), [orders]);
   const latestOrderOutcome = useMemo(() => summarizeLatestOrderOutcome(orders), [orders]);
   const recentOrderOutcomes = useMemo(() => summarizeRecentOrderOutcomes(orders), [orders]);
+  const outcomeConsistency = useMemo(() => getOutcomeConsistency(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
@@ -797,6 +830,26 @@ export default function Pilot() {
           <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Outcome note</p>
             <p className="mt-1">{latestOrderOutcome.outcome}{latestOrderOutcome.updatedAt ? ` | Updated ${formatDate(latestOrderOutcome.updatedAt)}` : ''}</p>
+          </div>
+        )}
+
+        {!!outcomeConsistency.sampleSize && (
+          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Outcome consistency (recent {outcomeConsistency.sampleSize})</p>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+                <p className="text-xs text-zinc-500">Fill rate</p>
+                <p className="font-semibold text-zinc-900">{outcomeConsistency.fillRate.toFixed(0)}%</p>
+              </div>
+              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+                <p className="text-xs text-zinc-500">Reject rate</p>
+                <p className="font-semibold text-zinc-900">{outcomeConsistency.rejectRate.toFixed(0)}%</p>
+              </div>
+              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+                <p className="text-xs text-zinc-500">Pending</p>
+                <p className="font-semibold text-zinc-900">{outcomeConsistency.pending}</p>
+              </div>
+            </div>
           </div>
         )}
 
