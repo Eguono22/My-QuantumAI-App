@@ -296,6 +296,30 @@ function getExecutionConfidenceScore(orders, limit = 7) {
   };
 }
 
+function getReleaseGateDecision(executionReliabilityBlocked, recommendation) {
+  if (executionReliabilityBlocked) {
+    return {
+      status: 'HOLD',
+      tone: 'red',
+      reason: 'Execution reliability is below threshold.',
+    };
+  }
+
+  if (recommendation?.tone === 'emerald') {
+    return {
+      status: 'READY',
+      tone: 'emerald',
+      reason: 'Trust, value, and execution checks support broader pilot rollout.',
+    };
+  }
+
+  return {
+    status: 'HOLD',
+    tone: 'amber',
+    reason: 'More pilot proof is needed before expanding to a larger cohort.',
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -442,6 +466,7 @@ function buildPilotReport({
   candidates,
   feedbackSummary,
   recommendation,
+  releaseGateDecision,
 }) {
   const segments = feedbackSummary?.top_segments?.length
     ? feedbackSummary.top_segments.map((item) => `${item.segment} (${item.count})`).join(', ')
@@ -496,6 +521,7 @@ function buildPilotReport({
     `${recommendation.label}: ${recommendation.title}`,
     recommendation.message,
     `Next action: ${recommendation.next_action}`,
+    `Release gate: ${releaseGateDecision.status} - ${releaseGateDecision.reason}`,
     '',
     '## Recent Frictions',
     frictions,
@@ -827,6 +853,7 @@ export default function Pilot() {
       next_action: 'Reduce rejects first: inspect routing, risk caps, and order timing before inviting more users.',
     }
     : baseRecommendation;
+  const releaseGateDecision = getReleaseGateDecision(executionReliabilityBlocked, recommendation);
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -843,6 +870,7 @@ export default function Pilot() {
     candidates,
     feedbackSummary,
     recommendation,
+    releaseGateDecision,
   });
 
   const copyPilotReport = async () => {
@@ -891,7 +919,10 @@ export default function Pilot() {
 
       {executionReliabilityBlocked && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
-          <p className="text-xs font-semibold uppercase tracking-wide">Execution Gate</p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs font-semibold uppercase tracking-wide">Execution Gate</p>
+            <Pill tone={releaseGateDecision.tone}>{releaseGateDecision.status}</Pill>
+          </div>
           <p className="mt-1">
             Reliability is below threshold ({executionConfidence.score}/100 confidence, {outcomeConsistency.rejectRate.toFixed(0)}% reject rate).
             Keep pilot scope tight until this stabilizes.
@@ -1030,9 +1061,13 @@ export default function Pilot() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl">
             <Pill tone={recommendation.tone || 'amber'}>{recommendation.label}</Pill>
+            <div className="mt-2">
+              <Pill tone={releaseGateDecision.tone}>Release Gate: {releaseGateDecision.status}</Pill>
+            </div>
             <h2 className="mt-3 text-xl font-display font-bold uppercase">{recommendation.title}</h2>
             <p className="mt-2 text-sm opacity-90">{recommendation.message}</p>
             <p className="mt-3 text-sm font-semibold">{recommendation.next_action}</p>
+            <p className="mt-2 text-xs opacity-80">{releaseGateDecision.reason}</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-sm">
             <div className="rounded-md bg-white/75 px-3 py-2">

@@ -117,6 +117,7 @@ describe('Pilot execution reliability gate', () => {
     });
 
     expect(screen.getByText('Execution reliability is the blocker')).toBeInTheDocument();
-    expect(screen.getByText(/Reliability is below threshold/i)).toBeInTheDocument();
+    expect(screen.getByText(/Keep pilot scope tight until this stabilizes/i)).toBeInTheDocument();
+    expect(screen.getByText('Release Gate: HOLD')).toBeInTheDocument();
   });
 });
