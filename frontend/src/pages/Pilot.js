@@ -253,6 +253,49 @@ function getOutcomeTrendSignal(orders, limit = 7) {
   };
 }
 
+function getExecutionConfidenceScore(orders, limit = 7) {
+  const consistency = getOutcomeConsistency(orders, limit);
+  const sampleSize = consistency.sampleSize;
+
+  if (!sampleSize) {
+    return {
+      sampleSize: 0,
+      score: 0,
+      label: 'No Confidence Signal Yet',
+      tone: 'zinc',
+    };
+  }
+
+  const rawScore = Math.round((consistency.fillRate * 0.7) + ((100 - consistency.rejectRate) * 0.3));
+  const samplePenalty = sampleSize < limit ? (limit - sampleSize) * 5 : 0;
+  const score = Math.max(0, Math.min(100, rawScore - samplePenalty));
+
+  if (score >= 75) {
+    return {
+      sampleSize,
+      score,
+      label: 'High Confidence',
+      tone: 'emerald',
+    };
+  }
+
+  if (score >= 50) {
+    return {
+      sampleSize,
+      score,
+      label: 'Moderate Confidence',
+      tone: 'amber',
+    };
+  }
+
+  return {
+    sampleSize,
+    score,
+    label: 'Low Confidence',
+    tone: 'red',
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -409,6 +452,7 @@ function buildPilotReport({
   const recentOutcomes = summarizeRecentOrderOutcomes(orders);
   const outcomeConsistency = getOutcomeConsistency(orders);
   const outcomeTrend = getOutcomeTrendSignal(orders);
+  const executionConfidence = getExecutionConfidenceScore(orders);
   const outcomesText = recentOutcomes.length
     ? recentOutcomes.map((item) => `- ${item.asset} ${item.action} ${item.status}: ${item.outcome}`).join('\n')
     : '- None yet';
@@ -443,6 +487,7 @@ function buildPilotReport({
     `Recent fill rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.fillRate.toFixed(0)}%`,
     `Recent reject rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.rejectRate.toFixed(0)}%`,
     `Execution trend (${outcomeTrend.sampleSize} orders): ${outcomeTrend.label}`,
+    `Execution confidence (${executionConfidence.sampleSize} orders): ${executionConfidence.score}/100 (${executionConfidence.label})`,
     `Filled notional: ${orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
     'Recent outcomes:',
     outcomesText,
@@ -711,6 +756,7 @@ export default function Pilot() {
   const recentOrderOutcomes = useMemo(() => summarizeRecentOrderOutcomes(orders), [orders]);
   const outcomeConsistency = useMemo(() => getOutcomeConsistency(orders), [orders]);
   const outcomeTrend = useMemo(() => getOutcomeTrendSignal(orders), [orders]);
+  const executionConfidence = useMemo(() => getExecutionConfidenceScore(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
@@ -832,10 +878,11 @@ export default function Pilot() {
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <MetricCard label="Pilot Day" value={currentDay ? `${currentDay}/${PILOT_LENGTH_DAYS}` : 'Not started'} hint={`Started ${formatDate(pilotStart)}`} tone={currentDay ? 'emerald' : 'amber'} />
         <MetricCard label="Trust Gates" value={formatPercent(gateProgress)} hint={`${gates.filter((gate) => gate.complete).length}/${gates.length} proof points ready`} tone={gateProgress >= 80 ? 'emerald' : 'amber'} />
         <MetricCard label="Paper Orders" value={orders.length} hint={`${orderStats.filled} filled, ${orderStats.pending} pending, ${orderStats.rejected} rejected`} tone={orders.length > 0 ? 'sky' : 'zinc'} />
+        <MetricCard label="Execution Confidence" value={`${executionConfidence.score}/100`} hint={executionConfidence.label} tone={executionConfidence.tone} />
         <MetricCard label="Beta Pipeline" value={candidates.length} hint={`${candidateStats.SCHEDULED} scheduled, ${candidateStats.COMPLETED} completed`} tone={candidates.length >= 10 ? 'emerald' : 'amber'} />
       </div>
 
@@ -902,6 +949,7 @@ export default function Pilot() {
                 <p className="font-semibold text-zinc-900">{outcomeConsistency.pending}</p>
               </div>
             </div>
+            <p className="mt-2 text-xs text-zinc-600">Execution confidence: <span className="font-semibold">{executionConfidence.score}/100</span> ({executionConfidence.label})</p>
           </div>
         )}
 
