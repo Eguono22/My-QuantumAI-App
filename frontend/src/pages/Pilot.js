@@ -204,6 +204,55 @@ function getOutcomeConsistency(orders, limit = 7) {
   };
 }
 
+function getOutcomeTrendSignal(orders, limit = 7) {
+  const recent = orders.slice(0, limit);
+  const sampleSize = recent.length;
+  const statuses = recent.map((order) => String(order.status || 'UNKNOWN').toUpperCase());
+
+  if (!sampleSize) {
+    return {
+      sampleSize: 0,
+      label: 'No Trend Yet',
+      tone: 'zinc',
+      message: 'Need more paper orders to judge execution reliability.',
+      sequence: [],
+    };
+  }
+
+  const filled = statuses.filter((status) => status === 'FILLED' || status === 'PARTIAL_FILL').length;
+  const rejected = statuses.filter((status) => status === 'REJECTED').length;
+  const fillRate = (filled / sampleSize) * 100;
+  const rejectRate = (rejected / sampleSize) * 100;
+
+  if (fillRate >= 70 && rejectRate <= 15) {
+    return {
+      sampleSize,
+      label: 'Stable Execution',
+      tone: 'emerald',
+      message: 'Recent paper orders are filling consistently with minimal rejection noise.',
+      sequence: statuses,
+    };
+  }
+
+  if (rejectRate >= 30) {
+    return {
+      sampleSize,
+      label: 'Risky Execution',
+      tone: 'red',
+      message: 'Recent rejection levels are elevated; investigate route, timing, or risk constraints.',
+      sequence: statuses,
+    };
+  }
+
+  return {
+    sampleSize,
+    label: 'Mixed Execution',
+    tone: 'amber',
+    message: 'Recent outcomes are uneven; continue proof collection before widening pilot scope.',
+    sequence: statuses,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -359,6 +408,7 @@ function buildPilotReport({
     : '- None logged yet';
   const recentOutcomes = summarizeRecentOrderOutcomes(orders);
   const outcomeConsistency = getOutcomeConsistency(orders);
+  const outcomeTrend = getOutcomeTrendSignal(orders);
   const outcomesText = recentOutcomes.length
     ? recentOutcomes.map((item) => `- ${item.asset} ${item.action} ${item.status}: ${item.outcome}`).join('\n')
     : '- None yet';
@@ -392,6 +442,7 @@ function buildPilotReport({
     `Rejected: ${orderStats.rejected}`,
     `Recent fill rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.fillRate.toFixed(0)}%`,
     `Recent reject rate (${outcomeConsistency.sampleSize} orders): ${outcomeConsistency.rejectRate.toFixed(0)}%`,
+    `Execution trend (${outcomeTrend.sampleSize} orders): ${outcomeTrend.label}`,
     `Filled notional: ${orderStats.totalFilledNotional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
     'Recent outcomes:',
     outcomesText,
@@ -659,6 +710,7 @@ export default function Pilot() {
   const latestOrderOutcome = useMemo(() => summarizeLatestOrderOutcome(orders), [orders]);
   const recentOrderOutcomes = useMemo(() => summarizeRecentOrderOutcomes(orders), [orders]);
   const outcomeConsistency = useMemo(() => getOutcomeConsistency(orders), [orders]);
+  const outcomeTrend = useMemo(() => getOutcomeTrendSignal(orders), [orders]);
   const feedbackStats = useMemo(() => getFeedbackStats(feedbackEntries), [feedbackEntries]);
   const candidateStats = useMemo(() => getCandidateStats(candidates), [candidates]);
   const feedbackCandidateOptions = candidates.filter((candidate) => candidate.status !== 'DECLINED');
@@ -850,6 +902,17 @@ export default function Pilot() {
                 <p className="font-semibold text-zinc-900">{outcomeConsistency.pending}</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {!!outcomeTrend.sampleSize && (
+          <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-800">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Execution trend signal</p>
+              <Pill tone={outcomeTrend.tone}>{outcomeTrend.label}</Pill>
+            </div>
+            <p className="mt-2 text-zinc-700">{outcomeTrend.message}</p>
+            <p className="mt-2 text-xs text-zinc-500">Recent sequence: {outcomeTrend.sequence.join(' -> ')}</p>
           </div>
         )}
 
