@@ -815,7 +815,18 @@ export default function Pilot() {
     },
   ];
   const gateProgress = Math.round((gates.filter((gate) => gate.complete).length / gates.length) * 100);
-  const recommendation = feedbackSummary?.recommendation || buildLocalSummary(feedbackEntries).recommendation;
+  const baseRecommendation = feedbackSummary?.recommendation || buildLocalSummary(feedbackEntries).recommendation;
+  const executionReliabilityBlocked = executionConfidence.sampleSize > 0
+    && (executionConfidence.score < 50 || outcomeConsistency.rejectRate >= 30);
+  const recommendation = executionReliabilityBlocked
+    ? {
+      label: 'Fix Execution Reliability',
+      tone: 'red',
+      title: 'Execution reliability is the blocker',
+      message: 'Recent paper outcomes are not stable enough to expand the pilot safely.',
+      next_action: 'Reduce rejects first: inspect routing, risk caps, and order timing before inviting more users.',
+    }
+    : baseRecommendation;
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -876,6 +887,16 @@ export default function Pilot() {
 
       {!!error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {executionReliabilityBlocked && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="text-xs font-semibold uppercase tracking-wide">Execution Gate</p>
+          <p className="mt-1">
+            Reliability is below threshold ({executionConfidence.score}/100 confidence, {outcomeConsistency.rejectRate.toFixed(0)}% reject rate).
+            Keep pilot scope tight until this stabilizes.
+          </p>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -1401,8 +1422,8 @@ export default function Pilot() {
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Trust Gates</h2>
             <p className="text-sm text-zinc-600">These gates define whether the product is ready for the next batch of beta users.</p>
           </div>
-          {gates.map((gate) => (
-            <PilotGate key={gate.key} {...gate} />
+          {gates.map(({ key, ...gateProps }) => (
+            <PilotGate key={key} {...gateProps} />
           ))}
         </div>
 
