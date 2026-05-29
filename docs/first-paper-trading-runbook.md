@@ -155,3 +155,47 @@ Look in this order:
 2. execute one tiny paper trade
 3. log the feedback in `/app/pilot`
 4. repeat with the next beta user
+
+## 10. Fast QA Smoke Checklist (2-5 Minutes)
+
+Use this for quick confidence before demos, beta sessions, or handoffs.
+
+### Automated checks
+
+```powershell
+# API + auth + signals + paper trade + orders + portfolio
+.\scripts\run_paper_trading_check.ps1
+
+# Backend regression
+.\.venv\Scripts\python.exe -m pytest tests/backend -q
+
+# Frontend regression (non-interactive)
+Set-Location frontend
+$env:CI='true'
+npm test -- --watchAll=false --runInBand --passWithNoTests
+Set-Location ..
+```
+
+### Manual UI checks
+
+1. Open `http://localhost:3000`
+2. Register or login
+3. Place one tiny paper trade (for example `AAPL` qty `1`)
+4. Confirm in Orders:
+	- order appears
+	- status moves to `FILLED` after `Poll Pending` if needed
+5. Confirm in Portfolio:
+	- holding appears
+	- total trades increments
+
+### Negative checks
+
+1. Submit an oversized trade and confirm it is blocked by risk limits.
+2. Submit quantity `0` and confirm validation error appears.
+3. Confirm no extra invalid order is created in Orders.
+
+### Auth guard check
+
+1. Logout.
+2. Try direct navigation to a protected route (for example `/app/orders`).
+3. Confirm redirect to `/login`.

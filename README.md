@@ -139,6 +139,7 @@ Optional smoke test for the combined launcher:
 ```powershell
 .\scripts\start_local_stack.ps1 -SmokeTest
 ```
+The default startup timeout for this launcher is 180 seconds.
 
 Paper-trading readiness check for Alpaca-backed paper execution:
 ```powershell
@@ -184,6 +185,8 @@ python -m pytest tests/backend/test_quantum_ai.py -v
 python -m pytest tests/backend/test_market.py -v
 python -m pytest tests/backend/test_trading.py -v
 ```
+
+Quick regression + UI validation checklist: see `docs/first-paper-trading-runbook.md` section **Fast QA Smoke Checklist (2-5 Minutes)**.
 
 ## 📁 Project Structure
 
@@ -367,6 +370,15 @@ Run this before going live:
 ```bash
 python scripts/prelaunch_check.py
 ```
+By default, the checker auto-detects a healthy local backend on `http://127.0.0.1:8000` or `http://127.0.0.1:8011`.
+To target a specific environment, set `PRELAUNCH_API_BASE` explicitly.
+
+Windows PowerShell example:
+```powershell
+$env:PRELAUNCH_API_BASE = "http://127.0.0.1:8011"
+python scripts/prelaunch_check.py
+```
+
 This validates:
 - health + startup diagnostics
 - register/login/me auth flow
