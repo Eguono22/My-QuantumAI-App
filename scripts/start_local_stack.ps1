@@ -1,7 +1,7 @@
 param(
     [int]$BackendPort = 8011,
     [int]$FrontendPort = 3000,
-    [int]$StartupTimeoutSeconds = 120,
+    [int]$StartupTimeoutSeconds = 180,
     [switch]$SmokeTest
 )
 

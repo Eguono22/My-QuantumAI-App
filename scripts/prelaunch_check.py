@@ -33,6 +33,40 @@ def choose_trade_defaults(expected_broker: str | None) -> tuple[str, str]:
     return "BTC", "0.001"
 
 
+def resolve_api_base(client: httpx.Client, include_probe: bool) -> str:
+    configured_base = (os.getenv("PRELAUNCH_API_BASE") or "").strip()
+    startup_suffix = "/health/startup?include_probe=true" if include_probe else "/health/startup"
+
+    if configured_base:
+        health = client.get(f"{configured_base}/health")
+        if health.status_code != 200:
+            fail(f"/health returned {health.status_code} (base={configured_base})")
+        startup = client.get(f"{configured_base}{startup_suffix}")
+        if startup.status_code != 200:
+            fail(f"/health/startup returned {startup.status_code} (base={configured_base})")
+        ok(f"/health (base={configured_base})")
+        ok(f"/health/startup (base={configured_base})")
+        return configured_base
+
+    candidate_bases = ["http://127.0.0.1:8000", "http://127.0.0.1:8011"]
+    for candidate in candidate_bases:
+        try:
+            health = client.get(f"{candidate}/health")
+            startup = client.get(f"{candidate}{startup_suffix}")
+        except httpx.HTTPError:
+            continue
+        if health.status_code == 200 and startup.status_code == 200:
+            ok(f"/health (auto-detected base={candidate})")
+            ok(f"/health/startup (auto-detected base={candidate})")
+            return candidate
+
+    fail(
+        "Could not find a healthy API base. "
+        "Tried http://127.0.0.1:8000 and http://127.0.0.1:8011 for /health and /health/startup. "
+        "Set PRELAUNCH_API_BASE to your running backend URL and retry."
+    )
+
+
 def validate_startup_payload(
     startup_payload: dict,
     expected_broker: str | None,
@@ -99,7 +133,6 @@ def validate_startup_payload(
 
 
 def main() -> None:
-    base = os.getenv("PRELAUNCH_API_BASE", "http://127.0.0.1:8000")
     include_probe = env_flag("PRELAUNCH_INCLUDE_PROBE", default=False)
     expected_broker = (os.getenv("PRELAUNCH_EXPECT_BROKER_PROVIDER") or "").strip().lower() or None
     expected_market_data = (
@@ -113,18 +146,12 @@ def main() -> None:
     password = "PrelaunchPass123!"
 
     with httpx.Client(timeout=12.0) as client:
-        health = client.get(f"{base}/health")
-        if health.status_code != 200:
-            fail(f"/health returned {health.status_code}")
-        ok("/health")
+        base = resolve_api_base(client, include_probe=include_probe)
 
         startup_url = f"{base}/health/startup"
         if include_probe:
             startup_url = f"{startup_url}?include_probe=true"
         startup = client.get(startup_url)
-        if startup.status_code != 200:
-            fail(f"/health/startup returned {startup.status_code}")
-        ok("/health/startup")
         startup_payload = startup.json()
         validate_startup_payload(startup_payload, expected_broker, expected_market_data, include_probe)
 
