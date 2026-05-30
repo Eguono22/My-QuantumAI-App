@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { tradingService } from '../services/tradingService';
 
-const PILOT_LENGTH_DAYS = 14;
+const PILOT_LENGTH_DAYS = 15;
 const PILOT_START_KEY = 'quantumai_pilot_started_at';
 const PILOT_FEEDBACK_KEY = 'quantumai_pilot_feedback';
 
@@ -52,7 +52,7 @@ const weeklyPlan = [
     detail: 'Review orders, blocked decisions, fills, and portfolio movement daily. Look for confusion and repeat value.',
   },
   {
-    label: 'Days 11-14',
+    label: 'Days 11-15',
     title: 'Decide what to double down on',
     detail: 'Interview pilot users and convert the clearest trust gaps into the next product milestone.',
   },
@@ -492,6 +492,371 @@ function getDaySevenGate(currentDay, orders, recentOrderOutcomes, analytics, day
   };
 }
 
+function buildDayEightToFifteenCheckpoints({
+  currentDay,
+  orders,
+  outcomeConsistency,
+  outcomeTrend,
+  executionConfidence,
+  candidateStats,
+  feedbackSummary,
+  recommendation,
+  releaseGateDecision,
+}) {
+  const feedbackTotal = Number(feedbackSummary?.total_feedback || 0);
+  const avgTrust = Number(feedbackSummary?.avg_trust_score || 0);
+  const avgValue = Number(feedbackSummary?.avg_value_score || 0);
+  const yesRate = Number(feedbackSummary?.yes_rate_pct || 0);
+  const wouldPayYes = Number(feedbackSummary?.would_pay_yes || 0);
+  const recentFrictions = Array.isArray(feedbackSummary?.recent_frictions)
+    ? feedbackSummary.recent_frictions.length
+    : 0;
+  const completedCandidates = Number(candidateStats?.COMPLETED || 0);
+  const blockedReasons = getTopBlockedReasons(orders);
+
+  const day8Reached = currentDay >= 8 || orders.length >= 5;
+  const day8Pass = outcomeConsistency.sampleSize >= 5
+    && outcomeConsistency.fillRate >= 40
+    && executionConfidence.score >= 55;
+  const day8 = day8Pass
+    ? {
+      day: 8,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 8 behavior trend check passed',
+      message: 'Order evidence is broad enough to treat execution behavior as a trend, not a one-off.',
+      nextAction: 'Keep collecting outcomes and compare pattern shifts daily through Day 10.',
+      metrics: [
+        `Orders tracked: ${orders.length}`,
+        `Fill rate: ${outcomeConsistency.fillRate.toFixed(0)}%`,
+        `Confidence: ${executionConfidence.score}/100`,
+      ],
+    }
+    : day8Reached
+      ? {
+        day: 8,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 8 behavior trend check is on hold',
+        message: 'Execution behavior still lacks enough consistency for trend-based trust claims.',
+        nextAction: 'Increase tiny paper order coverage and reduce noisy rejects before claiming stability.',
+        metrics: [
+          `Orders tracked: ${orders.length}`,
+          `Fill rate: ${outcomeConsistency.fillRate.toFixed(0)}%`,
+          `Confidence: ${executionConfidence.score}/100`,
+        ],
+      }
+      : {
+        day: 8,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 8 behavior trend check not reached yet',
+        message: `Need ${Math.max(0, 5 - orders.length)} more recorded order${Math.max(0, 5 - orders.length) === 1 ? '' : 's'} to judge trend stability.`,
+        nextAction: 'Capture a broader sample of order outcomes before making trend claims.',
+        metrics: [
+          `Orders tracked: ${orders.length}`,
+          `Fill rate: ${outcomeConsistency.fillRate.toFixed(0)}%`,
+          `Confidence: ${executionConfidence.score}/100`,
+        ],
+      };
+
+  const day9Reached = currentDay >= 9 || orders.length >= 6;
+  const day9Pass = outcomeConsistency.sampleSize >= 6
+    && outcomeConsistency.rejectRate < 25
+    && blockedReasons.length <= 2;
+  const day9 = day9Pass
+    ? {
+      day: 9,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 9 rejection-control check passed',
+      message: 'Reject behavior is controlled enough to avoid undermining user confidence during sessions.',
+      nextAction: 'Preserve routing and risk settings while continuing to track reject causes.',
+      metrics: [
+        `Reject rate: ${outcomeConsistency.rejectRate.toFixed(0)}%`,
+        `Top reject reasons: ${blockedReasons.length ? blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ') : 'none'}`,
+      ],
+    }
+    : day9Reached
+      ? {
+        day: 9,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 9 rejection-control check is on hold',
+        message: 'Reject behavior remains too high or too noisy for reliable confidence-building sessions.',
+        nextAction: 'Prioritize reject diagnostics and remove the top recurring rejection reasons.',
+        metrics: [
+          `Reject rate: ${outcomeConsistency.rejectRate.toFixed(0)}%`,
+          `Top reject reasons: ${blockedReasons.length ? blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ') : 'none'}`,
+        ],
+      }
+      : {
+        day: 9,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 9 rejection-control check not reached yet',
+        message: 'Need a larger order sample before rejection quality can be judged fairly.',
+        nextAction: 'Continue logging outcomes so rejection patterns are statistically meaningful.',
+        metrics: [
+          `Reject rate: ${outcomeConsistency.rejectRate.toFixed(0)}%`,
+          `Top reject reasons: ${blockedReasons.length ? blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ') : 'none'}`,
+        ],
+      };
+
+  const day10Reached = currentDay >= 10 || orders.length >= 7;
+  const day10Pass = day8Pass
+    && day9Pass
+    && outcomeTrend.label !== 'Risky Execution'
+    && executionConfidence.score >= 60;
+  const day10 = day10Pass
+    ? {
+      day: 10,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 10 execution-stability check passed',
+      message: 'Execution behavior is stable enough to support confidence-focused validation calls.',
+      nextAction: 'Use the stable evidence baseline to focus on trust and value conversations.',
+      metrics: [
+        `Trend: ${outcomeTrend.label}`,
+        `Confidence: ${executionConfidence.score}/100`,
+      ],
+    }
+    : day10Reached
+      ? {
+        day: 10,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 10 execution-stability check is on hold',
+        message: 'Execution behavior still shows instability that can distort trust outcomes in later sessions.',
+        nextAction: 'Do not widen pilot scope until trend and confidence remain stable across recent outcomes.',
+        metrics: [
+          `Trend: ${outcomeTrend.label}`,
+          `Confidence: ${executionConfidence.score}/100`,
+        ],
+      }
+      : {
+        day: 10,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 10 execution-stability check not reached yet',
+        message: 'Need more recent outcomes before concluding execution stability.',
+        nextAction: 'Continue collecting daily order evidence and tracking trend movement.',
+        metrics: [
+          `Trend: ${outcomeTrend.label}`,
+          `Confidence: ${executionConfidence.score}/100`,
+        ],
+      };
+
+  const day11Reached = currentDay >= 11 || completedCandidates >= 3;
+  const day11Pass = completedCandidates >= 3 && feedbackTotal >= 6;
+  const day11 = day11Pass
+    ? {
+      day: 11,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 11 validation-coverage check passed',
+      message: 'There is enough completed participant coverage to trust direction signals from interviews.',
+      nextAction: 'Keep the same interview script and maintain comparability across participants.',
+      metrics: [
+        `Completed candidates: ${completedCandidates}`,
+        `Feedback entries: ${feedbackTotal}`,
+      ],
+    }
+    : day11Reached
+      ? {
+        day: 11,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 11 validation-coverage check is on hold',
+        message: 'Participant coverage is still too thin for reliable product-direction decisions.',
+        nextAction: 'Prioritize scheduling and completion before interpreting trust/value shifts as strong signals.',
+        metrics: [
+          `Completed candidates: ${completedCandidates}`,
+          `Feedback entries: ${feedbackTotal}`,
+        ],
+      }
+      : {
+        day: 11,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 11 validation-coverage check not reached yet',
+        message: 'Need more completed users and feedback entries before broad conclusions are valid.',
+        nextAction: 'Move invited users to scheduled/completed and log each session outcome.',
+        metrics: [
+          `Completed candidates: ${completedCandidates}`,
+          `Feedback entries: ${feedbackTotal}`,
+        ],
+      };
+
+  const day12Reached = currentDay >= 12 || feedbackTotal >= 7;
+  const day12Pass = feedbackTotal >= 7 && avgValue >= 4;
+  const day12 = day12Pass
+    ? {
+      day: 12,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 12 value-proof check passed',
+      message: 'Participants are consistently reporting that the workflow creates tangible day-to-day value.',
+      nextAction: 'Capture the top value moments and preserve them as the default user path.',
+      metrics: [
+        `Average value: ${avgValue.toFixed(1)} / 5`,
+        `Feedback entries: ${feedbackTotal}`,
+      ],
+    }
+    : day12Reached
+      ? {
+        day: 12,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 12 value-proof check is on hold',
+        message: 'Value signals are still too weak to support expansion decisions confidently.',
+        nextAction: 'Tighten the workflow around faster review and clearer user wins per session.',
+        metrics: [
+          `Average value: ${avgValue.toFixed(1)} / 5`,
+          `Feedback entries: ${feedbackTotal}`,
+        ],
+      }
+      : {
+        day: 12,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 12 value-proof check not reached yet',
+        message: 'Need a deeper feedback sample before value confidence can be judged.',
+        nextAction: 'Keep collecting value feedback after each completed session.',
+        metrics: [
+          `Average value: ${avgValue.toFixed(1)} / 5`,
+          `Feedback entries: ${feedbackTotal}`,
+        ],
+      };
+
+  const day13Reached = currentDay >= 13 || feedbackTotal >= 8;
+  const day13Pass = feedbackTotal >= 8 && avgTrust >= 4 && recentFrictions <= feedbackTotal;
+  const day13 = day13Pass
+    ? {
+      day: 13,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 13 trust-proof check passed',
+      message: 'Trust evidence is strong enough to support a controlled expansion recommendation.',
+      nextAction: 'Finalize trust messaging and keep reliability guardrails unchanged.',
+      metrics: [
+        `Average trust: ${avgTrust.toFixed(1)} / 5`,
+        `Recent frictions: ${recentFrictions}`,
+      ],
+    }
+    : day13Reached
+      ? {
+        day: 13,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 13 trust-proof check is on hold',
+        message: 'Trust confidence is still below threshold for a safe pilot expansion decision.',
+        nextAction: 'Address top trust frictions before widening the pilot audience.',
+        metrics: [
+          `Average trust: ${avgTrust.toFixed(1)} / 5`,
+          `Recent frictions: ${recentFrictions}`,
+        ],
+      }
+      : {
+        day: 13,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 13 trust-proof check not reached yet',
+        message: 'Need additional trust feedback before final confidence can be judged.',
+        nextAction: 'Run more trust-focused sessions and log friction precisely.',
+        metrics: [
+          `Average trust: ${avgTrust.toFixed(1)} / 5`,
+          `Recent frictions: ${recentFrictions}`,
+        ],
+      };
+
+  const day14Reached = currentDay >= 14 || feedbackTotal >= 8;
+  const day14Pass = feedbackTotal >= 8 && (wouldPayYes >= 3 || yesRate >= 40);
+  const day14 = day14Pass
+    ? {
+      day: 14,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 14 pricing-signal check passed',
+      message: 'Willingness-to-pay evidence is strong enough to treat monetization as plausible.',
+      nextAction: 'Keep pricing simple and validate with the same trust-first framing.',
+      metrics: [
+        `Would pay yes: ${wouldPayYes}`,
+        `Yes-rate: ${yesRate.toFixed(0)}%`,
+      ],
+    }
+    : day14Reached
+      ? {
+        day: 14,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 14 pricing-signal check is on hold',
+        message: 'Willingness-to-pay evidence is still too weak for confident pricing direction.',
+        nextAction: 'Clarify paid outcomes and rerun pricing questions after trust/value refinements.',
+        metrics: [
+          `Would pay yes: ${wouldPayYes}`,
+          `Yes-rate: ${yesRate.toFixed(0)}%`,
+        ],
+      }
+      : {
+        day: 14,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 14 pricing-signal check not reached yet',
+        message: 'Need more interview data before pricing intent can be read confidently.',
+        nextAction: 'Keep collecting willingness-to-pay responses from each completed session.',
+        metrics: [
+          `Would pay yes: ${wouldPayYes}`,
+          `Yes-rate: ${yesRate.toFixed(0)}%`,
+        ],
+      };
+
+  const previousDays = [day8, day9, day10, day11, day12, day13, day14];
+  const allPreviousPassed = previousDays.every((item) => item.status === 'PASS');
+  const day15Reached = currentDay >= 15 || allPreviousPassed;
+  const day15Pass = allPreviousPassed && releaseGateDecision.status === 'READY' && recommendation?.tone === 'emerald';
+  const day15 = day15Pass
+    ? {
+      day: 15,
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 15 release-readiness check passed',
+      message: 'Pilot evidence across execution, trust, value, and pricing supports controlled expansion.',
+      nextAction: 'Expand to the next cohort while preserving existing safety and reliability controls.',
+      metrics: [
+        `Release gate: ${releaseGateDecision.status}`,
+        `Recommendation: ${recommendation?.label || 'N/A'}`,
+      ],
+    }
+    : day15Reached
+      ? {
+        day: 15,
+        status: 'HOLD',
+        tone: 'red',
+        title: 'Day 15 release-readiness check is on hold',
+        message: 'One or more pilot checkpoints are still below threshold for expansion.',
+        nextAction: 'Resolve remaining hold checkpoints before opening the next beta cohort.',
+        metrics: [
+          `Release gate: ${releaseGateDecision.status}`,
+          `Recommendation: ${recommendation?.label || 'N/A'}`,
+        ],
+      }
+      : {
+        day: 15,
+        status: 'IN PROGRESS',
+        tone: 'amber',
+        title: 'Day 15 release-readiness check not reached yet',
+        message: 'Complete Days 8-14 checkpoints before making the final release call.',
+        nextAction: 'Continue the pilot script and keep collecting evidence daily.',
+        metrics: [
+          `Release gate: ${releaseGateDecision.status}`,
+          `Recommendation: ${recommendation?.label || 'N/A'}`,
+        ],
+      };
+
+  return [...previousDays, day15];
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -635,6 +1000,7 @@ function buildPilotReport({
   dayFiveGate,
   daySixGate,
   daySevenGate,
+  dayEightToFifteen,
   orderStats,
   orders,
   candidateStats,
@@ -658,7 +1024,7 @@ function buildPilotReport({
     : '- None yet';
 
   return [
-    '# QuantumAI 14-Day Trust Pilot Report',
+    '# QuantumAI 15-Day Trust Pilot Report',
     '',
     `Generated: ${new Date().toLocaleString()}`,
     `Pilot day: ${currentDay || 'Not started'} / ${PILOT_LENGTH_DAYS}`,
@@ -728,6 +1094,14 @@ function buildPilotReport({
     daySevenGate.message,
     `Next action: ${daySevenGate.nextAction}`,
     '',
+    ...dayEightToFifteen.flatMap((checkpoint) => [
+      `## Day ${checkpoint.day} Checkpoint`,
+      `Status: ${checkpoint.status}`,
+      checkpoint.message,
+      `Next action: ${checkpoint.nextAction}`,
+      ...checkpoint.metrics,
+      '',
+    ]),
     '## Recent Frictions',
     frictions,
   ].join('\n');
@@ -1062,6 +1436,17 @@ export default function Pilot() {
   const dayFiveGate = getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, currentDay);
   const daySixGate = getDaySixGate(currentDay, orders, outcomeConsistency, executionConfidence);
   const daySevenGate = getDaySevenGate(currentDay, orders, recentOrderOutcomes, analytics, daySixGate);
+  const dayEightToFifteen = buildDayEightToFifteenCheckpoints({
+    currentDay,
+    orders,
+    outcomeConsistency,
+    outcomeTrend,
+    executionConfidence,
+    candidateStats,
+    feedbackSummary,
+    recommendation,
+    releaseGateDecision,
+  });
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -1075,6 +1460,7 @@ export default function Pilot() {
     dayFiveGate,
     daySixGate,
     daySevenGate,
+    dayEightToFifteen,
     orderStats,
     orders,
     candidateStats,
@@ -1102,7 +1488,7 @@ export default function Pilot() {
         <div className="relative px-6 py-8 md:px-10 md:py-10">
           <p className="text-emerald-100 text-xs tracking-[0.18em] uppercase">Private Beta Milestone</p>
           <h1 className="mt-2 text-3xl md:text-4xl font-display font-bold text-white uppercase">
-            14-Day Trust Pilot
+            15-Day Trust Pilot
           </h1>
           <p className="mt-3 max-w-3xl text-sm md:text-base text-emerald-50">
             Prove one complete paper-trading loop: connect, review AI rationale, enforce risk, execute tiny paper trades, and learn whether traders come back.
@@ -1391,6 +1777,23 @@ export default function Pilot() {
           </div>
         </div>
       </div>
+
+      {dayEightToFifteen.map((checkpoint) => (
+        <div
+          key={`day-${checkpoint.day}`}
+          className={`rounded-md border px-5 py-4 ${checkpoint.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : checkpoint.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}
+        >
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-3xl">
+              <Pill tone={checkpoint.tone}>{`Day ${checkpoint.day} ${checkpoint.status}`}</Pill>
+              <h2 className="mt-3 text-xl font-display font-bold uppercase">{checkpoint.title}</h2>
+              <p className="mt-2 text-sm opacity-90">{checkpoint.message}</p>
+              <p className="mt-3 text-sm font-semibold">{checkpoint.nextAction}</p>
+              <p className="mt-2 text-xs opacity-80">{checkpoint.metrics.join(' | ')}</p>
+            </div>
+          </div>
+        </div>
+      ))}
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
         <div className="market-panel rounded-md p-4">
@@ -1822,7 +2225,7 @@ export default function Pilot() {
       <div className="market-panel rounded-md p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">14-Day Operating Plan</h2>
+            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">15-Day Operating Plan</h2>
             <p className="text-sm text-zinc-600">Do these in order. Resist broad feature work until the pilot answers the trust questions.</p>
           </div>
           <Pill tone="sky">Pilot script</Pill>

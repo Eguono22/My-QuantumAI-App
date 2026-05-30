@@ -20,6 +20,7 @@ jest.mock('../services/tradingService', () => ({
 describe('Pilot execution reliability gate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
 
     tradingService.getStartupHealth.mockResolvedValue({
       status: 'ok',
@@ -119,5 +120,50 @@ describe('Pilot execution reliability gate', () => {
     expect(screen.getByText('Execution reliability is the blocker')).toBeInTheDocument();
     expect(screen.getByText(/Keep pilot scope tight until this stabilizes/i)).toBeInTheDocument();
     expect(screen.getByText('Release Gate: HOLD')).toBeInTheDocument();
+  });
+
+  it('renders day 8 to day 15 checkpoint cards', async () => {
+    window.localStorage.setItem('quantumai_pilot_started_at', '2026-01-01T00:00:00.000Z');
+
+    render(
+      <MemoryRouter>
+        <Pilot />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Day 8 behavior trend check is on hold')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Day 8 behavior trend check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 9 rejection-control check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 10 execution-stability check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 11 validation-coverage check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 12 value-proof check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 13 trust-proof check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 14 pricing-signal check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 15 release-readiness check is on hold')).toBeInTheDocument();
+  });
+
+  it('includes day 8 to day 15 checkpoints in the pilot report output', async () => {
+    window.localStorage.setItem('quantumai_pilot_started_at', '2026-01-01T00:00:00.000Z');
+
+    render(
+      <MemoryRouter>
+        <Pilot />
+      </MemoryRouter>
+    );
+
+    const reportBox = await screen.findByDisplayValue(/# QuantumAI 15-Day Trust Pilot Report/i);
+    const reportText = reportBox.value;
+
+    expect(reportText).toContain('## Day 8 Checkpoint');
+    expect(reportText).toContain('## Day 9 Checkpoint');
+    expect(reportText).toContain('## Day 10 Checkpoint');
+    expect(reportText).toContain('## Day 11 Checkpoint');
+    expect(reportText).toContain('## Day 12 Checkpoint');
+    expect(reportText).toContain('## Day 13 Checkpoint');
+    expect(reportText).toContain('## Day 14 Checkpoint');
+    expect(reportText).toContain('## Day 15 Checkpoint');
   });
 });
