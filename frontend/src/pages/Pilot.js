@@ -376,6 +376,70 @@ function getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, cu
   };
 }
 
+function getTopBlockedReasons(orders, limit = 3) {
+  const counts = orders
+    .filter((order) => String(order.status || '').toUpperCase() === 'REJECTED')
+    .map((order) => (order.reason || 'Unspecified rejection').trim())
+    .reduce((acc, reason) => ({ ...acc, [reason]: (acc[reason] || 0) + 1 }), {});
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([reason, count]) => ({ reason, count }));
+}
+
+function getDaySixGate(currentDay, orders, outcomeConsistency, executionConfidence) {
+  const reachedByTime = currentDay >= 6;
+  const reachedByEvidence = orders.length >= 3;
+  const reached = reachedByTime || reachedByEvidence;
+  const blockedReasons = getTopBlockedReasons(orders);
+  const hasOutcomeMix = outcomeConsistency.filled > 0 || outcomeConsistency.rejected > 0;
+  const pass = orders.length >= 3 && hasOutcomeMix && executionConfidence.score >= 50;
+
+  if (!reached) {
+    return {
+      status: 'IN PROGRESS',
+      tone: 'amber',
+      title: 'Day 6 execution evidence not reached yet',
+      message: `Need ${Math.max(0, 3 - orders.length)} more recorded order${Math.max(0, 3 - orders.length) === 1 ? '' : 's'} before Day 6 behavior tracking is meaningful.`,
+      nextAction: 'Run tiny paper trades and log outcomes so fill/reject behavior is visible.',
+      ordersTracked: orders.length,
+      fillRate: outcomeConsistency.fillRate,
+      rejectRate: outcomeConsistency.rejectRate,
+      confidence: executionConfidence.score,
+      blockedReasons,
+    };
+  }
+
+  if (pass) {
+    return {
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 6 execution evidence is healthy',
+      message: 'Order behavior has enough evidence to support daily pilot review decisions.',
+      nextAction: 'Keep tracking fills, rejects, and portfolio movement daily through Day 10.',
+      ordersTracked: orders.length,
+      fillRate: outcomeConsistency.fillRate,
+      rejectRate: outcomeConsistency.rejectRate,
+      confidence: executionConfidence.score,
+      blockedReasons,
+    };
+  }
+
+  return {
+    status: 'HOLD',
+    tone: 'red',
+    title: 'Day 6 execution evidence is unstable',
+    message: 'Recent paper-order outcomes are not consistent enough to treat as reliable behavior proof.',
+    nextAction: 'Diagnose rejection patterns and order timing before expanding pilot activity.',
+    ordersTracked: orders.length,
+    fillRate: outcomeConsistency.fillRate,
+    rejectRate: outcomeConsistency.rejectRate,
+    confidence: executionConfidence.score,
+    blockedReasons,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -517,6 +581,7 @@ function buildPilotReport({
   currentDay,
   gateProgress,
   dayFiveGate,
+  daySixGate,
   orderStats,
   orders,
   candidateStats,
@@ -588,6 +653,18 @@ function buildPilotReport({
     `Yes-rate: ${dayFiveGate.yesRate.toFixed(0)}%`,
     dayFiveGate.message,
     `Next action: ${dayFiveGate.nextAction}`,
+    '',
+    '## Day 6 Execution Evidence',
+    `Status: ${daySixGate.status}`,
+    `Orders tracked: ${daySixGate.ordersTracked}`,
+    `Fill rate: ${daySixGate.fillRate.toFixed(0)}%`,
+    `Reject rate: ${daySixGate.rejectRate.toFixed(0)}%`,
+    `Execution confidence: ${daySixGate.confidence}/100`,
+    daySixGate.message,
+    `Next action: ${daySixGate.nextAction}`,
+    daySixGate.blockedReasons.length
+      ? `Top blocked reasons: ${daySixGate.blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ')}`
+      : 'Top blocked reasons: none',
     '',
     '## Recent Frictions',
     frictions,
@@ -921,6 +998,7 @@ export default function Pilot() {
     : baseRecommendation;
   const releaseGateDecision = getReleaseGateDecision(executionReliabilityBlocked, recommendation);
   const dayFiveGate = getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, currentDay);
+  const daySixGate = getDaySixGate(currentDay, orders, outcomeConsistency, executionConfidence);
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -932,6 +1010,7 @@ export default function Pilot() {
     currentDay,
     gateProgress,
     dayFiveGate,
+    daySixGate,
     orderStats,
     orders,
     candidateStats,
@@ -1178,6 +1257,40 @@ export default function Pilot() {
             <div className="rounded-md bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
               <p className="mt-1 font-display font-bold">{dayFiveGate.yesRate.toFixed(0)}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`rounded-md border px-5 py-4 ${daySixGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySixGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="max-w-3xl">
+            <Pill tone={daySixGate.tone}>{`Day 6 ${daySixGate.status}`}</Pill>
+            <h2 className="mt-3 text-xl font-display font-bold uppercase">{daySixGate.title}</h2>
+            <p className="mt-2 text-sm opacity-90">{daySixGate.message}</p>
+            <p className="mt-3 text-sm font-semibold">{daySixGate.nextAction}</p>
+            <p className="mt-2 text-xs opacity-80">
+              {daySixGate.blockedReasons.length
+                ? `Top blocked reasons: ${daySixGate.blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ')}`
+                : 'Top blocked reasons: none'}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Orders</p>
+              <p className="mt-1 font-display font-bold">{daySixGate.ordersTracked}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Fill Rate</p>
+              <p className="mt-1 font-display font-bold">{daySixGate.fillRate.toFixed(0)}%</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Reject Rate</p>
+              <p className="mt-1 font-display font-bold">{daySixGate.rejectRate.toFixed(0)}%</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Confidence</p>
+              <p className="mt-1 font-display font-bold">{daySixGate.confidence}</p>
             </div>
           </div>
         </div>
