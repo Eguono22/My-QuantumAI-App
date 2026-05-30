@@ -320,6 +320,62 @@ function getReleaseGateDecision(executionReliabilityBlocked, recommendation) {
   };
 }
 
+function getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, currentDay) {
+  const totalFeedback = Number(feedbackSummary?.total_feedback || 0);
+  const avgTrust = Number(feedbackSummary?.avg_trust_score || 0);
+  const avgValue = Number(feedbackSummary?.avg_value_score || 0);
+  const yesRate = Number(feedbackSummary?.yes_rate_pct || 0);
+
+  const reachedByFeedback = totalFeedback >= 5;
+  const reachedByTime = currentDay >= 5;
+  const reached = reachedByFeedback || reachedByTime;
+  const pass = reachedByFeedback
+    && avgTrust >= 4
+    && avgValue >= 4
+    && yesRate >= 40
+    && releaseGateDecision.status === 'READY';
+
+  if (!reached) {
+    return {
+      status: 'IN PROGRESS',
+      tone: 'amber',
+      title: 'Day 5 trust gate not reached yet',
+      message: `Need ${Math.max(0, 5 - totalFeedback)} more feedback entr${Math.max(0, 5 - totalFeedback) === 1 ? 'y' : 'ies'} before making the Day 5 decision.`,
+      nextAction: 'Keep scheduling pilot sessions and log one feedback entry after each call.',
+      totalFeedback,
+      avgTrust,
+      avgValue,
+      yesRate,
+    };
+  }
+
+  if (pass) {
+    return {
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 5 trust gate passed',
+      message: 'Trust, value, willingness to pay, and execution reliability are strong enough for controlled expansion.',
+      nextAction: 'Expand to the next qualified paper-only beta cohort while keeping safety controls unchanged.',
+      totalFeedback,
+      avgTrust,
+      avgValue,
+      yesRate,
+    };
+  }
+
+  return {
+    status: 'HOLD',
+    tone: recommendation?.tone || 'red',
+    title: 'Day 5 trust gate is on hold',
+    message: recommendation?.message || 'Pilot proof is still below the release threshold.',
+    nextAction: recommendation?.next_action || 'Collect more trust evidence before expanding.',
+    totalFeedback,
+    avgTrust,
+    avgValue,
+    yesRate,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -460,6 +516,7 @@ function buildLocalSummary(entries) {
 function buildPilotReport({
   currentDay,
   gateProgress,
+  dayFiveGate,
   orderStats,
   orders,
   candidateStats,
@@ -522,6 +579,15 @@ function buildPilotReport({
     recommendation.message,
     `Next action: ${recommendation.next_action}`,
     `Release gate: ${releaseGateDecision.status} - ${releaseGateDecision.reason}`,
+    '',
+    '## Day 5 Trust Gate',
+    `Status: ${dayFiveGate.status}`,
+    `Feedback total: ${dayFiveGate.totalFeedback} / 5`,
+    `Average trust: ${dayFiveGate.avgTrust.toFixed(1)} / 5`,
+    `Average value: ${dayFiveGate.avgValue.toFixed(1)} / 5`,
+    `Yes-rate: ${dayFiveGate.yesRate.toFixed(0)}%`,
+    dayFiveGate.message,
+    `Next action: ${dayFiveGate.nextAction}`,
     '',
     '## Recent Frictions',
     frictions,
@@ -854,6 +920,7 @@ export default function Pilot() {
     }
     : baseRecommendation;
   const releaseGateDecision = getReleaseGateDecision(executionReliabilityBlocked, recommendation);
+  const dayFiveGate = getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, currentDay);
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -864,6 +931,7 @@ export default function Pilot() {
   const pilotReport = buildPilotReport({
     currentDay,
     gateProgress,
+    dayFiveGate,
     orderStats,
     orders,
     candidateStats,
@@ -1081,6 +1149,35 @@ export default function Pilot() {
             <div className="rounded-md bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
               <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.yes_rate_pct || 0).toFixed(0)}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`rounded-md border px-5 py-4 ${dayFiveGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : dayFiveGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="max-w-3xl">
+            <Pill tone={dayFiveGate.tone}>{`Day 5 ${dayFiveGate.status}`}</Pill>
+            <h2 className="mt-3 text-xl font-display font-bold uppercase">{dayFiveGate.title}</h2>
+            <p className="mt-2 text-sm opacity-90">{dayFiveGate.message}</p>
+            <p className="mt-3 text-sm font-semibold">{dayFiveGate.nextAction}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Feedback</p>
+              <p className="mt-1 font-display font-bold">{dayFiveGate.totalFeedback}/5</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Trust</p>
+              <p className="mt-1 font-display font-bold">{dayFiveGate.avgTrust.toFixed(1)}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Value</p>
+              <p className="mt-1 font-display font-bold">{dayFiveGate.avgValue.toFixed(1)}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
+              <p className="mt-1 font-display font-bold">{dayFiveGate.yesRate.toFixed(0)}%</p>
             </div>
           </div>
         </div>
