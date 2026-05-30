@@ -440,6 +440,58 @@ function getDaySixGate(currentDay, orders, outcomeConsistency, executionConfiden
   };
 }
 
+function getDaySevenGate(currentDay, orders, recentOrderOutcomes, analytics, daySixGate) {
+  const reachedByTime = currentDay >= 7;
+  const reachedByEvidence = orders.length >= 3;
+  const reached = reachedByTime || reachedByEvidence;
+
+  const recentStatuses = recentOrderOutcomes.map((item) => item.status);
+  const hasFilledEvidence = recentStatuses.some((status) => status === 'FILLED' || status === 'PARTIAL_FILL');
+  const hasAccountabilityEvidence = recentStatuses.some((status) => status === 'REJECTED' || status === 'CANCELED')
+    || recentStatuses.some((status) => status === 'PENDING');
+  const decisionCount = Number(analytics?.decisions || 0);
+
+  if (!reached) {
+    return {
+      status: 'IN PROGRESS',
+      tone: 'amber',
+      title: 'Day 7 accountability gate not reached yet',
+      message: 'Need more order lifecycle evidence before Day 7 audit confidence is meaningful.',
+      nextAction: 'Keep recording tiny paper orders and review status transitions daily.',
+      decisionCount,
+      recentStatuses,
+      hasFilledEvidence,
+      hasAccountabilityEvidence,
+    };
+  }
+
+  if (daySixGate.status === 'PASS' && hasFilledEvidence && hasAccountabilityEvidence && decisionCount > 0) {
+    return {
+      status: 'PASS',
+      tone: 'emerald',
+      title: 'Day 7 accountability gate passed',
+      message: 'Execution outcomes and decision evidence are strong enough for confidence-focused user sessions.',
+      nextAction: 'Use Session 7 to validate willingness to pay with confidence and accountability proof visible.',
+      decisionCount,
+      recentStatuses,
+      hasFilledEvidence,
+      hasAccountabilityEvidence,
+    };
+  }
+
+  return {
+    status: 'HOLD',
+    tone: 'red',
+    title: 'Day 7 accountability gate is on hold',
+    message: 'Order lifecycle or decision evidence is still incomplete for confidence-focused validation.',
+    nextAction: 'Prioritize clear fill/reject traces and decision logging before Day 7 review calls.',
+    decisionCount,
+    recentStatuses,
+    hasFilledEvidence,
+    hasAccountabilityEvidence,
+  };
+}
+
 function loadStoredFeedback() {
   try {
     const raw = localStorage.getItem(PILOT_FEEDBACK_KEY);
@@ -582,6 +634,7 @@ function buildPilotReport({
   gateProgress,
   dayFiveGate,
   daySixGate,
+  daySevenGate,
   orderStats,
   orders,
   candidateStats,
@@ -665,6 +718,15 @@ function buildPilotReport({
     daySixGate.blockedReasons.length
       ? `Top blocked reasons: ${daySixGate.blockedReasons.map((item) => `${item.reason} (${item.count})`).join('; ')}`
       : 'Top blocked reasons: none',
+    '',
+    '## Day 7 Accountability Gate',
+    `Status: ${daySevenGate.status}`,
+    `Decision evidence count: ${daySevenGate.decisionCount}`,
+    `Has filled evidence: ${daySevenGate.hasFilledEvidence ? 'yes' : 'no'}`,
+    `Has accountability evidence: ${daySevenGate.hasAccountabilityEvidence ? 'yes' : 'no'}`,
+    `Recent statuses: ${daySevenGate.recentStatuses.length ? daySevenGate.recentStatuses.join(' -> ') : 'none'}`,
+    daySevenGate.message,
+    `Next action: ${daySevenGate.nextAction}`,
     '',
     '## Recent Frictions',
     frictions,
@@ -999,6 +1061,7 @@ export default function Pilot() {
   const releaseGateDecision = getReleaseGateDecision(executionReliabilityBlocked, recommendation);
   const dayFiveGate = getDayFiveGate(feedbackSummary, recommendation, releaseGateDecision, currentDay);
   const daySixGate = getDaySixGate(currentDay, orders, outcomeConsistency, executionConfidence);
+  const daySevenGate = getDaySevenGate(currentDay, orders, recentOrderOutcomes, analytics, daySixGate);
   const recommendationTone = recommendation.tone === 'red'
     ? 'border-red-200 bg-red-50 text-red-900'
     : recommendation.tone === 'emerald'
@@ -1011,6 +1074,7 @@ export default function Pilot() {
     gateProgress,
     dayFiveGate,
     daySixGate,
+    daySevenGate,
     orderStats,
     orders,
     candidateStats,
@@ -1291,6 +1355,38 @@ export default function Pilot() {
             <div className="rounded-md bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Confidence</p>
               <p className="mt-1 font-display font-bold">{daySixGate.confidence}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`rounded-md border px-5 py-4 ${daySevenGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySevenGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="max-w-3xl">
+            <Pill tone={daySevenGate.tone}>{`Day 7 ${daySevenGate.status}`}</Pill>
+            <h2 className="mt-3 text-xl font-display font-bold uppercase">{daySevenGate.title}</h2>
+            <p className="mt-2 text-sm opacity-90">{daySevenGate.message}</p>
+            <p className="mt-3 text-sm font-semibold">{daySevenGate.nextAction}</p>
+            <p className="mt-2 text-xs opacity-80">
+              Recent statuses: {daySevenGate.recentStatuses.length ? daySevenGate.recentStatuses.join(' -> ') : 'none'}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Decisions</p>
+              <p className="mt-1 font-display font-bold">{daySevenGate.decisionCount}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Filled</p>
+              <p className="mt-1 font-display font-bold">{daySevenGate.hasFilledEvidence ? 'Yes' : 'No'}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Accountability</p>
+              <p className="mt-1 font-display font-bold">{daySevenGate.hasAccountabilityEvidence ? 'Yes' : 'No'}</p>
+            </div>
+            <div className="rounded-md bg-white/75 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide opacity-70">Recent</p>
+              <p className="mt-1 font-display font-bold">{daySevenGate.recentStatuses.length}</p>
             </div>
           </div>
         </div>
