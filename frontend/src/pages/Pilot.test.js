@@ -132,20 +132,18 @@ describe('Pilot execution reliability gate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Day 8 behavior trend check is on hold')).toBeInTheDocument();
+      expect(screen.getByText('Day 8 execution-stability check is on hold')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Day 8 behavior trend check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 9 rejection-control check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 8 execution-stability check is on hold')).toBeInTheDocument();
     expect(screen.getByText('Day 10 execution-stability check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 11 validation-coverage check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 12 value-proof check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 13 trust-proof check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 14 pricing-signal check is on hold')).toBeInTheDocument();
-    expect(screen.getByText('Day 15 release-readiness check is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 15 trust-and-value checkpoint is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 16 repeatability checkpoint is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 21 scale-readiness checkpoint is on hold')).toBeInTheDocument();
+    expect(screen.getByText('Day 30 final release-readiness check is on hold')).toBeInTheDocument();
   });
 
-  it('includes day 8 to day 15 checkpoints in the pilot report output', async () => {
+  it('includes day 8 to day 30 checkpoints in the pilot report output', async () => {
     window.localStorage.setItem('quantumai_pilot_started_at', '2026-01-01T00:00:00.000Z');
 
     render(
@@ -154,16 +152,14 @@ describe('Pilot execution reliability gate', () => {
       </MemoryRouter>
     );
 
-    const reportBox = await screen.findByDisplayValue(/# QuantumAI 15-Day Trust Pilot Report/i);
+    const reportBox = await screen.findByDisplayValue(/# QuantumAI 30-Day Trust Pilot Report/i);
     const reportText = reportBox.value;
 
     expect(reportText).toContain('## Day 8 Checkpoint');
-    expect(reportText).toContain('## Day 9 Checkpoint');
     expect(reportText).toContain('## Day 10 Checkpoint');
-    expect(reportText).toContain('## Day 11 Checkpoint');
-    expect(reportText).toContain('## Day 12 Checkpoint');
-    expect(reportText).toContain('## Day 13 Checkpoint');
-    expect(reportText).toContain('## Day 14 Checkpoint');
     expect(reportText).toContain('## Day 15 Checkpoint');
+    expect(reportText).toContain('## Day 16 Checkpoint');
+    expect(reportText).toContain('## Day 21 Checkpoint');
+    expect(reportText).toContain('## Day 30 Checkpoint');
   });
 });

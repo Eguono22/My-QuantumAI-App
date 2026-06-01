@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
   { path: '/app', label: 'Dashboard', icon: '📊' },
-  { path: '/app/pilot', label: '15-Day Pilot', icon: '15' },
+  { path: '/app/pilot', label: '30-Day Pilot', icon: '30' },
   { path: '/app/connect', label: 'Connection Center', icon: '🛰️' },
   { path: '/app/notifications', label: 'Notifications', icon: '🔔' },
   { path: '/app/markets', label: 'Markets', icon: '💹' },
