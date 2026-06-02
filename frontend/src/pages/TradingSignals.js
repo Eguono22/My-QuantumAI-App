@@ -6,6 +6,12 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
+function sourceBadgeClass(source) {
+  return source === 'alpaca'
+    ? 'bg-sky-100 text-sky-800 border-sky-200'
+    : 'bg-amber-100 text-amber-800 border-amber-200';
+}
+
 function summarizeOrderAudit(orders) {
   if (!orders.length) {
     return {
@@ -1613,7 +1619,7 @@ export default function TradingSignals({ preferences }) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Strategy Tester</h2>
-            <p className="text-zinc-600 text-sm">Backtest AI signal directionality on synthetic historical candles</p>
+            <p className="text-zinc-600 text-sm">Backtest signal plans on configured historical candles with stop-loss, take-profit, slippage, and fee assumptions.</p>
           </div>
           <button
             onClick={handleRunBacktest}
@@ -1671,10 +1677,19 @@ export default function TradingSignals({ preferences }) {
             />
           </div>
         </div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Backtests use the configured market-data provider when available. Unsupported assets may still use synthetic history, so treat results as product validation evidence, not live performance proof.
+        </div>
 
         {backtestResult && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Backtest source</span>
+              <span className={`inline-flex rounded border px-2 py-1 text-xs font-semibold ${sourceBadgeClass(backtestResult.data_source)}`}>
+                {backtestResult.data_source_label || 'Source unknown'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-2 text-sm">
               <div className="market-panel-soft rounded-md p-2">
                 <p className="text-zinc-500 text-xs">Trades</p>
                 <p className="font-semibold text-zinc-900">{backtestResult.trades}</p>
@@ -1697,6 +1712,14 @@ export default function TradingSignals({ preferences }) {
                 <p className="text-zinc-500 text-xs">Max Drawdown</p>
                 <p className="font-semibold text-zinc-900">{backtestResult.max_drawdown_pct}%</p>
               </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Avg Hold</p>
+                <p className="font-semibold text-zinc-900">{Number(backtestResult.avg_holding_bars || 0).toFixed(1)} bars</p>
+              </div>
+              <div className="market-panel-soft rounded-md p-2">
+                <p className="text-zinc-500 text-xs">Fees Paid</p>
+                <p className="font-semibold text-zinc-900">{formatCurrency(backtestResult.total_fees_paid || 0)}</p>
+              </div>
             </div>
             {!!backtestResult.trade_log?.length && (
               <div className="overflow-x-auto">
@@ -1707,6 +1730,7 @@ export default function TradingSignals({ preferences }) {
                       <th className="text-left px-3 py-2">Action</th>
                       <th className="text-right px-3 py-2">Entry</th>
                       <th className="text-right px-3 py-2">Exit</th>
+                      <th className="text-left px-3 py-2">Reason</th>
                       <th className="text-right px-3 py-2">Qty</th>
                       <th className="text-right px-3 py-2">Confidence</th>
                       <th className="text-right px-3 py-2">PnL</th>
@@ -1719,6 +1743,7 @@ export default function TradingSignals({ preferences }) {
                         <td className="px-3 py-2 text-zinc-900 font-semibold">{trade.action}</td>
                         <td className="px-3 py-2 text-right text-zinc-900">{formatCurrency(trade.entry_price)}</td>
                         <td className="px-3 py-2 text-right text-zinc-900">{formatCurrency(trade.exit_price)}</td>
+                        <td className="px-3 py-2 text-zinc-700">{trade.exit_reason || 'N/A'}</td>
                         <td className="px-3 py-2 text-right text-zinc-900">{trade.quantity.toFixed(4)}</td>
                         <td className="px-3 py-2 text-right text-zinc-900">{(Number(trade.confidence || 0) * 100).toFixed(1)}%</td>
                         <td className={`px-3 py-2 text-right font-semibold ${trade.pnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>

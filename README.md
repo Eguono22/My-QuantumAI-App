@@ -1,6 +1,6 @@
 # ⚛️ QuantumAI Trading Platform
 
-A comprehensive, full-stack trading web application powered by quantum-inspired AI algorithms for market analysis and portfolio optimization.
+A full-stack trading workspace built around quantum-inspired signals, paper-trading controls, and a narrow live-trading pilot.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -17,10 +17,17 @@ A comprehensive, full-stack trading web application powered by quantum-inspired 
 │  Chart.js   │  │  - MSE          │  │  │   Redis Cache   │  │
 │  Tailwind   │  └─────────────────┘  │  └─────────────────┘  │
 │             │                       │                       │
-│  WebSocket  │◄──────WebSocket───────┤  Mock Market Data     │
-│  Client     │                       │  (Geometric BM)       │
+│  WebSocket  │◄──────WebSocket───────┤  Alpaca equities +    │
+│  Client     │                       │  synthetic fallback   │
 └─────────────┴───────────────────────┴───────────────────────┘
 ```
+
+## 🎯 Current Scope
+
+- Best current fit: signal review, paper trading, broker-readiness checks, and trust-pilot workflows.
+- Real broker execution is intentionally narrow: Alpaca-backed live mode is guarded and defaults to a small allowed-symbol list.
+- Market research coverage is broader than real execution coverage. Unsupported assets can still fall back to synthetic data depending on provider support.
+- The "quantum" layer is quantum-inspired analytics, not a true quantum-computing deployment.
 
 ## 🚀 Tech Stack
 

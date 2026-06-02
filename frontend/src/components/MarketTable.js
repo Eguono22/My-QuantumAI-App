@@ -42,6 +42,12 @@ export default function MarketTable({ items = [] }) {
     return direction === 'asc' ? '↑' : '↓';
   };
 
+  const sourceBadgeClass = (source) => (
+    source === 'alpaca'
+      ? 'bg-sky-100 text-sky-800 border-sky-200'
+      : 'bg-amber-100 text-amber-800 border-amber-200'
+  );
+
   return (
     <div className="market-panel rounded-md overflow-hidden">
       <div className="bg-market-black text-white px-4 py-3 text-sm font-semibold uppercase tracking-widest">
@@ -85,7 +91,12 @@ export default function MarketTable({ items = [] }) {
               return (
                 <tr key={item.symbol} className="border-t border-zinc-200 hover:bg-zinc-50">
                   <td className="px-4 py-3 font-display font-bold text-base tracking-wide text-zinc-900">{item.symbol}</td>
-                  <td className="px-4 py-3 text-zinc-600">{item.name}</td>
+                  <td className="px-4 py-3 text-zinc-600">
+                    <div>{item.name}</div>
+                    <span className={`mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${sourceBadgeClass(item.data_source)}`}>
+                      {item.data_source_label || 'Source unknown'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right text-zinc-900 font-semibold">{formatCurrency(item.price)}</td>
                   <td className={`px-4 py-3 text-right font-semibold ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatPercent(item.change_pct_24h)}

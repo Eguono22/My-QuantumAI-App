@@ -9,6 +9,8 @@ const positiveAsset = {
   change_pct_24h: 2.35,
   volume_24h: 1500000000,
   market_cap: 850000000000,
+  data_source: 'alpaca',
+  data_source_label: 'Alpaca live/provider',
 };
 
 const negativeAsset = {
@@ -18,6 +20,8 @@ const negativeAsset = {
   change_pct_24h: -1.42,
   volume_24h: 750000000,
   market_cap: 274000000000,
+  data_source: 'synthetic',
+  data_source_label: 'Synthetic fallback',
 };
 
 describe('MarketCard', () => {
@@ -54,5 +58,10 @@ describe('MarketCard', () => {
     render(<MarketCard data={positiveAsset} />);
     expect(screen.getByText(/Vol:/)).toBeInTheDocument();
     expect(screen.getByText(/Cap:/)).toBeInTheDocument();
+  });
+
+  it('renders the market data source badge', () => {
+    render(<MarketCard data={positiveAsset} />);
+    expect(screen.getByText('Alpaca live/provider')).toBeInTheDocument();
   });
 });

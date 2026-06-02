@@ -127,6 +127,9 @@ export default function TradingSignalCard({ signal }) {
     || 'Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.';
   const executionAudit = signal.execution_audit;
   const postTradeOutcome = buildPostTradeOutcome(signal, executionAudit, invalidationCondition);
+  const sourceBadgeClass = signal.market_data_source === 'alpaca'
+    ? 'bg-sky-100 text-sky-800 border-sky-200'
+    : 'bg-amber-100 text-amber-800 border-amber-200';
 
   return (
     <div className={`rounded-md p-4 border ${bgColor} transition hover:opacity-95`}>
@@ -134,6 +137,9 @@ export default function TradingSignalCard({ signal }) {
         <div>
           <span className="font-display font-bold text-zinc-900 text-lg tracking-wide">{signal.asset}</span>
           <p className="text-zinc-500 text-xs mt-1">{formatDate(signal.timestamp)}</p>
+          <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${sourceBadgeClass}`}>
+            {signal.market_data_source_label || 'Source unknown'}
+          </span>
         </div>
         <span className={`text-lg font-bold ${textColor}`}>{signal.signal_type}</span>
       </div>
@@ -247,6 +253,13 @@ export default function TradingSignalCard({ signal }) {
             <p className="font-semibold text-zinc-900">Confidence drivers</p>
             <p className="mt-1">
               {confidenceDrivers.length ? confidenceDrivers.join(' | ') : 'Confidence is based on model agreement and recent market structure.'}
+            </p>
+          </div>
+
+          <div>
+            <p className="font-semibold text-zinc-900">Market data source</p>
+            <p className="mt-1">
+              {signal.market_data_source_label || 'Source unknown'}
             </p>
           </div>
 

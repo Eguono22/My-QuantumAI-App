@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../backend'))
 
 from services.trading_service import TradingService
+import services.trading_service as trading_service_module
 from services.mql5_service import MQL5BridgeService, MQL5BridgeError
 from services.market_service import MarketService
 from services.notification_service import notification_service
@@ -31,7 +32,9 @@ class TestTradingService:
         signals = self.service.generate_signals(db)
         assert isinstance(signals, list)
         assert len(signals) > 0
-        
+        assert signals[0]["market_data_source"] in {"alpaca", "synthetic"}
+        assert "market_data_source_label" in signals[0]
+
         db.close()
     
     def test_signal_has_required_fields(self):
@@ -195,6 +198,71 @@ class TestTradingService:
         assert "win_rate" in result
         assert "max_drawdown_pct" in result
         assert "trade_log" in result
+        assert result["data_source"] in {"alpaca", "synthetic"}
+
+    def test_backtest_uses_trade_plan_levels_and_costs(self, monkeypatch):
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        history = []
+        for hour in range(60):
+            close = 100.0
+            high = 100.5
+            low = 99.5
+            if hour == 49:
+                high = 103.0
+                close = 102.25
+            history.append({
+                "timestamp": (start + datetime.timedelta(hours=hour)).isoformat(),
+                "open": 100.0,
+                "high": high,
+                "low": low,
+                "close": close,
+                "volume": 10000.0,
+            })
+
+        monkeypatch.setattr(
+            trading_service_module.market_service,
+            "get_price_history_with_source",
+            lambda asset, days: {
+                "history": history,
+                "data_source": "synthetic",
+                "data_source_label": "Synthetic fallback",
+            },
+        )
+
+        calls = {"count": 0}
+
+        def fake_generate_signal(asset, prices):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return {
+                    "asset": asset,
+                    "signal_type": "BUY",
+                    "confidence": 0.81,
+                    "stop_loss": 99.0,
+                    "take_profit": 102.0,
+                    "horizon": "INTRADAY",
+                    "signal_half_life_min": 180,
+                }
+            return {
+                "asset": asset,
+                "signal_type": "HOLD",
+                "confidence": 0.5,
+            }
+
+        monkeypatch.setattr(trading_service_module.signal_generator, "generate_signal", fake_generate_signal)
+
+        result = self.service.backtest_signals("BTC", days=30, starting_capital=10000, risk_per_trade_pct=1)
+
+        assert result["trades"] == 1
+        assert result["total_fees_paid"] > 0
+        assert result["avg_holding_bars"] == 1.0
+        trade = result["trade_log"][0]
+        assert trade["exit_reason"] == "TAKE_PROFIT"
+        assert trade["holding_bars"] == 1
+        assert trade["fees_paid"] > 0
+        assert trade["pnl"] < trade["gross_pnl"]
+        assert trade["exit_price"] < 102.0
+        assert trade["pnl"] > 0
 
     def test_trade_returns_broker_and_risk_metadata(self):
         from sqlalchemy import create_engine

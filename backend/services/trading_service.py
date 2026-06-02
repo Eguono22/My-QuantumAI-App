@@ -528,22 +528,26 @@ class TradingService:
             "price": fallback_price,
             "timestamp": now,
             "rationale": ["Fallback signal generated after upstream data issue."],
+            "market_data_source": "synthetic",
+            "market_data_source_label": "Synthetic fallback",
         }
 
     def _generate_signals_ephemeral(self) -> List[Dict]:
         signals = []
         for symbol in MOCK_ASSETS.keys():
             try:
-                prices = market_service.get_prices_for_signal(symbol)
-                signal = signal_generator.generate_signal(symbol, prices)
+                signal = self._build_signal_analytics(symbol)
             except Exception:
                 signal = self._fallback_signal(symbol)
             signals.append(signal)
         return signals
 
     def _build_signal_analytics(self, asset: str) -> Dict:
-        prices = market_service.get_prices_for_signal(asset)
-        return signal_generator.generate_signal(asset, prices)
+        signal_input = market_service.get_prices_for_signal_with_source(asset)
+        signal = signal_generator.generate_signal(asset, signal_input["prices"])
+        signal["market_data_source"] = signal_input["data_source"]
+        signal["market_data_source_label"] = signal_input["data_source_label"]
+        return signal
 
     def get_portfolio(self, db: Session, user_id: int) -> List[Dict]:
         holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
@@ -1325,8 +1329,7 @@ class TradingService:
         signals = []
         for symbol in MOCK_ASSETS.keys():
             try:
-                prices = market_service.get_prices_for_signal(symbol)
-                signal = signal_generator.generate_signal(symbol, prices)
+                signal = self._build_signal_analytics(symbol)
                 db_signal = TradingSignal(
                     asset=symbol,
                     signal_type=signal["signal_type"],
@@ -1391,6 +1394,8 @@ class TradingService:
                 "invalidation_reason": analytics.get("invalidation_reason"),
                 "recent_price_context": analytics.get("recent_price_context"),
                 "previous_similar_outcome": analytics.get("previous_similar_outcome"),
+                "market_data_source": analytics.get("market_data_source"),
+                "market_data_source_label": analytics.get("market_data_source_label"),
             })
         return enriched
 
@@ -1592,6 +1597,64 @@ class TradingService:
         db.delete(alert)
         db.commit()
 
+    def _backtest_max_holding_bars(self, signal: Dict) -> int:
+        horizon = str(signal.get("horizon") or "").upper()
+        horizon_defaults = {
+            "SCALP": 6,
+            "INTRADAY": 24,
+            "SWING": 72,
+        }
+        if horizon in horizon_defaults:
+            return horizon_defaults[horizon]
+
+        half_life_min = signal.get("signal_half_life_min")
+        if half_life_min is not None:
+            try:
+                return max(4, min(72, int(round(float(half_life_min) / 60.0))))
+            except (TypeError, ValueError):
+                pass
+        return 24
+
+    def _backtest_fill_price(self, raw_price: float, side: str) -> float:
+        slippage_fraction = float(settings.SIM_SLIPPAGE_BPS) / 10000.0
+        direction = 1.0 if (side or "").lower() == "buy" else -1.0
+        return float(raw_price) * (1.0 + direction * slippage_fraction)
+
+    def _resolve_backtest_exit(
+        self,
+        action: str,
+        history: List[Dict],
+        entry_index: int,
+        stop_loss: Optional[float],
+        take_profit: Optional[float],
+        max_holding_bars: int,
+    ) -> tuple[float, str, int]:
+        last_index = min(len(history) - 1, entry_index + max(1, max_holding_bars))
+        exit_index = last_index
+        exit_reason = "TIME_EXIT"
+        exit_price = float(history[last_index]["close"])
+        resolved_action = (action or "").upper()
+
+        for idx in range(entry_index + 1, last_index + 1):
+            high = float(history[idx]["high"])
+            low = float(history[idx]["low"])
+
+            if resolved_action == "BUY":
+                stop_hit = stop_loss is not None and low <= float(stop_loss)
+                target_hit = take_profit is not None and high >= float(take_profit)
+            else:
+                stop_hit = stop_loss is not None and high >= float(stop_loss)
+                target_hit = take_profit is not None and low <= float(take_profit)
+
+            # Intrabar sequencing is unknown, so use the more conservative outcome
+            # when both stop and target are touched in the same bar.
+            if stop_hit:
+                return (float(stop_loss), "STOP_LOSS", idx)
+            if target_hit:
+                return (float(take_profit), "TAKE_PROFIT", idx)
+
+        return (exit_price, exit_reason, exit_index)
+
     def backtest_signals(
         self,
         asset: str,
@@ -1609,7 +1672,8 @@ class TradingService:
         if risk_per_trade_pct <= 0 or risk_per_trade_pct > 20:
             raise ValueError("Risk per trade % must be between 0 and 20")
 
-        history = market_service.get_price_history(asset, days)
+        history_context = market_service.get_price_history_with_source(asset, days)
+        history = history_context["history"]
         closes = [float(candle["close"]) for candle in history]
         if len(closes) < 60:
             raise ValueError("Not enough history for backtest")
@@ -1621,50 +1685,90 @@ class TradingService:
         trades = []
         wins = 0
         losses = 0
+        total_fees_paid = 0.0
+        total_holding_bars = 0
+        fee_fraction = float(settings.SIM_FEE_BPS) / 10000.0
 
-        for i in range(lookback, len(closes) - 1):
+        i = lookback
+        while i < len(closes) - 1:
             window = closes[max(0, i - lookback): i + 1]
             signal = signal_generator.generate_signal(asset, window)
-            action = signal.get("signal_type", "HOLD")
+            action = str(signal.get("signal_type", "HOLD")).upper()
             if action == "HOLD":
                 equity_peak = max(equity_peak, capital)
                 drawdown = ((equity_peak - capital) / equity_peak * 100) if equity_peak > 0 else 0
                 max_drawdown_pct = max(max_drawdown_pct, drawdown)
+                i += 1
                 continue
 
-            entry_price = closes[i]
-            exit_price = closes[i + 1]
-            position_risk = capital * (risk_per_trade_pct / 100.0)
-            quantity = position_risk / entry_price if entry_price > 0 else 0
+            raw_entry_price = closes[i]
+            entry_side = "buy" if action == "BUY" else "sell"
+            exit_side = "sell" if action == "BUY" else "buy"
+            entry_price = self._backtest_fill_price(raw_entry_price, entry_side)
+            stop_loss = signal.get("stop_loss")
+            take_profit = signal.get("take_profit")
+
+            position_risk_budget = capital * (risk_per_trade_pct / 100.0)
+            stop_distance = abs(entry_price - float(stop_loss)) if stop_loss not in {None, 0} else 0.0
+            if stop_distance > 0:
+                quantity = position_risk_budget / stop_distance
+            else:
+                quantity = position_risk_budget / entry_price if entry_price > 0 else 0.0
+
+            if entry_price > 0:
+                quantity = min(quantity, capital / entry_price)
             if quantity <= 0:
+                i += 1
                 continue
 
+            max_holding_bars = self._backtest_max_holding_bars(signal)
+            raw_exit_price, exit_reason, exit_index = self._resolve_backtest_exit(
+                action=action,
+                history=history,
+                entry_index=i,
+                stop_loss=float(stop_loss) if stop_loss is not None else None,
+                take_profit=float(take_profit) if take_profit is not None else None,
+                max_holding_bars=max_holding_bars,
+            )
+            exit_price = self._backtest_fill_price(raw_exit_price, exit_side)
             direction = 1 if action == "BUY" else -1
-            pnl = (exit_price - entry_price) * quantity * direction
+            gross_pnl = (exit_price - entry_price) * quantity * direction
+            fees_paid = (entry_price * quantity + exit_price * quantity) * fee_fraction
+            pnl = gross_pnl - fees_paid
             capital += pnl
+            total_fees_paid += fees_paid
+            holding_bars = max(1, exit_index - i)
+            total_holding_bars += holding_bars
             if pnl >= 0:
                 wins += 1
             else:
                 losses += 1
 
             trades.append({
-                "timestamp": history[i + 1]["timestamp"],
+                "timestamp": history[i]["timestamp"],
                 "action": action,
                 "entry_price": round(entry_price, 6),
                 "exit_price": round(exit_price, 6),
                 "quantity": round(quantity, 8),
                 "pnl": round(pnl, 6),
                 "confidence": round(float(signal.get("confidence", 0.5)), 4),
+                "exit_reason": exit_reason,
+                "holding_bars": holding_bars,
+                "fees_paid": round(fees_paid, 6),
+                "gross_pnl": round(gross_pnl, 6),
+                "exit_timestamp": history[exit_index]["timestamp"],
             })
 
             equity_peak = max(equity_peak, capital)
             drawdown = ((equity_peak - capital) / equity_peak * 100) if equity_peak > 0 else 0
             max_drawdown_pct = max(max_drawdown_pct, drawdown)
+            i = exit_index + 1
 
         total_trades = len(trades)
         total_pnl = capital - starting_capital
         win_rate = (wins / total_trades * 100) if total_trades else 0.0
         avg_trade_pnl = (total_pnl / total_trades) if total_trades else 0.0
+        avg_holding_bars = (total_holding_bars / total_trades) if total_trades else 0.0
 
         return {
             "asset": asset,
@@ -1678,6 +1782,10 @@ class TradingService:
             "ending_capital": round(capital, 2),
             "max_drawdown_pct": round(max_drawdown_pct, 2),
             "avg_trade_pnl": round(avg_trade_pnl, 4),
+            "avg_holding_bars": round(avg_holding_bars, 2),
+            "total_fees_paid": round(total_fees_paid, 4),
+            "data_source": history_context["data_source"],
+            "data_source_label": history_context["data_source_label"],
             "trade_log": trades[-100:],
         }
 

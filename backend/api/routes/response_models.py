@@ -28,6 +28,8 @@ class MarketOverviewItem(BaseModel):
     market_cap: float
     high_24h: float
     low_24h: float
+    data_source: Optional[str] = None
+    data_source_label: Optional[str] = None
 
 
 class PriceHistoryItem(BaseModel):
@@ -59,6 +61,8 @@ class MarketPredictionResponse(BaseModel):
     interval_low: float
     interval_high: float
     generated_at: str
+    data_source: Optional[str] = None
+    data_source_label: Optional[str] = None
 
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
@@ -156,6 +160,8 @@ class SignalResponse(BaseModel):
     invalidation_reason: Optional[str] = None
     recent_price_context: Optional[List[str]] = None
     previous_similar_outcome: Optional[str] = None
+    market_data_source: Optional[str] = None
+    market_data_source_label: Optional[str] = None
 
 
 class HFTResponse(BaseModel):
@@ -196,6 +202,11 @@ class BacktestTradeResponse(BaseModel):
     quantity: float
     pnl: float
     confidence: float
+    exit_reason: Optional[str] = None
+    holding_bars: Optional[int] = None
+    fees_paid: Optional[float] = None
+    gross_pnl: Optional[float] = None
+    exit_timestamp: Optional[str] = None
 
 
 class StrategyBacktestResponse(BaseModel):
@@ -210,6 +221,10 @@ class StrategyBacktestResponse(BaseModel):
     ending_capital: float
     max_drawdown_pct: float
     avg_trade_pnl: float
+    avg_holding_bars: Optional[float] = None
+    total_fees_paid: Optional[float] = None
+    data_source: Optional[str] = None
+    data_source_label: Optional[str] = None
     trade_log: List[BacktestTradeResponse]
 
 

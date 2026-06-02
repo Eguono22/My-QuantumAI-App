@@ -197,6 +197,9 @@ export default function Dashboard({ preferences }) {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
           {topMarkets.map((item) => {
             const positive = Number(item.change_pct_24h) >= 0;
+            const sourceBadgeClass = item.data_source === 'alpaca'
+              ? 'bg-sky-950/60 text-sky-200 border-sky-800'
+              : 'bg-amber-950/60 text-amber-200 border-amber-800';
             return (
               <div key={item.symbol} className="rounded-lg p-3 border border-zinc-800 bg-zinc-900/40">
                 <div className="flex items-center justify-between">
@@ -206,6 +209,9 @@ export default function Dashboard({ preferences }) {
                   </span>
                 </div>
                 <p className="text-zinc-300 text-sm mt-1">{item.name}</p>
+                <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${sourceBadgeClass}`}>
+                  {item.data_source_label || 'Source unknown'}
+                </span>
                 <p className="text-white font-semibold mt-2">{Number(item.price).toLocaleString()}</p>
               </div>
             );

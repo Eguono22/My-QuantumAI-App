@@ -203,6 +203,18 @@ class MarketService:
         self.prediction_model = MarketPredictionModel()
         self._alpaca_symbols = [s for s in MOCK_ASSETS.keys() if s.isalpha() and len(s) <= 5]
 
+    def _source_meta(self, source: str) -> Dict[str, str]:
+        normalized = (source or "synthetic").strip().lower()
+        if normalized == "alpaca":
+            return {
+                "data_source": "alpaca",
+                "data_source_label": "Alpaca live/provider",
+            }
+        return {
+            "data_source": "synthetic",
+            "data_source_label": "Synthetic fallback",
+        }
+
     def _using_alpaca_data(self) -> bool:
         return (
             (settings.MARKET_DATA_PROVIDER or "mock").lower() == "alpaca"
@@ -215,13 +227,13 @@ class MarketService:
             "APCA-API-SECRET-KEY": settings.ALPACA_API_SECRET or "",
         }
 
-    def _to_market_row(self, symbol: str, price: float, reference_price: float) -> Dict:
+    def _to_market_row(self, symbol: str, price: float, reference_price: float, source: str = "synthetic") -> Dict:
         info = MOCK_ASSETS[symbol]
         change_pct = ((price - reference_price) / reference_price) * 100 if reference_price else 0.0
         rng = np.random.default_rng(
             int(hashlib.sha256((symbol + datetime.now(timezone.utc).strftime('%Y%m%d%H')).encode()).hexdigest(), 16) % (2**32)
         )
-        return {
+        row = {
             "symbol": symbol,
             "name": info["name"],
             "price": round(float(price), 2),
@@ -232,6 +244,8 @@ class MarketService:
             "high_24h": round(float(price) * 1.02, 2),
             "low_24h": round(float(price) * 0.98, 2),
         }
+        row.update(self._source_meta(source))
+        return row
 
     def _get_alpaca_latest_prices(self, symbols: List[str]) -> Dict[str, float]:
         if not symbols:
@@ -268,9 +282,10 @@ class MarketService:
         overview = []
         for symbol, info in MOCK_ASSETS.items():
             current = alpaca_prices.get(symbol)
+            source = "alpaca" if current is not None else "synthetic"
             if current is None:
                 current = get_current_price(symbol, info["base_price"], info["volatility"])
-            overview.append(self._to_market_row(symbol, current, info["base_price"]))
+            overview.append(self._to_market_row(symbol, current, info["base_price"], source=source))
         return overview
     
     def get_asset(self, symbol: str) -> Dict:
@@ -283,22 +298,32 @@ class MarketService:
         if self._using_alpaca_data() and symbol in self._alpaca_symbols:
             prices = self._get_alpaca_latest_prices([symbol])
             if symbol in prices:
-                return self._to_market_row(symbol, prices[symbol], info["base_price"])
+                return self._to_market_row(symbol, prices[symbol], info["base_price"], source="alpaca")
 
         current = get_current_price(symbol, info["base_price"], info["volatility"])
-        return self._to_market_row(symbol, current, info["base_price"])
-    
-    def get_price_history(self, symbol: str, days: int = 30) -> List[Dict]:
-        """Get historical price data for a symbol."""
+        return self._to_market_row(symbol, current, info["base_price"], source="synthetic")
+
+    def get_price_history_with_source(self, symbol: str, days: int = 30) -> Dict:
+        """Get historical price data for a symbol with source metadata."""
         symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
-            return []
+            return {"history": [], **self._source_meta("synthetic")}
         if self._using_alpaca_data() and symbol in self._alpaca_symbols:
             bars = self._get_alpaca_bars(symbol, days)
             if bars:
-                return bars
+                return {
+                    "history": bars,
+                    **self._source_meta("alpaca"),
+                }
         info = MOCK_ASSETS[symbol]
-        return generate_price_history(symbol, info["base_price"], info["volatility"], days)
+        return {
+            "history": generate_price_history(symbol, info["base_price"], info["volatility"], days),
+            **self._source_meta("synthetic"),
+        }
+
+    def get_price_history(self, symbol: str, days: int = 30) -> List[Dict]:
+        """Get historical price data for a symbol."""
+        return self.get_price_history_with_source(symbol, days)["history"]
 
     def _get_alpaca_bars(self, symbol: str, days: int) -> List[Dict]:
         limit = max(24, min(days * 24, 10000))
@@ -339,13 +364,26 @@ class MarketService:
         return history
     
     def get_prices_for_signal(self, symbol: str) -> List[float]:
-        """Get recent prices for signal generation."""
+        """Get recent prices for signal generation.
+
+        This reuses the normal history loader so signals follow the configured
+        market-data provider instead of always training on synthetic data.
+        """
+        history_context = self.get_price_history_with_source(symbol, 30)
+        history = history_context["history"]
+        return [h["close"] for h in history]
+
+    def get_prices_for_signal_with_source(self, symbol: str) -> Dict:
+        """Get recent prices for signal generation with source metadata."""
         symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
-            return []
-        info = MOCK_ASSETS[symbol]
-        history = generate_price_history(symbol, info["base_price"], info["volatility"], 30)
-        return [h["close"] for h in history]
+            return {"prices": [], **self._source_meta("synthetic")}
+        history_context = self.get_price_history_with_source(symbol, 30)
+        return {
+            "prices": [h["close"] for h in history_context["history"]],
+            "data_source": history_context["data_source"],
+            "data_source_label": history_context["data_source_label"],
+        }
 
     def get_market_prediction(self, symbol: str, days: int = 60, horizon_hours: int = 24) -> Dict:
         """Predict future price movement for a symbol."""
@@ -356,14 +394,15 @@ class MarketService:
         days = max(7, min(days, 365))
         horizon_hours = max(1, min(horizon_hours, 72))
 
-        history = self.get_price_history(symbol, days)
+        history_context = self.get_price_history_with_source(symbol, days)
+        history = history_context["history"]
         closes = np.array([float(row["close"]) for row in history], dtype=float)
         if len(closes) < 10:
             return None
 
         forecast = self.prediction_model.forecast(closes, horizon_steps=horizon_hours)
         latest_price = float(closes[-1])
-        return {
+        result = {
             "symbol": symbol,
             "current_price": latest_price,
             "predicted_price": round(float(forecast["predicted_price"]), 6),
@@ -375,5 +414,7 @@ class MarketService:
             "interval_high": round(float(forecast["interval_high"]), 6),
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+        result.update(self._source_meta(history_context["data_source"]))
+        return result
 
 market_service = MarketService()

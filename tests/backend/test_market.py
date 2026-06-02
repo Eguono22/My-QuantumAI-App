@@ -15,7 +15,7 @@ class TestMarketService:
     
     def test_market_overview_has_required_fields(self):
         overview = self.service.get_market_overview()
-        required = ["symbol", "name", "price", "change_24h", "volume_24h"]
+        required = ["symbol", "name", "price", "change_24h", "volume_24h", "data_source", "data_source_label"]
         for item in overview:
             for field in required:
                 assert field in item
@@ -25,6 +25,7 @@ class TestMarketService:
         assert asset is not None
         assert asset["symbol"] == "BTC"
         assert asset["price"] > 0
+        assert asset["data_source"] in {"alpaca", "synthetic"}
     
     def test_get_asset_case_insensitive(self):
         asset = self.service.get_asset("btc")
@@ -48,6 +49,19 @@ class TestMarketService:
     def test_get_price_history_returns_data(self):
         history = self.service.get_price_history("BTC", days=7)
         assert len(history) > 0
+
+    def test_get_prices_for_signal_uses_market_history_provider(self, monkeypatch):
+        alpaca_history = [
+            {"timestamp": "2026-01-01T00:00:00Z", "open": 100.0, "high": 101.0, "low": 99.5, "close": 100.5, "volume": 10_000},
+            {"timestamp": "2026-01-01T01:00:00Z", "open": 100.5, "high": 102.0, "low": 100.0, "close": 101.75, "volume": 12_000},
+        ]
+
+        monkeypatch.setattr(self.service, "_using_alpaca_data", lambda: True)
+        monkeypatch.setattr(self.service, "_get_alpaca_bars", lambda symbol, days: alpaca_history)
+
+        closes = self.service.get_prices_for_signal("AAPL")
+
+        assert closes == [100.5, 101.75]
 
     def test_get_market_prediction_returns_data(self):
         prediction = self.service.get_market_prediction("BTC", days=45, horizon_hours=12)

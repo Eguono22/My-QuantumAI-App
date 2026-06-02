@@ -6,6 +6,12 @@ import { marketService } from '../services/marketService';
 import { tradingService } from '../services/tradingService';
 import { formatCurrency, formatPercent, formatLargeNumber } from '../utils/formatters';
 
+function getSourceBadgeClass(source) {
+  return source === 'alpaca'
+    ? 'bg-sky-100 text-sky-800 border-sky-200'
+    : 'bg-amber-100 text-amber-800 border-amber-200';
+}
+
 export default function Markets() {
   const [markets, setMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +108,9 @@ export default function Markets() {
                 <div>
                   <p className="font-display font-bold text-zinc-900 text-2xl tracking-wide">{market.symbol}</p>
                   <p className="text-sm text-zinc-500">{market.name}</p>
+                  <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${getSourceBadgeClass(market.data_source)}`}>
+                    {market.data_source_label || 'Source unknown'}
+                  </span>
                 </div>
                 <span className={`text-sm font-semibold px-2 py-1 rounded ${positive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {formatPercent(market.change_pct_24h)}

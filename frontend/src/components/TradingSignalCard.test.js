@@ -16,6 +16,8 @@ const buySignal = {
   market_regime: 'TRENDING',
   vote_breakdown: { buy: 6, sell: 1, hold: 2 },
   rationale: ['Quantum walk projects upward drift.', 'MACD histogram is positive.'],
+  market_data_source: 'alpaca',
+  market_data_source_label: 'Alpaca live/provider',
   execution_audit: {
     summary: '2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.',
     lastOrder: {
@@ -35,6 +37,8 @@ const sellSignal = {
   confidence: 0.71,
   price: 2280.0,
   timestamp: '2024-01-15T12:00:00Z',
+  market_data_source: 'synthetic',
+  market_data_source_label: 'Synthetic fallback',
 };
 
 const holdSignal = {
@@ -43,6 +47,8 @@ const holdSignal = {
   confidence: 0.55,
   price: 185.5,
   timestamp: '2024-01-15T10:00:00Z',
+  market_data_source: 'synthetic',
+  market_data_source_label: 'Synthetic fallback',
 };
 
 describe('TradingSignalCard', () => {
@@ -124,6 +130,7 @@ describe('TradingSignalCard', () => {
     expect(screen.getByText('TRENDING regime | +5.20% expected move | Strength score pending')).toBeInTheDocument();
     expect(screen.getByText('Previous Similar Signal Outcome')).toBeInTheDocument();
     expect(screen.getByText('Not enough closed similar signals yet. Treat this as evidence to collect in paper mode.')).toBeInTheDocument();
+    expect(screen.getAllByText('Alpaca live/provider').length).toBeGreaterThan(0);
     expect(screen.getByText('Recent Execution Audit')).toBeInTheDocument();
     expect(screen.getByText('2 filled/partial, 1 pending, 0 rejected, 0 canceled. Last outcome: FILLED for 1.')).toBeInTheDocument();
     expect(screen.getByText('Post-Trade Outcome Summary')).toBeInTheDocument();
