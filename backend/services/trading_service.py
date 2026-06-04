@@ -18,6 +18,8 @@ risk_engine = RiskEngine()
 logger = logging.getLogger("quantumai.trading")
 
 class TradingService:
+    CASH_ASSET_SYMBOL = "USD_CASH"
+
     def _build_operator_brief_alert_key(self, hours: int, alert: Dict) -> str:
         digest = hashlib.sha256(
             "::".join([
@@ -550,7 +552,14 @@ class TradingService:
         return signal
 
     def get_portfolio(self, db: Session, user_id: int) -> List[Dict]:
-        holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
+        holdings = (
+            db.query(Portfolio)
+            .filter(
+                Portfolio.user_id == user_id,
+                Portfolio.asset != self.CASH_ASSET_SYMBOL,
+            )
+            .all()
+        )
         result = []
         for holding in holdings:
             current_price_data = market_service.get_asset(holding.asset)
@@ -570,6 +579,101 @@ class TradingService:
                 "pnl_pct": round(pnl_pct, 2),
             })
         return result
+
+    def _get_cash_holding(self, db: Session, user_id: int) -> Optional[Portfolio]:
+        return (
+            db.query(Portfolio)
+            .filter(
+                Portfolio.user_id == user_id,
+                Portfolio.asset == self.CASH_ASSET_SYMBOL,
+            )
+            .first()
+        )
+
+    def get_cash_balance(self, db: Session, user_id: int) -> float:
+        cash_holding = self._get_cash_holding(db, user_id)
+        return round(float(cash_holding.quantity or 0.0), 2) if cash_holding else 0.0
+
+    def deposit_funds(self, db: Session, user_id: int, amount: float, commit: bool = True) -> Dict:
+        if amount <= 0:
+            raise ValueError("Deposit amount must be greater than 0")
+
+        cash_holding = self._get_cash_holding(db, user_id)
+        if cash_holding is None:
+            cash_holding = Portfolio(
+                user_id=user_id,
+                asset=self.CASH_ASSET_SYMBOL,
+                quantity=0.0,
+                avg_price=1.0,
+            )
+            db.add(cash_holding)
+
+        cash_holding.quantity = float(cash_holding.quantity or 0.0) + float(amount)
+        cash_holding.avg_price = 1.0
+
+        funding_trade = Trade(
+            user_id=user_id,
+            asset=self.CASH_ASSET_SYMBOL,
+            action="deposit",
+            quantity=float(amount),
+            price=1.0,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(funding_trade)
+
+        if commit:
+            db.commit()
+            db.refresh(funding_trade)
+        else:
+            db.flush()
+
+        return {
+            "success": True,
+            "action": "deposit",
+            "amount": round(float(amount), 2),
+            "cash_balance": round(float(cash_holding.quantity or 0.0), 2),
+            "timestamp": funding_trade.timestamp.isoformat(),
+            "message": "Deposit completed",
+        }
+
+    def withdraw_funds(self, db: Session, user_id: int, amount: float, commit: bool = True) -> Dict:
+        if amount <= 0:
+            raise ValueError("Withdrawal amount must be greater than 0")
+
+        cash_holding = self._get_cash_holding(db, user_id)
+        available_cash = float(cash_holding.quantity or 0.0) if cash_holding else 0.0
+        if available_cash < float(amount):
+            raise ValueError("Insufficient cash balance")
+
+        cash_holding.quantity = available_cash - float(amount)
+        cash_holding.avg_price = 1.0
+        if cash_holding.quantity <= 0:
+            db.delete(cash_holding)
+
+        funding_trade = Trade(
+            user_id=user_id,
+            asset=self.CASH_ASSET_SYMBOL,
+            action="withdraw",
+            quantity=float(amount),
+            price=1.0,
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(funding_trade)
+
+        if commit:
+            db.commit()
+            db.refresh(funding_trade)
+        else:
+            db.flush()
+
+        return {
+            "success": True,
+            "action": "withdraw",
+            "amount": round(float(amount), 2),
+            "cash_balance": round(max(0.0, cash_holding.quantity if cash_holding is not None else 0.0), 2),
+            "timestamp": funding_trade.timestamp.isoformat(),
+            "message": "Withdrawal completed",
+        }
 
     def _trading_mode(self) -> str:
         return (settings.TRADING_MODE or "paper").strip().lower()
@@ -1121,9 +1225,10 @@ class TradingService:
     def get_performance(self, db: Session, user_id: int) -> Dict:
         trades = db.query(Trade).filter(Trade.user_id == user_id).order_by(Trade.timestamp).all()
         portfolio = self.get_portfolio(db, user_id)
+        cash_balance = self.get_cash_balance(db, user_id)
         
-        total_value = sum(h["current_value"] for h in portfolio)
-        total_cost = sum(h["cost_basis"] for h in portfolio)
+        total_value = sum(h["current_value"] for h in portfolio) + cash_balance
+        total_cost = sum(h["cost_basis"] for h in portfolio) + cash_balance
         total_pnl = total_value - total_cost
         
         return {
@@ -1131,6 +1236,7 @@ class TradingService:
             "total_cost": round(total_cost, 2),
             "total_pnl": round(total_pnl, 2),
             "total_pnl_pct": round((total_pnl / total_cost * 100) if total_cost > 0 else 0, 2),
+            "cash_balance": round(cash_balance, 2),
             "holdings": portfolio,
             "trade_count": len(trades),
         }

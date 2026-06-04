@@ -15,6 +15,8 @@ export default function Portfolio({ user, preferences }) {
   const [selectedAsset, setSelectedAsset] = useState('BTC');
   const [loading, setLoading] = useState(true);
   const [tradeForm, setTradeForm] = useState({ asset: 'BTC', action: 'buy', quantity: '' });
+  const [fundingAmount, setFundingAmount] = useState('');
+  const [cashBalance, setCashBalance] = useState(0);
   const [alert, setAlert] = useState(null);
   const [activeView, setActiveView] = useState(preferences?.portfolioView || 'overview');
 
@@ -23,11 +25,12 @@ export default function Portfolio({ user, preferences }) {
   }, [preferences?.portfolioView]);
 
   const fetchData = useCallback(async () => {
-    const [portRes, perfRes, histRes, overviewRes] = await Promise.allSettled([
+    const [portRes, perfRes, histRes, overviewRes, cashRes] = await Promise.allSettled([
       tradingService.getPortfolio(),
       tradingService.getPerformance(),
       marketService.getHistory(selectedAsset, 30),
       marketService.getOverview(),
+      tradingService.getCashBalance(),
     ]);
 
     if (portRes.status === 'fulfilled') {
@@ -53,6 +56,12 @@ export default function Portfolio({ user, preferences }) {
       setAssetOptions(symbols);
       if (!symbols.includes(selectedAsset) && symbols.length > 0) {
         setSelectedAsset(symbols[0]);
+      }
+
+      if (cashRes.status === 'fulfilled') {
+        setCashBalance(cashRes.value?.cash_balance || 0);
+      } else {
+        setCashBalance(0);
       }
       if (symbols.length > 0) {
         setTradeForm(prev => (
@@ -92,6 +101,29 @@ export default function Portfolio({ user, preferences }) {
       fetchData();
     } catch (err) {
       setAlert({ type: 'error', message: err.response?.data?.detail || 'Trade failed' });
+    }
+  };
+
+  const handleFunding = async (type) => {
+    const amount = parseFloat(fundingAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setAlert({ type: 'error', message: 'Please enter a valid amount greater than 0' });
+      return;
+    }
+
+    try {
+      const result = type === 'deposit'
+        ? await tradingService.depositFunds(amount)
+        : await tradingService.withdrawFunds(amount);
+
+      setAlert({
+        type: 'success',
+        message: `${type === 'deposit' ? 'Deposit' : 'Withdrawal'} successful. Cash balance: ${formatCurrency(result.cash_balance)}`,
+      });
+      setFundingAmount('');
+      fetchData();
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.detail || `${type} failed` });
     }
   };
 
@@ -139,12 +171,13 @@ export default function Portfolio({ user, preferences }) {
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
       {performance && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
             { label: 'Total Value', value: formatCurrency(performance.total_value), color: 'text-zinc-900' },
             { label: 'Total P&L', value: formatCurrency(performance.total_pnl), color: getChangeColor(performance.total_pnl) },
             { label: 'P&L %', value: formatPercent(performance.total_pnl_pct), color: getChangeColor(performance.total_pnl_pct) },
             { label: 'Total Trades', value: performance.trade_count, color: 'text-sky-700' },
+            { label: 'Cash Balance', value: formatCurrency(cashBalance), color: 'text-emerald-700' },
           ].map(stat => (
             <div key={stat.label} className="market-panel rounded-md p-4">
               <p className="text-zinc-500 text-sm uppercase">{stat.label}</p>
@@ -209,6 +242,35 @@ export default function Portfolio({ user, preferences }) {
                 {tradeForm.action === 'buy' ? 'Buy' : 'Sell'} {tradeForm.asset}
               </button>
             </form>
+            <div className="mt-6 pt-6 border-t border-zinc-200 space-y-3">
+              <h3 className="text-sm font-semibold uppercase text-zinc-700">Funding</h3>
+              <p className="text-xs text-zinc-500">Available cash: {formatCurrency(cashBalance)}</p>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={fundingAmount}
+                onChange={e => setFundingAmount(e.target.value)}
+                className="market-input rounded-md px-3 py-2"
+                placeholder="Amount"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleFunding('deposit')}
+                  className="py-2 rounded-md text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
+                >
+                  Deposit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFunding('withdraw')}
+                  className="py-2 rounded-md text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white transition"
+                >
+                  Withdraw
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

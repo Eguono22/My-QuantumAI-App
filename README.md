@@ -81,6 +81,9 @@ A full-stack trading workspace built around quantum-inspired signals, paper-trad
 | POST | `/trading/mql5/bridge/execute-ai` | Shared secret | Analyze and execute a trade for a user |
 | GET | `/portfolio` | Yes | User portfolio |
 | POST | `/portfolio/trade` | Yes | Execute buy/sell |
+| GET | `/portfolio/cash` | Yes | Get current cash balance |
+| POST | `/portfolio/deposit` | Yes | Add funds to cash balance |
+| POST | `/portfolio/withdraw` | Yes | Withdraw funds from cash balance |
 | GET | `/portfolio/performance` | Yes | Portfolio P&L |
 | GET | `/health/startup` | No | Startup diagnostics (broker/data readiness) |
 | POST | `/monitoring/frontend-error` | No | Ingest frontend runtime error events |
