@@ -645,9 +645,10 @@ class TradingService:
         if available_cash < float(amount):
             raise ValueError("Insufficient cash balance")
 
-        cash_holding.quantity = available_cash - float(amount)
+        final_cash_balance = available_cash - float(amount)
+        cash_holding.quantity = final_cash_balance
         cash_holding.avg_price = 1.0
-        if cash_holding.quantity <= 0:
+        if final_cash_balance <= 0:
             db.delete(cash_holding)
 
         funding_trade = Trade(
@@ -670,7 +671,7 @@ class TradingService:
             "success": True,
             "action": "withdraw",
             "amount": round(float(amount), 2),
-            "cash_balance": round(max(0.0, cash_holding.quantity if cash_holding is not None else 0.0), 2),
+            "cash_balance": round(final_cash_balance, 2),
             "timestamp": funding_trade.timestamp.isoformat(),
             "message": "Withdrawal completed",
         }
@@ -1227,9 +1228,11 @@ class TradingService:
         portfolio = self.get_portfolio(db, user_id)
         cash_balance = self.get_cash_balance(db, user_id)
         
-        total_value = sum(h["current_value"] for h in portfolio) + cash_balance
-        total_cost = sum(h["cost_basis"] for h in portfolio) + cash_balance
-        total_pnl = total_value - total_cost
+        holdings_value = sum(h["current_value"] for h in portfolio)
+        holdings_cost = sum(h["cost_basis"] for h in portfolio)
+        total_value = holdings_value
+        total_cost = holdings_cost
+        total_pnl = holdings_value - holdings_cost
         
         return {
             "total_value": round(total_value, 2),

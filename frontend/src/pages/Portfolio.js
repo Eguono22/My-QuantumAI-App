@@ -57,17 +57,16 @@ export default function Portfolio({ user, preferences }) {
       if (!symbols.includes(selectedAsset) && symbols.length > 0) {
         setSelectedAsset(symbols[0]);
       }
-
-      if (cashRes.status === 'fulfilled') {
-        setCashBalance(cashRes.value?.cash_balance || 0);
-      } else {
-        setCashBalance(0);
-      }
       if (symbols.length > 0) {
         setTradeForm(prev => (
           symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }
         ));
       }
+    }
+    if (cashRes.status === 'fulfilled') {
+      setCashBalance(cashRes.value?.cash_balance || 0);
+    } else {
+      setCashBalance(0);
     }
 
     const coreFailed = portRes.status === 'rejected' && perfRes.status === 'rejected';
