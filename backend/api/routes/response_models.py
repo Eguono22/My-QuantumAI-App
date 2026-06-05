@@ -102,8 +102,18 @@ class PerformanceResponse(BaseModel):
     total_cost: float
     total_pnl: float
     total_pnl_pct: float
+    cash_balance: float
     holdings: List[PortfolioHolding]
     trade_count: int
+
+
+class FundingResponse(BaseModel):
+    success: bool
+    action: str
+    amount: float
+    cash_balance: float
+    timestamp: str
+    message: str
 
 
 # ── Trading signals ───────────────────────────────────────────────────────────

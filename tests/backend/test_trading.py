@@ -128,6 +128,74 @@ class TestTradingService:
         
         db.close()
 
+    def test_deposit_funds_updates_cash_balance(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="cashuser", email="cash@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        result = self.service.deposit_funds(db, user.id, 250.75)
+        assert result["success"] is True
+        assert result["action"] == "deposit"
+        assert result["cash_balance"] == 250.75
+        assert self.service.get_cash_balance(db, user.id) == 250.75
+
+        db.close()
+
+    def test_withdraw_funds_reduces_cash_balance(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="cashuser2", email="cash2@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        self.service.deposit_funds(db, user.id, 300.0)
+        result = self.service.withdraw_funds(db, user.id, 125.0)
+
+        assert result["success"] is True
+        assert result["action"] == "withdraw"
+        assert result["cash_balance"] == 175.0
+        assert self.service.get_cash_balance(db, user.id) == 175.0
+
+        db.close()
+
+    def test_withdraw_funds_fails_when_cash_is_insufficient(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from models.database import Base, User
+        import datetime
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        user = User(username="cashuser3", email="cash3@test.com", hashed_password="hashed", created_at=datetime.datetime.now(datetime.timezone.utc))
+        db.add(user)
+        db.commit()
+
+        with pytest.raises(ValueError, match="Insufficient cash balance"):
+            self.service.withdraw_funds(db, user.id, 1.0)
+
+        db.close()
+
     def test_limit_order_stays_pending_when_not_reached(self):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker

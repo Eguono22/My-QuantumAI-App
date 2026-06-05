@@ -21,9 +21,21 @@ export const tradingService = {
     const response = await api.get('/portfolio');
     return response.data;
   },
+  getCashBalance: async () => {
+    const response = await api.get('/portfolio/cash');
+    return response.data;
+  },
   executeTrade: async (asset, action, quantity, price, options = {}) => {
     const payload = { asset, action, quantity, price, ...options };
     const response = await api.post('/portfolio/trade', payload);
+    return response.data;
+  },
+  depositFunds: async (amount) => {
+    const response = await api.post('/portfolio/deposit', { amount });
+    return response.data;
+  },
+  withdrawFunds: async (amount) => {
+    const response = await api.post('/portfolio/withdraw', { amount });
     return response.data;
   },
   getPerformance: async () => {
