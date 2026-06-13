@@ -16,7 +16,7 @@ const navItems = [
 export default function Sidebar({ isOpen, unreadNotifications = 0 }) {
   const location = useLocation();
   return (
-    <aside className={`fixed left-0 top-16 h-full bg-white border-r border-market-line transition-all duration-300 z-40 ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
+    <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-white border-r border-market-line transition-all duration-300 z-40 ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
       <div className="p-4">
         <nav className="space-y-2">
           {navItems.map((item) => (

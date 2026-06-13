@@ -40,9 +40,9 @@ function ProtectedLayout({
         onToggleSidebar={onToggleSidebar}
         unreadNotifications={unreadNotifications}
       />
-      <div className="flex pt-16">
+      <div className="flex min-h-screen pt-16 overflow-x-hidden">
         <Sidebar isOpen={sidebarOpen} unreadNotifications={unreadNotifications} />
-        <main className={`flex-1 p-4 md:p-6 lg:p-8 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
+        <main className={`min-w-0 flex-1 p-4 md:p-5 lg:p-6 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
           {children}
         </main>
       </div>
