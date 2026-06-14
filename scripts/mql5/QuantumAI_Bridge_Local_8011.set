@@ -1,5 +1,5 @@
 QuantumApiBaseUrl=http://127.0.0.1:8011
-QuantumBridgeSecret=364adf113c0246689fdbe016d00140de7a7168daab3e4f6e1f743ab320f2103a
+QuantumBridgeSecret=fa903318b0f00e253af0c8f08c7eca777b9afa63aa255a1fa7bbbedb2fc38105
 QuantumTerminalId=mt5-demo-terminal
 QuantumUserId=1
 ExecutionMode=ANALYZE_ONLY

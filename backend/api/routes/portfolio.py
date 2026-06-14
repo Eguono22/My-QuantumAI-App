@@ -57,10 +57,17 @@ def execute_trade(request: TradeRequest, db: Session = Depends(get_db), current_
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Log unexpected exceptions and return a meaningful error
+        import logging
+        logger = logging.getLogger("quantumai.api")
+        logger.exception("Unexpected error in execute_trade: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Trade execution failed: {str(e)}")
 
 @router.get("/performance", response_model=PerformanceResponse)
 def get_performance(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return trading_service.get_performance(db, current_user.id)
+
 
 
 @router.post("/deposit", response_model=FundingResponse)
@@ -69,6 +76,11 @@ def deposit_funds(request: FundingRequest, db: Session = Depends(get_db), curren
         return trading_service.deposit_funds(db, current_user.id, request.amount)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("quantumai.api")
+        logger.exception("Unexpected error in deposit_funds: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Deposit failed: {str(e)}")
 
 
 @router.post("/withdraw", response_model=FundingResponse)
@@ -77,3 +89,8 @@ def withdraw_funds(request: FundingRequest, db: Session = Depends(get_db), curre
         return trading_service.withdraw_funds(db, current_user.id, request.amount)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("quantumai.api")
+        logger.exception("Unexpected error in withdraw_funds: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(e)}")

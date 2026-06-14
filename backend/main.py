@@ -4,8 +4,9 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot
 from api.websocket import websocket_endpoint
@@ -54,6 +55,28 @@ app.include_router(pilot.router)
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await websocket_endpoint(websocket)
+
+
+# Global exception handler for all unhandled exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Catch all unhandled exceptions and return meaningful error messages."""
+    # Don't override FastAPI's built-in HTTPException handling
+    if isinstance(exc, FastAPIHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+    
+    # Log the exception for debugging
+    logger.exception(f"Unhandled exception in {request.url}: {exc}")
+    
+    # Return a meaningful error message
+    error_message = str(exc) if str(exc) else "An unexpected error occurred"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {error_message}"},
+    )
 
 
 def ensure_sqlite_schema_compat():
