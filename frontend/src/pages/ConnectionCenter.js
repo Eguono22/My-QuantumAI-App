@@ -68,8 +68,27 @@ function BridgeAlertCard({ alert }) {
   );
 }
 
-function isHealthyStartup(status) {
-  return status === 'ok' || status === 'healthy';
+function isReachableStartup(status) {
+  return status === 'ok' || status === 'healthy' || status === 'degraded';
+}
+
+function getStartupTone(status) {
+  if (status === 'ok' || status === 'healthy') {
+    return {
+      label: 'Healthy',
+      className: 'text-emerald-700',
+    };
+  }
+  if (status === 'degraded') {
+    return {
+      label: 'Degraded',
+      className: 'text-amber-700',
+    };
+  }
+  return {
+    label: 'Offline',
+    className: 'text-red-700',
+  };
 }
 
 function formatLimit(value, suffix = '') {
@@ -237,8 +256,9 @@ export default function ConnectionCenter() {
 
   const terminalCount = mql5Status?.terminal_count ?? 0;
   const activeTerminals = mql5Status?.active_terminals ?? 0;
+  const startupTone = getStartupTone(startupHealth?.status);
   const checks = {
-    backendHealthy: isHealthyStartup(startupHealth?.status),
+    backendHealthy: isReachableStartup(startupHealth?.status),
     brokerReady: startupHealth?.trading?.broker_ready === true,
     bridgeEnabled: mql5Status?.enabled === true,
     bridgeSecretConfigured: mql5Status?.shared_secret_configured === true,
@@ -298,8 +318,8 @@ export default function ConnectionCenter() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="market-panel rounded-[24px] p-4">
           <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Backend</p>
-          <p className={`mt-2 text-2xl font-display font-bold ${checks.backendHealthy ? 'text-emerald-700' : 'text-red-700'}`}>
-            {checks.backendHealthy ? 'Healthy' : 'Offline'}
+          <p className={`mt-2 text-2xl font-display font-bold ${startupTone.className}`}>
+            {startupTone.label}
           </p>
           <p className="text-xs text-zinc-500 mt-2">{API_BASE_URL}</p>
         </div>

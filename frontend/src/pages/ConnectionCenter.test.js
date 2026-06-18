@@ -102,4 +102,32 @@ describe('ConnectionCenter', () => {
     expect(await screen.findByText('Paper Execution Ready')).toBeInTheDocument();
     expect(screen.getByText('Safe paper-trading loop is ready')).toBeInTheDocument();
   });
+
+  it('treats degraded startup as reachable instead of offline', async () => {
+    tradingService.getStartupHealth.mockResolvedValue({
+      status: 'degraded',
+      trading: {
+        broker_ready: true,
+        trading_mode: 'paper',
+        broker_provider: 'paper',
+        reason: 'Password reset email delivery is not configured yet.',
+      },
+      risk_limits: {
+        max_notional_per_trade: 25000,
+        max_daily_notional: 100000,
+        max_daily_trades: 50,
+        max_risk_percent_per_trade: 2,
+      },
+    });
+
+    render(
+      <MemoryRouter future={routerFuture}>
+        <ConnectionCenter />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Degraded')).toBeInTheDocument();
+    expect(screen.queryByText('Backend is not reachable')).not.toBeInTheDocument();
+    expect(screen.getByText('Bridge is configured, terminal heartbeat pending')).toBeInTheDocument();
+  });
 });
