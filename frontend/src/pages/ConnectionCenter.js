@@ -5,8 +5,6 @@ import Mql5BridgePanel from '../components/Mql5BridgePanel';
 import { tradingService } from '../services/tradingService';
 import { API_BASE_URL } from '../utils/constants';
 
-const productionBridgeBaseUrl = 'https://my-quantum-ai-app.vercel.app/api';
-
 const checklistLabels = {
   backendHealthy: 'Backend API reachable',
   brokerReady: 'Trading backend ready',
@@ -79,6 +77,24 @@ function formatLimit(value, suffix = '') {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
   return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })}${suffix}`;
+}
+
+function getRuntimeAppOrigin() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  return window.location.origin;
+}
+
+function getRuntimeBridgeBaseUrl() {
+  if (API_BASE_URL.startsWith('http://') || API_BASE_URL.startsWith('https://')) {
+    return API_BASE_URL;
+  }
+  const appOrigin = getRuntimeAppOrigin();
+  if (!appOrigin) {
+    return API_BASE_URL;
+  }
+  return `${appOrigin}${API_BASE_URL.startsWith('/') ? '' : '/'}${API_BASE_URL}`;
 }
 
 function getOperatorReadiness({ checks, startupHealth, mql5Status, bridgeAlerts }) {
@@ -182,6 +198,8 @@ export default function ConnectionCenter() {
   const [mql5Status, setMql5Status] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const bridgeBaseUrl = getRuntimeBridgeBaseUrl();
+  const appOrigin = getRuntimeAppOrigin();
 
   useEffect(() => {
     let isMounted = true;
@@ -468,12 +486,12 @@ export default function ConnectionCenter() {
             <div className="market-panel-soft rounded-[22px] p-4 border border-zinc-200">
               <p className="text-xs uppercase tracking-wide text-zinc-500">1. API Base URL</p>
               <p className="mt-2 text-zinc-800 font-medium">Use the production API URL in the EA inputs.</p>
-              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 overflow-x-auto">{productionBridgeBaseUrl}</code>
+              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 overflow-x-auto">{bridgeBaseUrl}</code>
             </div>
             <div className="market-panel-soft rounded-[22px] p-4 border border-zinc-200">
               <p className="text-xs uppercase tracking-wide text-zinc-500">2. MT5 URL</p>
               <p className="mt-2 text-zinc-800 font-medium">Allow the app origin in MT5 WebRequest settings.</p>
-              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 overflow-x-auto">https://my-quantum-ai-app.vercel.app</code>
+              <code className="block mt-3 text-xs bg-zinc-900 text-zinc-100 rounded-xl px-3 py-2 overflow-x-auto">{appOrigin || 'Set from the current app URL'}</code>
               <p className="mt-3 text-xs text-zinc-500">Tools → Options → Expert Advisors</p>
             </div>
             <div className="market-panel-soft rounded-[22px] p-4 border border-zinc-200">
