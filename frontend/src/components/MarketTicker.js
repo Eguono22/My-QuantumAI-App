@@ -4,7 +4,7 @@ import { formatCurrency, formatPercent } from '../utils/formatters';
 export default function MarketTicker({ items = [] }) {
   if (!items.length) {
     return (
-      <div className="market-panel rounded-md px-4 py-3 text-sm text-zinc-500">
+      <div className="market-panel rounded-[24px] px-4 py-4 text-sm text-zinc-500">
         Waiting for live market data...
       </div>
     );
@@ -13,22 +13,22 @@ export default function MarketTicker({ items = [] }) {
   const strip = [...items, ...items];
 
   return (
-    <div className="market-panel rounded-md overflow-hidden">
-      <div className="bg-market-black text-white px-3 py-2 text-xs font-semibold uppercase tracking-widest">
+    <div className="market-panel overflow-hidden rounded-[24px]">
+      <div className="bg-slate-950 text-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em]">
         Live Ticker
       </div>
-      <div className="relative overflow-hidden py-2">
+      <div className="relative overflow-hidden py-3">
         <div className="flex w-max animate-ticker">
           {strip.map((item, idx) => {
             const positive = item.change_pct_24h >= 0;
             return (
               <div
                 key={`${item.symbol}-${idx}`}
-                className="flex items-center gap-2 px-4 border-r border-zinc-200 whitespace-nowrap"
+                className="flex items-center gap-3 whitespace-nowrap border-r border-zinc-200/80 px-5"
               >
-                <span className="font-display text-base tracking-wide text-zinc-900">{item.symbol}</span>
-                <span className="text-zinc-700 text-sm">{formatCurrency(item.price)}</span>
-                <span className={`text-xs font-semibold ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
+                <span className="font-display text-base tracking-[0.16em] text-zinc-900">{item.symbol}</span>
+                <span className="text-sm font-medium text-zinc-700">{formatCurrency(item.price)}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${positive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {formatPercent(item.change_pct_24h)}
                 </span>
               </div>

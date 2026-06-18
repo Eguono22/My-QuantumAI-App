@@ -58,11 +58,12 @@ export default function Portfolio({ user, preferences }) {
         setSelectedAsset(symbols[0]);
       }
       if (symbols.length > 0) {
-        setTradeForm(prev => (
+        setTradeForm((prev) => (
           symbols.includes(prev.asset) ? prev : { ...prev, asset: symbols[0] }
         ));
       }
     }
+
     if (cashRes.status === 'fulfilled') {
       setCashBalance(cashRes.value?.cash_balance || 0);
     } else {
@@ -80,7 +81,9 @@ export default function Portfolio({ user, preferences }) {
     setLoading(false);
   }, [selectedAsset]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleTrade = async (e) => {
     e.preventDefault();
@@ -90,11 +93,7 @@ export default function Portfolio({ user, preferences }) {
       return;
     }
     try {
-      await tradingService.executeTrade(
-        tradeForm.asset,
-        tradeForm.action,
-        qty
-      );
+      await tradingService.executeTrade(tradeForm.asset, tradeForm.action, qty);
       setAlert({ type: 'success', message: `${tradeForm.action.toUpperCase()} order executed: ${tradeForm.quantity} ${tradeForm.asset}` });
       setTradeForm({ ...tradeForm, quantity: '' });
       fetchData();
@@ -132,20 +131,47 @@ export default function Portfolio({ user, preferences }) {
   const showHoldingsPanel = activeView !== 'performance';
   const showAllocationPanel = true;
   const showPriceChart = activeView !== 'risk';
+  const totalExposure = portfolio.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
+  const bestHolding = [...portfolio].sort((a, b) => Number(b.pnl_pct || 0) - Number(a.pnl_pct || 0))[0];
+  const worstHolding = [...portfolio].sort((a, b) => Number(a.pnl_pct || 0) - Number(b.pnl_pct || 0))[0];
 
   return (
     <div className="space-y-8 animate-fadeRise">
-      <div
-        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
-        style={{ background: 'linear-gradient(135deg, #101827 0%, #0e223f 52%, #194172 100%)' }}
-      >
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 18%, #38bdf8 0, transparent 34%), radial-gradient(circle at 80% 70%, #34d399 0, transparent 28%)' }} />
-        <div className="relative p-6 md:p-8">
-          <p className="text-cyan-200 text-xs tracking-[0.18em] uppercase">Portfolio Command</p>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide mt-1">Portfolio</h1>
-          <p className="text-zinc-200 mt-1">Execution panel and performance analytics</p>
+      <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/15 bg-[linear-gradient(135deg,#07111f_0%,#0c2442_48%,#15426d_100%)] p-6 shadow-panel md:p-8">
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 16% 18%, rgba(34,211,238,0.7) 0, transparent 28%), radial-gradient(circle at 82% 70%, rgba(16,185,129,0.34) 0, transparent 26%), radial-gradient(circle at 76% 20%, rgba(244,201,93,0.18) 0, transparent 18%)' }} />
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-200/90">Portfolio Command</p>
+            <h1 className="mt-2 font-display text-4xl font-bold uppercase text-white md:text-5xl">Capital, exposure, and execution in one view</h1>
+            <p className="mt-4 text-sm leading-6 text-slate-200 md:text-base">
+              Track current holdings, manage paper capital, and inspect performance with a layout that feels closer to a real operator dashboard.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
+                Operator: {user?.username || 'workspace'}
+              </span>
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                View: {activeView}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Total Exposure</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{formatCurrency(totalExposure)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Best Holding</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-300">{bestHolding ? bestHolding.asset : '--'}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Risk Watch</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-100">{worstHolding ? worstHolding.asset : '--'}</p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       <div className="flex flex-wrap gap-2">
         {[
@@ -156,10 +182,10 @@ export default function Portfolio({ user, preferences }) {
           <button
             key={view.key}
             onClick={() => setActiveView(view.key)}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
               activeView === view.key
-                ? 'bg-market-yellow text-black border border-amber-600'
-                : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+                ? 'bg-market-yellow text-slate-950 shadow-[0_10px_24px_rgba(244,201,93,0.22)]'
+                : 'border border-zinc-300 bg-white/70 text-zinc-800 hover:bg-zinc-100'
             }`}
           >
             {view.label}
@@ -170,132 +196,161 @@ export default function Portfolio({ user, preferences }) {
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
       {performance && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
-            { label: 'Total Value', value: formatCurrency(performance.total_value), color: 'text-zinc-900' },
-            { label: 'Total P&L', value: formatCurrency(performance.total_pnl), color: getChangeColor(performance.total_pnl) },
-            { label: 'P&L %', value: formatPercent(performance.total_pnl_pct), color: getChangeColor(performance.total_pnl_pct) },
-            { label: 'Total Trades', value: performance.trade_count, color: 'text-sky-700' },
-            { label: 'Cash Balance', value: formatCurrency(cashBalance), color: 'text-emerald-700' },
-          ].map(stat => (
-            <div key={stat.label} className="market-panel rounded-md p-4">
-              <p className="text-zinc-500 text-sm uppercase">{stat.label}</p>
-              <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+            { label: 'Total Value', value: formatCurrency(performance.total_value), tone: 'text-zinc-900' },
+            { label: 'Total P&L', value: formatCurrency(performance.total_pnl), tone: getChangeColor(performance.total_pnl) },
+            { label: 'P&L %', value: formatPercent(performance.total_pnl_pct), tone: getChangeColor(performance.total_pnl_pct) },
+            { label: 'Total Trades', value: performance.trade_count, tone: 'text-cyan-700' },
+            { label: 'Cash Balance', value: formatCurrency(cashBalance), tone: 'text-emerald-700' },
+          ].map((stat) => (
+            <div key={stat.label} className="market-panel rounded-[24px] p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">{stat.label}</p>
+              <p className={`mt-2 text-2xl font-semibold ${stat.tone}`}>{stat.value}</p>
             </div>
           ))}
-        </div>
+        </section>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section className="grid gap-6 lg:grid-cols-3">
         {showTradePanel && (
-          <div className="market-panel rounded-md p-6">
-            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Execute Trade</h2>
-            <form onSubmit={handleTrade} className="space-y-4">
+          <div className="market-panel rounded-[28px] p-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <label className="block text-sm text-zinc-600 mb-1">Asset</label>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Execution Ticket</p>
+                <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Execute Trade</h2>
+              </div>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                Paper Mode
+              </span>
+            </div>
+
+            <form onSubmit={handleTrade} className="mt-5 space-y-4">
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Asset</label>
                 <select
                   value={tradeForm.asset}
-                  onChange={e => setTradeForm({...tradeForm, asset: e.target.value})}
-                  className="market-select rounded-md px-3 py-2"
+                  onChange={(e) => setTradeForm({ ...tradeForm, asset: e.target.value })}
+                  className="market-select rounded-xl px-3 py-3"
                 >
-                  {assetOptions.map(s => (
+                  {assetOptions.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
+
               <div className="grid grid-cols-2 gap-2">
-                {['buy', 'sell'].map(action => (
+                {['buy', 'sell'].map((action) => (
                   <button
                     key={action}
                     type="button"
-                    onClick={() => setTradeForm({...tradeForm, action})}
-                    className={`py-2 rounded-md text-sm font-semibold transition ${
+                    onClick={() => setTradeForm({ ...tradeForm, action })}
+                    className={`rounded-xl py-3 text-sm font-semibold transition ${
                       tradeForm.action === action
-                        ? action === 'buy' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-                        : 'bg-white text-zinc-600 border border-zinc-300'
+                        ? action === 'buy'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-red-600 text-white'
+                        : 'border border-zinc-300 bg-white/70 text-zinc-700 hover:bg-zinc-100'
                     }`}
                   >
                     {action.toUpperCase()}
                   </button>
                 ))}
               </div>
+
               <div>
-                <label className="block text-sm text-zinc-600 mb-1">Quantity</label>
+                <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Quantity</label>
                 <input
                   type="number"
                   step="0.001"
                   min="0"
                   value={tradeForm.quantity}
-                  onChange={e => setTradeForm({...tradeForm, quantity: e.target.value})}
-                  className="market-input rounded-md px-3 py-2"
+                  onChange={(e) => setTradeForm({ ...tradeForm, quantity: e.target.value })}
+                  className="market-input rounded-xl px-3 py-3"
                   placeholder="0.00"
                   required
                 />
               </div>
+
               <button
                 type="submit"
-                className={`w-full py-3 rounded-md font-semibold transition ${
+                className={`w-full rounded-xl py-3 font-semibold text-white transition ${
                   tradeForm.action === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-                } text-white`}
+                }`}
               >
                 {tradeForm.action === 'buy' ? 'Buy' : 'Sell'} {tradeForm.asset}
               </button>
             </form>
-            <div className="mt-6 pt-6 border-t border-zinc-200 space-y-3">
-              <h3 className="text-sm font-semibold uppercase text-zinc-700">Funding</h3>
-              <p className="text-xs text-zinc-500">Available cash: {formatCurrency(cashBalance)}</p>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={fundingAmount}
-                onChange={e => setFundingAmount(e.target.value)}
-                className="market-input rounded-md px-3 py-2"
-                placeholder="Amount"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleFunding('deposit')}
-                  className="py-2 rounded-md text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
-                >
-                  Deposit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleFunding('withdraw')}
-                  className="py-2 rounded-md text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white transition"
-                >
-                  Withdraw
-                </button>
+
+            <div className="mt-6 border-t border-zinc-200/80 pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Funding Desk</p>
+                  <p className="mt-1 text-sm text-zinc-600">Available cash: {formatCurrency(cashBalance)}</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={fundingAmount}
+                  onChange={(e) => setFundingAmount(e.target.value)}
+                  className="market-input rounded-xl px-3 py-3"
+                  placeholder="Funding amount"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleFunding('deposit')}
+                    className="rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    Deposit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFunding('withdraw')}
+                    className="rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white transition hover:bg-amber-700"
+                  >
+                    Withdraw
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {showAllocationPanel && (
-          <div className="market-panel rounded-md p-6">
-            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Allocation</h2>
-            <PortfolioChart holdings={portfolio} />
+          <div className="market-panel rounded-[28px] p-6">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Composition</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Allocation</h2>
+            <div className="mt-5">
+              <PortfolioChart holdings={portfolio} />
+            </div>
           </div>
         )}
 
         {showHoldingsPanel && (
-          <div className="market-panel rounded-md p-6">
-            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase mb-4">Holdings</h2>
+          <div className="market-panel rounded-[28px] p-6">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Current Book</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Holdings</h2>
             {portfolio.length === 0 ? (
-              <p className="text-zinc-500 text-center py-8">No holdings yet. Execute a trade to get started.</p>
+              <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500">
+                No holdings yet. Execute a trade to get started.
+              </p>
             ) : (
-              <div className="space-y-3">
-                {portfolio.map(h => (
-                  <div key={h.asset} className="flex justify-between items-center p-3 bg-zinc-50 rounded-md border border-zinc-200">
-                    <div>
-                      <p className="font-semibold text-zinc-900">{h.asset}</p>
-                      <p className="text-xs text-zinc-500">{h.quantity} @ {formatCurrency(h.avg_price)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-zinc-900 font-semibold">{formatCurrency(h.current_value)}</p>
-                      <p className={`text-xs ${getChangeColor(h.pnl)}`}>{formatPercent(h.pnl_pct)}</p>
+              <div className="mt-5 space-y-3">
+                {portfolio.map((h) => (
+                  <div key={h.asset} className="market-panel-soft rounded-[22px] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-zinc-900">{h.asset}</p>
+                        <p className="mt-1 text-xs text-zinc-500">{h.quantity} @ {formatCurrency(h.avg_price)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-zinc-900">{formatCurrency(h.current_value)}</p>
+                        <p className={`mt-1 text-xs ${getChangeColor(h.pnl)}`}>{formatPercent(h.pnl_pct)}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -303,24 +358,29 @@ export default function Portfolio({ user, preferences }) {
             )}
           </div>
         )}
-      </div>
+      </section>
 
       {showPriceChart && (
-        <div className="market-panel rounded-md p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Price Chart</h2>
+        <section className="market-panel rounded-[28px] p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Market Context</p>
+              <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Price Chart</h2>
+            </div>
             <select
               value={selectedAsset}
-              onChange={e => setSelectedAsset(e.target.value)}
-              className="market-select rounded-md px-3 py-1 text-sm"
+              onChange={(e) => setSelectedAsset(e.target.value)}
+              className="market-select min-w-[150px] rounded-xl px-3 py-2 text-sm"
             >
-              {assetOptions.map(s => (
+              {assetOptions.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
-          <PriceChart history={priceHistory} symbol={selectedAsset} />
-        </div>
+          <div className="chart-glow mt-5 overflow-hidden rounded-[24px] border border-zinc-200/70 bg-zinc-950/95 p-3">
+            <PriceChart history={priceHistory} symbol={selectedAsset} />
+          </div>
+        </section>
       )}
     </div>
   );

@@ -23,7 +23,7 @@ describe('Navbar', () => {
 
   it('renders the live indicator', () => {
     renderNavbar({ user: null, onLogout: jest.fn(), onToggleSidebar: jest.fn() });
-    expect(screen.getByText('● Live')).toBeInTheDocument();
+    expect(screen.getByText('Live telemetry')).toBeInTheDocument();
   });
 
   it('shows the alerts badge when unread notifications exist', () => {

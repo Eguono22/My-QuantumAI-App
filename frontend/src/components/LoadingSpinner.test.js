@@ -11,19 +11,19 @@ describe('LoadingSpinner', () => {
   it('applies small size class', () => {
     const { container } = render(<LoadingSpinner size="sm" />);
     const spinner = container.querySelector('.animate-spin');
-    expect(spinner).toHaveClass('h-4', 'w-4');
+    expect(spinner).toHaveClass('h-5', 'w-5');
   });
 
   it('applies medium size class (default)', () => {
     const { container } = render(<LoadingSpinner />);
     const spinner = container.querySelector('.animate-spin');
-    expect(spinner).toHaveClass('h-8', 'w-8');
+    expect(spinner).toHaveClass('h-10', 'w-10');
   });
 
   it('applies large size class', () => {
     const { container } = render(<LoadingSpinner size="lg" />);
     const spinner = container.querySelector('.animate-spin');
-    expect(spinner).toHaveClass('h-12', 'w-12');
+    expect(spinner).toHaveClass('h-14', 'w-14');
   });
 
   it('always renders the spinner div with animate-spin', () => {

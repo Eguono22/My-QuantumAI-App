@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { marketService } from '../services/marketService';
 import { tradingService } from '../services/tradingService';
 import TradingSignalCard from '../components/TradingSignalCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+function getFlowTone(value) {
+  return Number(value) >= 0 ? 'text-emerald-300' : 'text-rose-300';
+}
 
 export default function Dashboard({ preferences }) {
   const [marketData, setMarketData] = useState([]);
@@ -48,285 +52,327 @@ export default function Dashboard({ preferences }) {
     return () => clearInterval(interval);
   }, [sentimentAsset]);
 
+  if (loading) return <LoadingSpinner size="lg" />;
+
   const pendingOrders = orders.filter((o) => o.status === 'PENDING');
+  const liveSignals = signals.filter((s) => s.signal_type !== 'HOLD');
+  const bullishMarkets = marketData.filter((item) => Number(item.change_pct_24h) >= 0).length;
   const layoutMode = preferences?.layout || 'trader-pro';
   const aiModel = preferences?.aiModel || 'quantum-core-v1';
   const isCompact = layoutMode === 'compact';
   const isFocus = layoutMode === 'focus';
   const showAdvancedSections = layoutMode === 'trader-pro';
-  const stats = [
-    { label: 'Markets Covered', value: marketData.length, color: 'text-white' },
-    { label: 'Live Signals', value: signals.filter((s) => s.signal_type !== 'HOLD').length, color: 'text-sky-300' },
-    { label: 'Pending Orders', value: pendingOrders.length, color: 'text-amber-300' },
-    { label: 'Broker Mode', value: startupHealth?.trading?.trading_mode || 'paper', color: 'text-emerald-300' },
-  ];
-  const topMarkets = [...marketData].slice(0, isFocus ? 4 : 8);
+  const topMarkets = [...marketData].slice(0, isFocus ? 4 : 6);
   const featuredSignals = [...signals].slice(0, isCompact ? 2 : 4);
-
-  if (loading) return <LoadingSpinner size="lg" />;
+  const marketFlow = marketData.length ? ((bullishMarkets / marketData.length) * 100) - 50 : 0;
+  const signalWinProxy = liveSignals.length ? ((liveSignals.filter((s) => Number(s.confidence) >= 0.65).length / liveSignals.length) * 100) : 0;
+  const stats = [
+    { label: 'Live Universe', value: `${marketData.length}`, note: 'Tracked instruments', tone: 'text-cyan-200' },
+    { label: 'Actionable Signals', value: `${liveSignals.length}`, note: 'Non-hold model output', tone: 'text-emerald-200' },
+    { label: 'Pending Orders', value: `${pendingOrders.length}`, note: 'Awaiting broker state', tone: 'text-amber-200' },
+    { label: 'Broker Mode', value: `${startupHealth?.trading?.trading_mode || 'paper'}`, note: 'Current execution route', tone: 'text-slate-100' },
+  ];
 
   return (
     <div className="space-y-8 animate-fadeRise">
-      <div
-        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
-        style={{ background: 'linear-gradient(135deg, #0b1220 0%, #0d1d3d 48%, #163a78 100%)' }}
-      >
-        <div
-          className="absolute inset-0 opacity-25"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #38bdf8 0, transparent 32%), radial-gradient(circle at 82% 70%, #22d3ee 0, transparent 36%)' }}
-        />
-        <div className="relative px-6 py-10 md:px-10 md:py-14">
-          <p className="text-sky-200 text-xs tracking-[0.18em] uppercase">QuantumAI Trading Platform</p>
-          <h1 className="mt-3 text-3xl md:text-5xl font-display font-bold text-white uppercase leading-tight">
-            Trade Smarter With Quantum-Inspired AI
-          </h1>
-          <p className="mt-4 text-sky-100 max-w-2xl text-sm md:text-base">
-            Prove a trustworthy paper-trading loop before scaling: connect, review AI rationale, enforce risk, execute tiny paper trades, and learn from the record.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <span className="px-3 py-1 rounded-md bg-cyan-900/60 text-cyan-200 text-xs font-semibold uppercase tracking-wide">
-              Model: {aiModel}
-            </span>
-            <span className="px-3 py-1 rounded-md bg-zinc-900/50 text-zinc-200 text-xs font-semibold uppercase tracking-wide">
-              Layout: {layoutMode}
-            </span>
-            <Link to="/app/pilot" className="px-5 py-2.5 rounded-md bg-emerald-300 text-zinc-950 font-semibold hover:bg-emerald-200 transition">
-              Start 14-Day Pilot
-            </Link>
-            <Link to="/app/signals" className="px-5 py-2.5 rounded-md border border-sky-300 text-sky-100 font-semibold hover:bg-sky-900/40 transition">
-              View AI Signals
-            </Link>
-            <Link to="/app/orders" className="px-5 py-2.5 rounded-md border border-zinc-500 text-zinc-200 font-semibold hover:bg-zinc-800/40 transition">
-              Open Orders
-            </Link>
-            <Link to="/app/connect" className="px-5 py-2.5 rounded-md border border-cyan-300 text-cyan-100 font-semibold hover:bg-cyan-900/30 transition">
-              Connection Center
-            </Link>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_360px]">
+        <div className="relative overflow-hidden rounded-[28px] border border-cyan-400/15 bg-[linear-gradient(135deg,#06101d_0%,#0c2240_48%,#103966_100%)] p-6 md:p-8 shadow-panel">
+          <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 18% 20%, rgba(56,189,248,0.65) 0, transparent 26%), radial-gradient(circle at 80% 18%, rgba(244,201,93,0.22) 0, transparent 18%), radial-gradient(circle at 86% 75%, rgba(16,185,129,0.35) 0, transparent 26%)' }} />
+          <div className="relative flex flex-col gap-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-200/90">Trading Command Center</p>
+                <h1 className="mt-3 font-display text-4xl font-bold uppercase leading-none text-white md:text-6xl">
+                  Real-time flow,
+                  <br />
+                  AI conviction,
+                  <br />
+                  cleaner execution.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-200 md:text-base">
+                  Watch the market board, inspect signal rationale, and keep every order inside a guarded paper-trading loop before capital ever touches live markets.
+                </p>
+              </div>
+
+              <div className="grid min-w-[250px] grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Signal Quality</p>
+                  <p className="mt-2 font-display text-3xl font-bold text-white">{signalWinProxy.toFixed(0)}%</p>
+                  <p className="mt-1 text-xs text-slate-300">Confidence above 65%</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Market Breadth</p>
+                  <p className={`mt-2 font-display text-3xl font-bold ${getFlowTone(marketFlow)}`}>
+                    {marketFlow >= 0 ? '+' : ''}{marketFlow.toFixed(0)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-300">Bullish minus bearish balance</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              {stats.map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">{stat.label}</p>
+                  <p className={`mt-2 truncate font-display text-2xl font-bold uppercase ${stat.tone}`}>{stat.value}</p>
+                  <p className="mt-1 text-xs text-slate-300">{stat.note}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link to="/app/signals" className="market-btn-primary rounded-xl px-5 py-3 text-sm font-semibold">
+                Open Signal Desk
+              </Link>
+              <Link to="/app/markets" className="rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/15">
+                View Market Radar
+              </Link>
+              <Link to="/app/orders" className="rounded-xl border border-white/12 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+                Review Orders
+              </Link>
+              <Link to="/app/connect" className="rounded-xl border border-white/12 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+                Check Integrations
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className={`grid grid-cols-2 ${isCompact ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-4`}>
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl p-4 border border-zinc-700" style={{ background: 'linear-gradient(180deg, #121a2c 0%, #0f172a 100%)' }}>
-            <p className="text-zinc-400 text-xs uppercase tracking-wide">{stat.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {!isFocus && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-          <div className="xl:col-span-2 rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0b1324 0%, #0f172a 100%)' }}>
-            <p className="text-xs uppercase tracking-wide text-zinc-400">Platform Edge</p>
-            <h2 className="text-2xl font-display font-bold text-white uppercase">Why Trade With QuantumAI</h2>
-            <div className="grid md:grid-cols-3 gap-3 mt-4">
-              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-                <p className="text-sky-300 text-xs uppercase">Execution Safety</p>
-                <p className="text-zinc-200 text-sm mt-2">Pre-trade risk validation with notional, daily volume, and risk-per-trade controls.</p>
-              </div>
-              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-                <p className="text-cyan-300 text-xs uppercase">Adaptive Signals</p>
-                <p className="text-zinc-200 text-sm mt-2">Quantum-inspired signal engine combining volatility, momentum, and regime context.</p>
-              </div>
-              <div className="rounded-lg p-4 border border-zinc-800 bg-zinc-900/50">
-                <p className="text-emerald-300 text-xs uppercase">Broker-Ready Ops</p>
-                <p className="text-zinc-200 text-sm mt-2">Order lifecycle tracking, pending polling, and cancellation controls in one place.</p>
-              </div>
+        <div className="market-panel rounded-[28px] p-5 md:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">Broker Status</p>
+              <h2 className="mt-2 font-display text-2xl font-bold uppercase text-zinc-900">Execution Readiness</h2>
             </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+              startupHealth?.status === 'ok'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}>
+              {startupHealth?.status === 'ok' ? 'Ready' : 'Check'}
+            </span>
           </div>
 
-          <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-400">System Status</p>
-                <h3 className="text-lg font-display font-bold text-white uppercase">Broker Readiness</h3>
-              </div>
-              <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                startupHealth?.status === 'ok' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'
-              }`}>
-                {startupHealth?.status === 'ok' ? 'READY' : 'CHECK'}
-              </span>
+          <div className="mt-5 space-y-3">
+            <div className="market-panel-soft rounded-2xl p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Provider</p>
+              <p className="mt-2 text-lg font-semibold text-zinc-900">{startupHealth?.trading?.broker_provider || 'Unavailable'}</p>
             </div>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Provider</span>
-                <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.broker_provider || 'unavailable'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Mode</span>
-                <span className="text-zinc-200 font-semibold">{startupHealth?.trading?.trading_mode || 'unavailable'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Credentials</span>
-                <span className={`font-semibold ${startupHealth?.credentials?.alpaca_configured ? 'text-emerald-300' : 'text-amber-300'}`}>
-                  {startupHealth?.credentials?.alpaca_configured ? 'Configured' : 'Missing or N/A'}
-                </span>
-              </div>
+            <div className="market-panel-soft rounded-2xl p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Mode</p>
+              <p className="mt-2 text-lg font-semibold text-zinc-900">{startupHealth?.trading?.trading_mode || 'Unavailable'}</p>
             </div>
-            {startupHealth?.trading?.reason && <p className="mt-3 text-xs text-zinc-400">{startupHealth.trading.reason}</p>}
-            <Link to="/app/connect" className="inline-block mt-4 text-sm font-semibold text-cyan-300 hover:text-cyan-200">
-              Open setup checklist
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {!isFocus && (
-        <div className="rounded-xl border border-emerald-700 p-5" style={{ background: 'linear-gradient(135deg, #071a12 0%, #0f2d24 52%, #10284a 100%)' }}>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="max-w-3xl">
-              <p className="text-emerald-200 text-xs uppercase tracking-wide">Next Best Step</p>
-              <h2 className="mt-2 text-xl font-display font-bold text-white uppercase">Run the 14-day paper-trading trust pilot</h2>
-              <p className="mt-2 text-sm text-emerald-50">
-                Keep the product focused on one proof: real users can understand, trust, and repeat the AI-assisted paper trading workflow.
+            <div className="market-panel-soft rounded-2xl p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Credentials</p>
+              <p className={`mt-2 text-lg font-semibold ${startupHealth?.credentials?.alpaca_configured ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {startupHealth?.credentials?.alpaca_configured ? 'Configured' : 'Missing or N/A'}
               </p>
             </div>
-            <Link to="/app/pilot" className="px-4 py-2 rounded-md bg-emerald-300 text-zinc-950 text-sm font-semibold hover:bg-emerald-200 transition">
-              Open Pilot
-            </Link>
           </div>
-        </div>
-      )}
 
-      <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0b1324 0%, #0f172a 100%)' }}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-xl font-display font-bold text-white uppercase">Live Markets</h2>
-          <Link to="/app/markets" className="text-sky-300 text-sm font-semibold hover:text-sky-200">View all markets</Link>
+          <div className="mt-5 rounded-2xl border border-cyan-200/60 bg-cyan-50/80 p-4 text-sm text-cyan-950">
+            <p className="font-semibold">Guard rails stay on.</p>
+            <p className="mt-1">
+              {startupHealth?.trading?.reason || 'Use paper mode first and promote only when the signal trust loop is repeatable.'}
+            </p>
+          </div>
+
+          <Link to="/app/pilot" className="mt-5 inline-flex rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100">
+            Open 14-Day Pilot
+          </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+      </section>
+
+      {!isFocus && (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {topMarkets.map((item) => {
             const positive = Number(item.change_pct_24h) >= 0;
-            const sourceBadgeClass = item.data_source === 'alpaca'
-              ? 'bg-sky-950/60 text-sky-200 border-sky-800'
-              : 'bg-amber-950/60 text-amber-200 border-amber-800';
             return (
-              <div key={item.symbol} className="rounded-lg p-3 border border-zinc-800 bg-zinc-900/40">
-                <div className="flex items-center justify-between">
-                  <p className="text-zinc-100 font-display font-bold text-lg">{item.symbol}</p>
-                  <span className={`text-xs font-semibold ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
+              <div key={item.symbol} className="market-panel rounded-[24px] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display text-2xl font-bold uppercase text-zinc-900">{item.symbol}</p>
+                    <p className="text-sm text-zinc-500">{item.name}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${positive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                     {positive ? '+' : ''}{Number(item.change_pct_24h).toFixed(2)}%
                   </span>
                 </div>
-                <p className="text-zinc-300 text-sm mt-1">{item.name}</p>
-                <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${sourceBadgeClass}`}>
-                  {item.data_source_label || 'Source unknown'}
-                </span>
-                <p className="text-white font-semibold mt-2">{Number(item.price).toLocaleString()}</p>
+                <p className="mt-6 text-[11px] uppercase tracking-[0.22em] text-zinc-500">Last Price</p>
+                <p className="mt-2 text-3xl font-semibold text-zinc-900">{Number(item.price).toLocaleString()}</p>
+                <div className="mt-5 flex items-center justify-between rounded-2xl border border-zinc-200/70 bg-zinc-50/70 px-3 py-3 text-xs">
+                  <span className="text-zinc-500">{item.data_source_label || 'Source unknown'}</span>
+                  <span className={`font-semibold ${positive ? 'text-emerald-700' : 'text-rose-700'}`}>{positive ? 'Momentum up' : 'Pressure down'}</span>
+                </div>
               </div>
             );
           })}
-        </div>
-      </div>
+        </section>
+      )}
 
-      <div className={`grid grid-cols-1 ${isCompact ? 'xl:grid-cols-2' : 'xl:grid-cols-3'} gap-5`}>
-        <div className="xl:col-span-2 rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-xl font-display font-bold text-white uppercase">Signal Snapshot</h2>
-            <Link to="/app/signals" className="text-cyan-300 text-sm font-semibold hover:text-cyan-200">Open signal center</Link>
+      <section className={`grid gap-5 ${isCompact ? 'xl:grid-cols-2' : 'xl:grid-cols-[minmax(0,1.5fr)_380px]'}`}>
+        <div className="market-panel rounded-[28px] p-5 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">AI Output</p>
+              <h2 className="mt-1 font-display text-2xl font-bold uppercase text-zinc-900">Signal Snapshot</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700">
+                Layout: {layoutMode}
+              </span>
+              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">
+                Model: {aiModel}
+              </span>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {featuredSignals.map((signal, i) => <TradingSignalCard key={signal.id ?? `${signal.asset}-${i}`} signal={signal} />)}
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {featuredSignals.map((signal, i) => (
+              <TradingSignalCard key={signal.id ?? `${signal.asset}-${i}`} signal={signal} />
+            ))}
           </div>
         </div>
 
-        {!isCompact && (
-          <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #101827 0%, #0f172a 100%)' }}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-display font-bold text-white uppercase">Pending Orders</h2>
-            <span className="text-sm font-semibold text-zinc-200">{pendingOrders.length}</span>
-          </div>
-          <div className="mt-3 space-y-2">
-            {pendingOrders.length === 0 && <p className="text-sm text-zinc-400">No pending orders right now.</p>}
-            {pendingOrders.slice(0, 4).map((order) => (
-              <div key={order.id} className="rounded-md p-3 bg-zinc-900/50 border border-zinc-800 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-zinc-100">{order.asset} {order.action.toUpperCase()}</p>
-                  <p className="text-xs text-zinc-400">Qty {Number(order.requested_quantity).toFixed(6)} | {order.order_type}</p>
+        <div className="space-y-5">
+          <div className="market-panel rounded-[28px] p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-bold uppercase text-zinc-900">Pending Orders</h2>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                {pendingOrders.length}
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {pendingOrders.length === 0 && (
+                <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500">
+                  No pending orders right now.
+                </p>
+              )}
+              {pendingOrders.slice(0, 4).map((order) => (
+                <div key={order.id} className="market-panel-soft rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{order.asset} {order.action.toUpperCase()}</p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Qty {Number(order.requested_quantity).toFixed(6)} • {order.order_type}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
+                      Pending
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[11px] font-semibold px-2 py-1 rounded bg-sky-900/60 text-sky-300">PENDING</span>
+              ))}
+            </div>
+            <Link to="/app/orders" className="mt-4 inline-flex rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100">
+              Manage Orders
+            </Link>
+          </div>
+
+          <div className="market-panel rounded-[28px] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">Next Step</p>
+                <h2 className="mt-1 font-display text-xl font-bold uppercase text-zinc-900">Trust Pilot</h2>
               </div>
-            ))}
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                Recommended
+              </span>
+            </div>
+            <p className="mt-3 text-sm text-zinc-600">
+              Keep the product focused on one proof: users can understand, trust, and repeat the AI-assisted paper trading workflow.
+            </p>
+            <Link to="/app/pilot" className="mt-4 inline-flex rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black">
+              Open Pilot Workspace
+            </Link>
           </div>
-          <Link to="/app/orders" className="inline-block mt-4 px-3 py-2 rounded-md bg-zinc-800 text-zinc-100 text-sm font-semibold hover:bg-zinc-700 transition">
-            Manage Orders
-          </Link>
-          </div>
-        )}
-      </div>
-
-      {showAdvancedSections && (
-        <div className="rounded-xl border border-zinc-700 p-5" style={{ background: 'linear-gradient(180deg, #0a0f1a 0%, #0f172a 100%)' }}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-xl font-display font-bold text-white uppercase">Sentiment Monitor</h2>
-            <p className="text-zinc-400 text-sm">Signal-weighted market mood for your selected instrument</p>
-          </div>
-          <select
-            value={sentimentAsset}
-            onChange={(e) => setSentimentAsset(e.target.value)}
-            className="rounded-md px-3 py-2 text-sm min-w-[120px] bg-zinc-900 text-zinc-100 border border-zinc-700"
-          >
-            {marketData.map((item) => (
-              <option key={item.symbol} value={item.symbol}>{item.symbol}</option>
-            ))}
-          </select>
         </div>
+      </section>
 
-        {sentiment && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-              <div className="rounded-md p-3 bg-zinc-900/50 border border-zinc-800">
-                <p className="text-zinc-400 text-xs uppercase">Label</p>
-                <p className={`font-semibold ${sentiment.label === 'BULLISH' ? 'text-emerald-300' : sentiment.label === 'BEARISH' ? 'text-red-300' : 'text-amber-300'}`}>
+      {showAdvancedSections && sentiment && (
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,380px)]">
+          <div className="market-panel rounded-[28px] p-5 md:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">Sentiment Engine</p>
+                <h2 className="mt-1 font-display text-2xl font-bold uppercase text-zinc-900">Market Mood</h2>
+              </div>
+              <select
+                value={sentimentAsset}
+                onChange={(e) => setSentimentAsset(e.target.value)}
+                className="market-select min-w-[140px] rounded-xl px-3 py-2 text-sm"
+              >
+                {marketData.map((item) => (
+                  <option key={item.symbol} value={item.symbol}>{item.symbol}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="market-panel-soft rounded-2xl p-4">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Label</p>
+                <p className={`mt-2 text-xl font-semibold ${
+                  sentiment.label === 'BULLISH'
+                    ? 'text-emerald-700'
+                    : sentiment.label === 'BEARISH'
+                      ? 'text-rose-700'
+                      : 'text-amber-700'
+                }`}>
                   {sentiment.label}
                 </p>
               </div>
-              <div className="rounded-md p-3 bg-zinc-900/50 border border-zinc-800">
-                <p className="text-zinc-400 text-xs uppercase">Score</p>
-                <p className="font-semibold text-zinc-100">{sentiment.score}</p>
+              <div className="market-panel-soft rounded-2xl p-4">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Score</p>
+                <p className="mt-2 text-xl font-semibold text-zinc-900">{sentiment.score}</p>
               </div>
-              <div className="rounded-md p-3 bg-zinc-900/50 border border-zinc-800">
-                <p className="text-zinc-400 text-xs uppercase">Confidence</p>
-                <p className="font-semibold text-zinc-100">{(sentiment.confidence * 100).toFixed(1)}%</p>
+              <div className="market-panel-soft rounded-2xl p-4">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Confidence</p>
+                <p className="mt-2 text-xl font-semibold text-zinc-900">{(sentiment.confidence * 100).toFixed(1)}%</p>
               </div>
             </div>
 
-            <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden mt-4">
+            <div className="mt-5 overflow-hidden rounded-full bg-zinc-200 h-3">
               <div
-                className={`h-3 ${sentiment.score >= 0.25 ? 'bg-emerald-500' : sentiment.score <= -0.25 ? 'bg-red-500' : 'bg-amber-500'}`}
+                className={`h-3 ${
+                  sentiment.score >= 0.25 ? 'bg-emerald-500' : sentiment.score <= -0.25 ? 'bg-rose-500' : 'bg-amber-500'
+                }`}
                 style={{ width: `${Math.min(100, Math.max(0, ((sentiment.score + 1) / 2) * 100))}%` }}
               />
             </div>
 
-            <div className="grid md:grid-cols-3 gap-2 mt-3">
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
               {sentiment.headlines.slice(0, 3).map((headline, idx) => (
-                <div key={`${sentiment.symbol}-headline-${idx}`} className="rounded-md p-3 text-sm text-zinc-300 bg-zinc-900/40 border border-zinc-800">
+                <div key={`${sentiment.symbol}-headline-${idx}`} className="market-panel-soft rounded-2xl p-4 text-sm text-zinc-600">
                   {headline}
                 </div>
               ))}
             </div>
-          </>
-        )}
-        </div>
-      )}
+          </div>
 
-      {showAdvancedSections && (
-        <div className="rounded-xl p-5 border border-zinc-700" style={{ background: 'linear-gradient(135deg, #091322 0%, #11253f 45%, #0d1b2f 100%)' }}>
-        <h2 className="text-xl font-display font-bold text-white uppercase">Risk Disclaimer</h2>
-        <p className="text-zinc-300 text-sm mt-2">
-          Trading leveraged instruments and crypto assets carries high risk. Past performance does not guarantee future results.
-          Use paper mode and strict risk controls before deploying capital.
-        </p>
-        <div className="mt-4 flex gap-3 flex-wrap">
-          <Link to="/app/portfolio" className="px-4 py-2 rounded-md bg-emerald-500 text-zinc-950 font-semibold hover:bg-emerald-400 transition">
-            Open Portfolio
-          </Link>
-          <Link to="/app/signals" className="px-4 py-2 rounded-md border border-zinc-500 text-zinc-100 font-semibold hover:bg-zinc-800/50 transition">
-            Review Signal Risk
-          </Link>
-        </div>
-        </div>
+          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,#071521_0%,#0f2238_100%)] p-5 text-white shadow-panel">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/80">Risk Policy</p>
+            <h2 className="mt-2 font-display text-2xl font-bold uppercase">Stay in guard-railed mode</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-200">
+              Trading leveraged instruments and crypto assets carries significant risk. Keep sizing small, validate entries manually, and use paper mode until the process is trustworthy.
+            </p>
+            <div className="mt-6 space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Before execution</p>
+                <p className="mt-2 text-sm text-slate-100">Confirm thesis, stop, target, and account heat.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">During pilot</p>
+                <p className="mt-2 text-sm text-slate-100">Collect trust evidence before broadening live scope.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link to="/app/portfolio" className="market-btn-primary rounded-xl px-4 py-2 text-sm font-semibold">
+                Open Portfolio
+              </Link>
+              <Link to="/app/signals" className="rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                Review Signals
+              </Link>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );

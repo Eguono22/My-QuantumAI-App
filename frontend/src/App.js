@@ -31,7 +31,7 @@ function ProtectedLayout({
   children,
 }) {
   return (
-    <>
+    <div className="min-h-screen">
       <Navbar
         user={user}
         theme={theme}
@@ -40,13 +40,23 @@ function ProtectedLayout({
         onToggleSidebar={onToggleSidebar}
         unreadNotifications={unreadNotifications}
       />
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          className="fixed inset-0 z-30 bg-slate-950/40 backdrop-blur-[2px] lg:hidden"
+          onClick={onToggleSidebar}
+        />
+      )}
       <div className="flex min-h-screen pt-16 overflow-x-hidden">
         <Sidebar isOpen={sidebarOpen} unreadNotifications={unreadNotifications} />
-        <main className={`min-w-0 flex-1 p-4 md:p-5 lg:p-6 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
-          {children}
+        <main className={`min-w-0 flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64 xl:ml-72' : 'ml-0'}`}>
+          <div className="mx-auto max-w-[1640px] p-4 md:p-6 xl:p-8">
+            {children}
+          </div>
         </main>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -219,7 +229,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen text-market-text font-sans">
+      <div className="min-h-screen text-market-text font-sans trading-grid">
         <Routes>
           <Route path="/" element={<Landing user={user} theme={theme} onToggleTheme={toggleTheme} />} />
           <Route path="/login" element={user ? <Navigate to="/app" /> : <Login onLogin={setUser} />} />

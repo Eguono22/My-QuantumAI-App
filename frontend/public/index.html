@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#121212" />
     <meta name="description" content="Quantum AI Trading Platform" />
-    <title>Quantum AI Trading Platform</title>
+    <title>QuantumAI Trader</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       (function bootstrapQuantumAppShell() {
@@ -47,21 +47,21 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Barlow', 'sans-serif'],
-              display: ['Barlow Condensed', 'sans-serif']
+              sans: ['IBM Plex Sans', 'sans-serif'],
+              display: ['Space Grotesk', 'sans-serif']
             },
             colors: {
               market: {
-                black: '#151515',
-                dark: '#262626',
-                yellow: '#ffbf00',
-                paper: '#f5f5f5',
-                line: '#dedede',
-                text: '#1f1f1f'
+                black: '#07111f',
+                dark: '#0d1b2f',
+                yellow: '#f4c95d',
+                paper: '#eef4ff',
+                line: '#20314c',
+                text: '#d9e4f4'
               },
             },
             boxShadow: {
-              panel: '0 2px 8px rgba(0, 0, 0, 0.08)',
+              panel: '0 18px 55px rgba(2, 10, 24, 0.26)',
             },
             keyframes: {
               fadeRise: {
@@ -84,42 +84,62 @@
     <style>
       :root {
         color-scheme: light;
-        --market-black: #151515;
-        --market-dark: #262626;
-        --market-yellow: #ffbf00;
-        --market-paper: #f5f5f5;
-        --market-line: #dedede;
-        --market-text: #1f1f1f;
-        --market-muted: #6a6a6a;
-        --panel-bg: #ffffff;
-        --panel-soft-bg: #fafafa;
-        --input-bg: #ffffff;
+        --market-black: #07111f;
+        --market-dark: #0d1b2f;
+        --market-yellow: #f4c95d;
+        --market-paper: #eef4ff;
+        --market-line: #cfd9ea;
+        --market-text: #10233c;
+        --market-muted: #5e718f;
+        --panel-bg: rgba(255, 255, 255, 0.84);
+        --panel-soft-bg: rgba(244, 248, 255, 0.86);
+        --input-bg: rgba(255, 255, 255, 0.96);
+        --panel-shadow: 0 18px 55px rgba(25, 53, 92, 0.14);
+        --panel-highlight: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+        --panel-glow: 0 0 0 1px rgba(85, 133, 209, 0.08);
         --page-bg:
-          radial-gradient(circle at 3% 4%, rgba(0, 0, 0, 0.03), transparent 16%),
-          linear-gradient(180deg, #f7f7f7 0%, #efefef 100%);
+          radial-gradient(circle at top left, rgba(82, 137, 255, 0.14), transparent 28%),
+          radial-gradient(circle at 88% 12%, rgba(0, 196, 179, 0.10), transparent 18%),
+          linear-gradient(180deg, #edf3ff 0%, #dfe8f6 100%);
       }
 
       html[data-theme='dark'] {
         color-scheme: dark;
-        --market-black: #0b1220;
-        --market-dark: #111827;
-        --market-yellow: #f9c74f;
-        --market-paper: #0f172a;
-        --market-line: #27354d;
-        --market-text: #e5e7eb;
-        --market-muted: #9ca3af;
-        --panel-bg: #0f172a;
-        --panel-soft-bg: #111827;
-        --input-bg: #0b1220;
+        --market-black: #050c17;
+        --market-dark: #091526;
+        --market-yellow: #f4c95d;
+        --market-paper: #091526;
+        --market-line: #1b2a41;
+        --market-text: #dde7f5;
+        --market-muted: #8ea3c2;
+        --panel-bg: rgba(10, 19, 35, 0.84);
+        --panel-soft-bg: rgba(13, 27, 47, 0.92);
+        --input-bg: rgba(8, 17, 31, 0.94);
+        --panel-shadow: 0 20px 60px rgba(1, 6, 16, 0.48);
+        --panel-highlight: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+        --panel-glow: 0 0 0 1px rgba(92, 134, 201, 0.12);
         --page-bg:
-          radial-gradient(circle at 3% 4%, rgba(34, 211, 238, 0.09), transparent 26%),
-          linear-gradient(180deg, #050a13 0%, #0b1220 100%);
+          radial-gradient(circle at 0% 0%, rgba(54, 96, 190, 0.18), transparent 24%),
+          radial-gradient(circle at 100% 0%, rgba(12, 166, 157, 0.12), transparent 22%),
+          radial-gradient(circle at 50% 100%, rgba(244, 201, 93, 0.08), transparent 24%),
+          linear-gradient(180deg, #030812 0%, #07111f 42%, #091526 100%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
       }
 
       body {
         margin: 0;
         color: var(--market-text);
         background: var(--page-bg);
+        font-family: 'IBM Plex Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
 
       #root {
@@ -129,52 +149,115 @@
       .market-panel {
         background: var(--panel-bg);
         border: 1px solid var(--market-line);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--panel-shadow), var(--panel-highlight), var(--panel-glow);
+        backdrop-filter: blur(18px);
       }
 
       .market-panel-soft {
         background: var(--panel-soft-bg);
         border: 1px solid var(--market-line);
+        box-shadow: var(--panel-highlight);
+        backdrop-filter: blur(16px);
       }
 
       .market-input,
       .market-select {
         width: 100%;
-        border: 1px solid #cfcfcf;
+        border: 1px solid var(--market-line);
         background: var(--input-bg);
         color: var(--market-text);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
 
       .market-input:focus,
       .market-select:focus {
         outline: none;
         border-color: var(--market-yellow);
-        box-shadow: 0 0 0 2px rgba(255, 191, 0, 0.25);
+        box-shadow: 0 0 0 3px rgba(244, 201, 93, 0.16);
       }
 
-      html[data-theme='dark'] .market-input,
-      html[data-theme='dark'] .market-select {
-        border-color: #334155;
+      .market-input::placeholder {
+        color: var(--market-muted);
       }
 
       .market-btn-primary {
-        background: var(--market-yellow);
-        color: #191919;
-        border: 1px solid #d69f00;
+        background: linear-gradient(135deg, #f4c95d 0%, #f0b93f 100%);
+        color: #0f172a;
+        border: 1px solid #e0ab29;
+        box-shadow: 0 10px 24px rgba(240, 185, 63, 0.24);
       }
 
       .market-btn-primary:hover {
-        background: #f2b600;
+        background: linear-gradient(135deg, #f8d57a 0%, #f4c95d 100%);
       }
 
       .market-btn-dark {
-        background: var(--market-black);
+        background: rgba(7, 17, 31, 0.7);
         color: #fff;
-        border: 1px solid #000;
+        border: 1px solid rgba(134, 166, 219, 0.2);
       }
 
       .market-btn-dark:hover {
-        background: #000;
+        background: rgba(10, 23, 40, 0.95);
+      }
+
+      .market-divider {
+        border-color: rgba(142, 163, 194, 0.16);
+      }
+
+      .trading-grid {
+        background-image:
+          linear-gradient(rgba(122, 144, 178, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(122, 144, 178, 0.08) 1px, transparent 1px);
+        background-size: 32px 32px;
+      }
+
+      .chart-glow {
+        position: relative;
+      }
+
+      .chart-glow::after {
+        content: '';
+        position: absolute;
+        inset: auto 10% -18px 10%;
+        height: 26px;
+        background: radial-gradient(circle, rgba(34, 211, 238, 0.2), transparent 70%);
+        filter: blur(18px);
+        pointer-events: none;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-zinc-900,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-black {
+        color: #edf4ff !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-zinc-700,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-zinc-600 {
+        color: #bfd1ea !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-zinc-500,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .text-zinc-400 {
+        color: #86a6db !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .bg-white,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) [class*='bg-white/'] {
+        background-color: rgba(10, 19, 35, 0.72) !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .border-white,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) [class*='border-white'] {
+        border-color: rgba(142, 163, 194, 0.16) !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .bg-zinc-50 {
+        background-color: rgba(10, 19, 35, 0.78) !important;
+      }
+
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .border-zinc-200,
+      html[data-theme='dark'] :is(.market-panel, .market-panel-soft) .border-zinc-300 {
+        border-color: rgba(142, 163, 194, 0.18) !important;
       }
     </style>
   </head>

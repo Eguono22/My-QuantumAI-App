@@ -171,168 +171,202 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
   };
 
   return (
-    <div className="space-y-6 animate-fadeRise">
-      <div>
-        <h1 className="text-2xl font-display font-bold uppercase text-zinc-900">App Settings</h1>
-        <p className="text-sm text-zinc-600">Control theme, language, layout, model, and dashboard defaults.</p>
-      </div>
+    <div className="space-y-8 animate-fadeRise">
+      <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/15 bg-[linear-gradient(135deg,#07111f_0%,#0d2340_45%,#153d68_100%)] p-6 shadow-panel md:p-8">
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 14% 18%, rgba(34,211,238,0.7) 0, transparent 28%), radial-gradient(circle at 84% 72%, rgba(244,201,93,0.18) 0, transparent 20%)' }} />
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-200/90">Workspace Settings</p>
+            <h1 className="mt-2 font-display text-4xl font-bold uppercase text-white md:text-5xl">Tune the desk to your operating style</h1>
+            <p className="mt-4 text-sm leading-6 text-slate-200 md:text-base">
+              Control the workspace layout, model defaults, billing posture, and alert routing from one command surface.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Theme</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{preferences.theme}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Layout</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{preferences.layout}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Model</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{preferences.aiModel}</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {telegramStatus && <Alert type={telegramStatus.type} message={telegramStatus.message} onClose={() => setTelegramStatus(null)} />}
       {billingMessage && <Alert type={billingMessage.type} message={billingMessage.message} onClose={() => setBillingMessage(null)} />}
 
-      <div className="market-panel rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Theme</label>
+      <section className="market-panel rounded-[28px] p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Experience</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Workspace Preferences</h2>
+          </div>
           <button
             onClick={onToggleTheme}
-            className="market-btn-dark rounded-md px-4 py-2 text-sm font-semibold"
+            className="market-btn-dark rounded-xl px-4 py-2 text-sm font-semibold"
           >
             Switch To {preferences.theme === 'dark' ? 'Light' : 'Dark'} Mode
           </button>
         </div>
 
-        <div>
-          <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Language</label>
-          <select
-            value={preferences.language}
-            onChange={(e) => onUpdatePreference('language', e.target.value)}
-            className="market-select rounded-md px-3 py-2 text-sm"
-          >
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <option key={lang} value={lang}>{lang.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Language</label>
+            <select
+              value={preferences.language}
+              onChange={(e) => onUpdatePreference('language', e.target.value)}
+              className="market-select rounded-xl px-3 py-3 text-sm"
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang} value={lang}>{lang.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Dashboard Layout</label>
-          <select
-            value={preferences.layout}
-            onChange={(e) => onUpdatePreference('layout', e.target.value)}
-            className="market-select rounded-md px-3 py-2 text-sm"
-          >
-            {LAYOUT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Dashboard Layout</label>
+            <select
+              value={preferences.layout}
+              onChange={(e) => onUpdatePreference('layout', e.target.value)}
+              className="market-select rounded-xl px-3 py-3 text-sm"
+            >
+              {LAYOUT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">AI Model</label>
-          <select
-            value={preferences.aiModel}
-            onChange={(e) => onUpdatePreference('aiModel', e.target.value)}
-            className="market-select rounded-md px-3 py-2 text-sm"
-          >
-            {MODEL_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">AI Model</label>
+            <select
+              value={preferences.aiModel}
+              onChange={(e) => onUpdatePreference('aiModel', e.target.value)}
+              className="market-select rounded-xl px-3 py-3 text-sm"
+            >
+              {MODEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Portfolio View</label>
-          <select
-            value={preferences.portfolioView}
-            onChange={(e) => onUpdatePreference('portfolioView', e.target.value)}
-            className="market-select rounded-md px-3 py-2 text-sm"
-          >
-            {PORTFOLIO_VIEW_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Portfolio View</label>
+            <select
+              value={preferences.portfolioView}
+              onChange={(e) => onUpdatePreference('portfolioView', e.target.value)}
+              className="market-select rounded-xl px-3 py-3 text-sm"
+            >
+              {PORTFOLIO_VIEW_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <section className="market-panel rounded-[28px] p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-lg font-display font-bold uppercase text-zinc-900">Billing</h2>
-            <p className="text-sm text-zinc-600">Use Stripe-hosted billing to add payment methods and manage subscription access.</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Commerce</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Billing</h2>
+            <p className="mt-1 text-sm text-zinc-600">Stripe-hosted billing for payment methods and subscription access.</p>
           </div>
-          <span className={`px-3 py-1 rounded-md text-xs font-semibold ${billingStatus?.configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            billingStatus?.configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+          }`}>
             {billingStatus?.configured ? 'Stripe Ready' : 'Stripe Not Configured'}
           </span>
         </div>
 
         {billingLoading ? (
-          <div className="text-sm text-zinc-500">Loading billing status...</div>
+          <div className="mt-5 text-sm text-zinc-500">Loading billing status...</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-              <div className="market-panel-soft rounded-md p-3">
-                <p className="text-zinc-500 text-xs uppercase">Provider</p>
-                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.provider || 'stripe'}</p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Provider</p>
+                <p className="mt-2 font-semibold text-zinc-900">{billingStatus?.provider || 'stripe'}</p>
               </div>
-              <div className="market-panel-soft rounded-md p-3">
-                <p className="text-zinc-500 text-xs uppercase">Customer</p>
-                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.has_customer ? 'Created' : 'Not Created'}</p>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Customer</p>
+                <p className="mt-2 font-semibold text-zinc-900">{billingStatus?.has_customer ? 'Created' : 'Not Created'}</p>
               </div>
-              <div className="market-panel-soft rounded-md p-3">
-                <p className="text-zinc-500 text-xs uppercase">Subscription</p>
-                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.subscription_status || 'none'}</p>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Subscription</p>
+                <p className="mt-2 font-semibold text-zinc-900">{billingStatus?.subscription_status || 'none'}</p>
               </div>
-              <div className="market-panel-soft rounded-md p-3">
-                <p className="text-zinc-500 text-xs uppercase">Pro Price</p>
-                <p className="font-semibold mt-1 text-zinc-900">{billingStatus?.pro_price_configured ? 'Configured' : 'Missing'}</p>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Pro Price</p>
+                <p className="mt-2 font-semibold text-zinc-900">{billingStatus?.pro_price_configured ? 'Configured' : 'Missing'}</p>
               </div>
             </div>
 
             {!billingStatus?.configured && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Add Stripe environment variables on the backend before collecting payment methods: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, and optionally STRIPE_PRICE_ID_PRO.
+              <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Add Stripe environment variables on the backend before collecting payment methods: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and optionally `STRIPE_PRICE_ID_PRO`.
               </div>
             )}
 
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <button
                 onClick={() => redirectToBillingSession(tradingService.createPaymentMethodSession, 'payment-method')}
                 disabled={!billingStatus?.configured || !!billingAction}
-                className="market-btn-primary rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                className="market-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 {billingAction === 'payment-method' ? 'Opening Stripe...' : 'Add Payment Method'}
               </button>
               <button
                 onClick={() => redirectToBillingSession(tradingService.createSubscriptionSession, 'subscription')}
                 disabled={!billingStatus?.configured || !billingStatus?.pro_price_configured || !!billingAction}
-                className="market-btn-dark rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                className="market-btn-dark rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 {billingAction === 'subscription' ? 'Opening Stripe...' : 'Start Pro Subscription'}
               </button>
               <button
                 onClick={() => redirectToBillingSession(tradingService.createBillingPortalSession, 'portal')}
                 disabled={!billingStatus?.configured || !billingStatus?.has_customer || !!billingAction}
-                className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
               >
                 {billingAction === 'portal' ? 'Opening Stripe...' : 'Manage Billing'}
               </button>
               <button
                 onClick={refreshBillingStatus}
                 disabled={billingLoading}
-                className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
               >
                 Refresh Billing
               </button>
             </div>
           </>
         )}
-      </div>
+      </section>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <section className="market-panel rounded-[28px] p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-lg font-display font-bold uppercase text-zinc-900">Telegram Alerts</h2>
-            <p className="text-sm text-zinc-600">Route critical MT5 bridge alerts to Telegram with per-user chat preferences.</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Notifications</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Telegram Alerts</h2>
+            <p className="mt-1 text-sm text-zinc-600">Route bridge alerts to Telegram with per-user delivery controls.</p>
           </div>
-          <span className={`px-3 py-1 rounded-md text-xs font-semibold ${telegramPrefs.telegram_bot_configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            telegramPrefs.telegram_bot_configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+          }`}>
             {telegramPrefs.telegram_bot_configured ? 'Bot Configured' : 'Preview Only'}
           </span>
         </div>
 
         {loadingTelegram ? (
-          <div className="text-sm text-zinc-500">Loading Telegram settings...</div>
+          <div className="mt-5 text-sm text-zinc-500">Loading Telegram settings...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
             <div className="space-y-4">
               <label className="flex items-center gap-3 text-sm text-zinc-800">
                 <input
@@ -344,17 +378,17 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
               </label>
 
               <div>
-                <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Telegram Chat ID</label>
+                <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Telegram Chat ID</label>
                 <input
                   value={telegramPrefs.telegram_chat_id}
                   onChange={(e) => setTelegramPrefs((prev) => ({ ...prev, telegram_chat_id: e.target.value }))}
                   placeholder="e.g. 123456789"
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  className="market-input rounded-xl px-3 py-3 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-zinc-600 mb-2 uppercase tracking-wide">Alert Severities</label>
+                <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-zinc-500">Alert Severities</label>
                 <div className="flex flex-wrap gap-3">
                   {['ERROR', 'WARN'].map((severity) => (
                     <label key={severity} className="flex items-center gap-2 text-sm text-zinc-800">
@@ -372,33 +406,33 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-zinc-600 mb-1 uppercase tracking-wide">Cooldown Seconds</label>
+                <label className="mb-1 block text-xs uppercase tracking-[0.18em] text-zinc-500">Cooldown Seconds</label>
                 <input
                   type="number"
                   min="60"
                   step="60"
                   value={telegramPrefs.telegram_cooldown_seconds}
                   onChange={(e) => setTelegramPrefs((prev) => ({ ...prev, telegram_cooldown_seconds: e.target.value }))}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  className="market-input rounded-xl px-3 py-3 text-sm"
                 />
               </div>
 
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-                If the bot token is not configured on the backend, test sends will return a preview-only result so you can still verify the message format safely.
+              <div className="rounded-[22px] border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+                If the bot token is not configured on the backend, test sends return a preview-only result so you can still verify message formatting safely.
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <button onClick={saveTelegramPreferences} className="market-btn-primary rounded-md px-4 py-2 text-sm font-semibold">
+                <button onClick={saveTelegramPreferences} className="market-btn-primary rounded-xl px-4 py-2 text-sm font-semibold">
                   Save Telegram Settings
                 </button>
-                <button onClick={sendTelegramTest} className="market-btn-dark rounded-md px-4 py-2 text-sm font-semibold">
+                <button onClick={sendTelegramTest} className="market-btn-dark rounded-xl px-4 py-2 text-sm font-semibold">
                   Send Test Message
                 </button>
               </div>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       <Mql5BridgePanel />
     </div>

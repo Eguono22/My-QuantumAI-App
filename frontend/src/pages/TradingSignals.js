@@ -828,20 +828,20 @@ export default function TradingSignals({ preferences }) {
   return (
     <div className="space-y-8 animate-fadeRise">
       <div
-        className="rounded-2xl overflow-hidden border border-zinc-700 relative"
-        style={{ background: 'linear-gradient(135deg, #0b1527 0%, #12294a 50%, #234a78 100%)' }}
+        className="relative overflow-hidden rounded-[30px] border border-cyan-400/15 shadow-panel"
+        style={{ background: 'linear-gradient(135deg, #07111f 0%, #0c2342 45%, #153f6a 100%)' }}
       >
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 15% 22%, #22d3ee 0, transparent 34%), radial-gradient(circle at 82% 72%, #38bdf8 0, transparent 28%)' }} />
-        <div className="relative p-6 md:p-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 15% 22%, rgba(34,211,238,0.75) 0, transparent 32%), radial-gradient(circle at 82% 72%, rgba(56,189,248,0.36) 0, transparent 26%), radial-gradient(circle at 76% 18%, rgba(244,201,93,0.18) 0, transparent 16%)' }} />
+        <div className="relative flex flex-col gap-6 p-6 md:p-8 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-cyan-200 text-xs tracking-[0.18em] uppercase">Signal Center</p>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-white uppercase tracking-wide">AI Trading Signals</h1>
-            <p className="text-zinc-200 mt-1">Machine-generated opportunities across tracked markets</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="px-2.5 py-1 rounded-md bg-cyan-900/60 text-cyan-100 text-xs font-semibold uppercase tracking-wide">
+            <p className="text-cyan-200 text-[11px] tracking-[0.32em] uppercase">Signal Center</p>
+            <h1 className="mt-2 text-4xl md:text-5xl font-display font-bold text-white uppercase tracking-wide">AI Trading Signals</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Machine-generated opportunities across tracked markets, with execution controls and risk review staged beside the signal flow.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
                 Model: {preferences?.aiModel || 'quantum-core-v1'}
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-zinc-900/60 text-zinc-100 text-xs font-semibold uppercase tracking-wide">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-100">
                 Layout: {preferences?.layout || 'trader-pro'}
               </span>
             </div>
@@ -849,7 +849,7 @@ export default function TradingSignals({ preferences }) {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="disabled:opacity-50 px-4 py-2 rounded-md transition flex items-center justify-center space-x-2 font-semibold bg-cyan-400 text-zinc-950 hover:bg-cyan-300"
+            className="market-btn-primary disabled:opacity-50 rounded-xl px-5 py-3 transition flex items-center justify-center space-x-2 font-semibold"
           >
             <span>{generating ? '⟳' : '↺'}</span>
             <span>{generating ? 'Generating...' : 'Generate New Signals'}</span>
@@ -860,7 +860,7 @@ export default function TradingSignals({ preferences }) {
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
       {startupHealth && (
-        <div className={`rounded-xl border px-4 py-3 text-sm ${
+        <div className={`rounded-[26px] border px-5 py-4 text-sm ${
           isLiveMode ? 'border-red-300 bg-red-50 text-red-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'
         }`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -887,7 +887,7 @@ export default function TradingSignals({ preferences }) {
       )}
 
       {executionMetrics && (
-        <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="market-panel rounded-[28px] p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Risk & Execution Health</h2>
@@ -897,24 +897,24 @@ export default function TradingSignals({ preferences }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Today Fill Rate</p>
               <p className="font-semibold text-zinc-900">{(executionToday.fill_rate_pct || 0).toFixed(2)}%</p>
               <p className="text-xs text-zinc-500 mt-1">{executionToday.orders_filled || 0}/{executionToday.orders_submitted || 0} filled</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">7D Requested Notional</p>
               <p className="font-semibold text-zinc-900">{formatCurrency(execution7d.requested_notional || 0)}</p>
               <p className="text-xs text-zinc-500 mt-1">Fees {formatCurrency(execution7d.fees_paid || 0)}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">30D Avg Slippage</p>
               <p className="font-semibold text-zinc-900">{(execution30d.avg_slippage_bps || 0).toFixed(2)} bps</p>
               <p className="text-xs text-zinc-500 mt-1">Live orders {execution30d.live_mode_orders || 0}</p>
             </div>
           </div>
 
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <div className="rounded-[22px] border border-zinc-200 bg-zinc-50 p-4">
             <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Today Regime Mix</p>
             <div className="flex flex-wrap gap-2 text-xs">
               {sortedRegimes(executionToday.regime_breakdown).map(([regime, count]) => (
@@ -928,7 +928,7 @@ export default function TradingSignals({ preferences }) {
       )}
 
       {operatorBrief && (
-        <div className="market-panel rounded-md p-4 space-y-4">
+        <div className="market-panel rounded-[28px] p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Operator Daily Brief</h2>
@@ -950,14 +950,14 @@ export default function TradingSignals({ preferences }) {
               <button
                 onClick={refreshOperatorBrief}
                 disabled={operatorBriefRefreshing}
-                className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {operatorBriefRefreshing ? 'Refreshing...' : 'Refresh Brief'}
               </button>
               {dismissedOperatorBriefAlerts.length > 0 && (
                 <button
                   onClick={restoreDismissedOperatorBriefAlerts}
-                  className="rounded-md border border-zinc-300 bg-zinc-50 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                  className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                 >
                   Restore dismissed ({dismissedOperatorBriefAlerts.length})
                 </button>
@@ -967,29 +967,29 @@ export default function TradingSignals({ preferences }) {
           <p className="text-xs text-zinc-500">Last updated: {operatorBriefLastUpdated ? new Date(operatorBriefLastUpdated).toLocaleString() : 'just now'}</p>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Accepted</p>
               <p className="font-semibold text-zinc-900">{operatorBrief.summary.accepted_orders}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Blocked</p>
               <p className="font-semibold text-zinc-900">{operatorBrief.summary.blocked_trades}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Risk Breaches</p>
               <p className="font-semibold text-zinc-900">{operatorBrief.summary.risk_breaches}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">No-Trade Blocks</p>
               <p className="font-semibold text-zinc-900">{operatorBrief.summary.no_trade_window_blocks}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Broker Issues</p>
               <p className="font-semibold text-zinc-900">{operatorBrief.summary.broker_issues}</p>
             </div>
           </div>
 
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+          <div className="rounded-[22px] border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
             <p>
               Regime drift: <span className="font-semibold">{operatorBrief.regime_drift.detected ? 'Detected' : 'Stable'}</span>
               {' '}({operatorBrief.regime_drift.today_top_regime} today vs {operatorBrief.regime_drift.rolling_7d_top_regime} rolling 7d)
@@ -1014,7 +1014,7 @@ export default function TradingSignals({ preferences }) {
 
           <div className="space-y-2">
             {operatorBriefAlerts.map((item, index) => (
-              <div key={item.alert_key || `brief-alert-${index}`} className="rounded-md border border-zinc-200 bg-white p-3 text-sm">
+              <div key={item.alert_key || `brief-alert-${index}`} className="rounded-[22px] border border-zinc-200 bg-white p-4 text-sm">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">{item.severity}</p>
                 <div className="mt-1 flex items-start justify-between gap-3">
                   <p className="font-semibold text-zinc-900">{item.title}</p>
@@ -1034,14 +1034,14 @@ export default function TradingSignals({ preferences }) {
                   {!item.acknowledged && (
                     <button
                       onClick={() => acknowledgeOperatorBriefAlert(item)}
-                      className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                      className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                     >
                       Acknowledge
                     </button>
                   )}
                   <button
                     onClick={() => dismissOperatorBriefAlert(item)}
-                    className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                    className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                   >
                     Dismiss
                   </button>
@@ -1049,13 +1049,13 @@ export default function TradingSignals({ preferences }) {
               </div>
             ))}
             {!operatorBriefAlerts.length && (
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600">
+              <div className="rounded-[22px] border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
                 All brief alerts for this window have been dismissed.
               </div>
             )}
           </div>
 
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 space-y-3">
+          <div className="rounded-[22px] border border-zinc-200 bg-zinc-50 p-4 space-y-3">
             <div>
               <h3 className="text-sm font-display font-bold text-zinc-900 uppercase">Alert History</h3>
               <p className="text-xs text-zinc-500">Recent acknowledged or dismissed operator issues across sessions.</p>
@@ -1269,7 +1269,7 @@ export default function TradingSignals({ preferences }) {
         </div>
       )}
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <div className="market-panel rounded-[28px] p-5 space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">HFT Executor</h2>
@@ -1278,7 +1278,7 @@ export default function TradingSignals({ preferences }) {
           <button
             onClick={handleHftRun}
             disabled={hftRunning}
-            className="market-btn-dark disabled:opacity-50 px-4 py-2 rounded-md font-semibold"
+            className="market-btn-dark disabled:opacity-50 px-4 py-2 rounded-xl font-semibold"
           >
             {hftRunning ? 'Running...' : 'Run HFT Batch'}
           </button>
@@ -1290,7 +1290,7 @@ export default function TradingSignals({ preferences }) {
             <select
               value={hftForm.asset}
               onChange={(e) => setHftForm({ ...hftForm, asset: e.target.value })}
-              className="market-select rounded-md px-3 py-2 text-sm"
+              className="market-select rounded-xl px-3 py-3 text-sm"
             >
               {(assetOptions.length ? assetOptions : ['BTC']).map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
@@ -1305,7 +1305,7 @@ export default function TradingSignals({ preferences }) {
               max="500"
               value={hftForm.cycles}
               onChange={(e) => setHftForm({ ...hftForm, cycles: e.target.value })}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1316,7 +1316,7 @@ export default function TradingSignals({ preferences }) {
               step="0.0001"
               value={hftForm.quantity}
               onChange={(e) => setHftForm({ ...hftForm, quantity: e.target.value })}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1328,26 +1328,26 @@ export default function TradingSignals({ preferences }) {
               step="0.1"
               value={hftForm.spread_bps}
               onChange={(e) => setHftForm({ ...hftForm, spread_bps: e.target.value })}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
         </div>
 
         {hftResult && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Trades</p>
               <p className="font-semibold text-zinc-900">{hftResult.trades_executed}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Latency</p>
               <p className="font-semibold text-zinc-900">{hftResult.avg_latency_ms} ms</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Gross PnL</p>
               <p className="font-semibold text-zinc-900">{formatCurrency(hftResult.gross_profit)}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[22px] p-4">
               <p className="text-zinc-500">Net PnL</p>
               <p className={`font-semibold ${hftResult.net_profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                 {formatCurrency(hftResult.net_profit)}
@@ -1357,7 +1357,7 @@ export default function TradingSignals({ preferences }) {
         )}
       </div>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <div className="market-panel rounded-[28px] p-5 space-y-4">
         <div>
           <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Advanced Order Ticket</h2>
           <p className="text-zinc-600 text-sm">
@@ -1371,7 +1371,7 @@ export default function TradingSignals({ preferences }) {
             <select
               value={advancedOrder.asset}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, asset: e.target.value }))}
-              className="market-select rounded-md px-3 py-2 text-sm"
+              className="market-select rounded-xl px-3 py-3 text-sm"
             >
               {(assetOptions.length ? assetOptions : ['BTC']).map((symbol) => (
                 <option key={`adv-${symbol}`} value={symbol}>{symbol}</option>
@@ -1383,7 +1383,7 @@ export default function TradingSignals({ preferences }) {
             <select
               value={advancedOrder.action}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, action: e.target.value }))}
-              className="market-select rounded-md px-3 py-2 text-sm"
+              className="market-select rounded-xl px-3 py-3 text-sm"
             >
               <option value="BUY">BUY</option>
               <option value="SELL">SELL</option>
@@ -1394,7 +1394,7 @@ export default function TradingSignals({ preferences }) {
             <select
               value={advancedOrder.orderType}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, orderType: e.target.value }))}
-              className="market-select rounded-md px-3 py-2 text-sm"
+              className="market-select rounded-xl px-3 py-3 text-sm"
             >
               <option value="MARKET">MARKET</option>
               <option value="LIMIT">LIMIT</option>
@@ -1409,7 +1409,7 @@ export default function TradingSignals({ preferences }) {
               step="0.0001"
               value={advancedOrder.quantity}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, quantity: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           {advancedOrder.orderType !== 'MARKET' && (
@@ -1421,7 +1421,7 @@ export default function TradingSignals({ preferences }) {
                 step="0.0001"
                 value={advancedOrder.triggerPrice}
                 onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, triggerPrice: e.target.value }))}
-                className="market-input rounded-md px-3 py-2 text-sm"
+                className="market-input rounded-xl px-3 py-3 text-sm"
               />
             </div>
           )}
@@ -1433,7 +1433,7 @@ export default function TradingSignals({ preferences }) {
               step="0.0001"
               value={advancedOrder.stopLoss}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, stopLoss: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1444,7 +1444,7 @@ export default function TradingSignals({ preferences }) {
               step="0.0001"
               value={advancedOrder.takeProfit}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, takeProfit: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1455,7 +1455,7 @@ export default function TradingSignals({ preferences }) {
               step="0.01"
               value={advancedOrder.trailingStopPct}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, trailingStopPct: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1466,12 +1466,12 @@ export default function TradingSignals({ preferences }) {
               step="0.1"
               value={advancedOrder.riskPercent}
               onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, riskPercent: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           {isLiveMode && (
             <>
-              <div className="md:col-span-2 rounded-md border border-red-200 bg-red-50 p-3">
+              <div className="md:col-span-2 rounded-[22px] border border-red-200 bg-red-50 p-4">
                 <label className="flex items-start gap-2 text-sm text-red-950">
                   <input
                     type="checkbox"
@@ -1487,7 +1487,7 @@ export default function TradingSignals({ preferences }) {
                 <input
                   value={advancedOrder.confirmationText}
                   onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, confirmationText: e.target.value }))}
-                  className="market-input rounded-md px-3 py-2 text-sm"
+                  className="market-input rounded-xl px-3 py-3 text-sm"
                 />
               </div>
               <div className="md:col-span-2">
@@ -1497,7 +1497,7 @@ export default function TradingSignals({ preferences }) {
                   onChange={(e) => setAdvancedOrder((prev) => ({ ...prev, operatorNote: e.target.value }))}
                   rows={3}
                   placeholder="Explain why this live order is being allowed"
-                  className="market-input rounded-md px-3 py-2 text-sm w-full"
+                  className="market-input rounded-xl px-3 py-3 text-sm w-full"
                 />
               </div>
             </>
@@ -1506,7 +1506,7 @@ export default function TradingSignals({ preferences }) {
         <button
           onClick={handleSubmitAdvancedOrder}
           disabled={advancedOrderLoading}
-          className={`px-4 py-2 rounded-md font-semibold disabled:opacity-50 ${isLiveMode ? 'bg-red-600 text-white hover:bg-red-700' : 'market-btn-primary'}`}
+          className={`px-4 py-3 rounded-xl font-semibold disabled:opacity-50 ${isLiveMode ? 'bg-red-600 text-white hover:bg-red-700' : 'market-btn-primary'}`}
         >
           {advancedOrderLoading ? 'Placing Order...' : isLiveMode ? 'Place Supervised Live Order' : 'Place Advanced Order'}
         </button>
@@ -1764,8 +1764,8 @@ export default function TradingSignals({ preferences }) {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
-              filter === f ? 'bg-market-yellow text-black border border-amber-600' : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              filter === f ? 'bg-market-yellow text-slate-950 shadow-[0_10px_24px_rgba(244,201,93,0.22)]' : 'bg-white/80 text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
             }`}
           >
             {f} ({f === 'ALL' ? signals.length : signals.filter(s => s.signal_type === f).length})
@@ -1773,12 +1773,12 @@ export default function TradingSignals({ preferences }) {
         ))}
       </div>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <div className="market-panel rounded-[28px] p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Signal Intelligence Controls</h2>
           <button
             onClick={() => setAutoRefresh((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-md text-sm font-semibold border ${autoRefresh ? 'bg-zinc-900 text-white border-black' : 'bg-white text-zinc-700 border-zinc-300'}`}
+            className={`rounded-xl px-3 py-2 text-sm font-semibold border ${autoRefresh ? 'bg-zinc-900 text-white border-black' : 'bg-white text-zinc-700 border-zinc-300'}`}
           >
             Auto Refresh: {autoRefresh ? 'On' : 'Off'}
           </button>
@@ -1791,7 +1791,7 @@ export default function TradingSignals({ preferences }) {
               value={assetQuery}
               onChange={(e) => setAssetQuery(e.target.value)}
               placeholder="Type symbol (e.g. BTC, AAPL)"
-              className="market-input rounded-md px-3 py-2 text-sm"
+            className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1799,7 +1799,7 @@ export default function TradingSignals({ preferences }) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="market-select rounded-md px-3 py-2 text-sm"
+              className="market-select rounded-xl px-3 py-3 text-sm"
             >
               <option value="confidence">Confidence</option>
               <option value="strength">Strength</option>
@@ -1823,30 +1823,30 @@ export default function TradingSignals({ preferences }) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-          <div className="market-panel-soft rounded-md p-2">
+          <div className="market-panel-soft rounded-[20px] p-3">
             <p className="text-zinc-500 text-xs">Visible Signals</p>
             <p className="font-semibold text-zinc-900">{insightStats.total}</p>
           </div>
-          <div className="market-panel-soft rounded-md p-2">
+          <div className="market-panel-soft rounded-[20px] p-3">
             <p className="text-zinc-500 text-xs">Buy</p>
             <p className="font-semibold text-emerald-700">{insightStats.buy}</p>
           </div>
-          <div className="market-panel-soft rounded-md p-2">
+          <div className="market-panel-soft rounded-[20px] p-3">
             <p className="text-zinc-500 text-xs">Sell</p>
             <p className="font-semibold text-red-700">{insightStats.sell}</p>
           </div>
-          <div className="market-panel-soft rounded-md p-2">
+          <div className="market-panel-soft rounded-[20px] p-3">
             <p className="text-zinc-500 text-xs">Hold</p>
             <p className="font-semibold text-amber-700">{insightStats.hold}</p>
           </div>
-          <div className="market-panel-soft rounded-md p-2">
+          <div className="market-panel-soft rounded-[20px] p-3">
             <p className="text-zinc-500 text-xs">Avg Confidence</p>
             <p className="font-semibold text-zinc-900">{insightStats.avgConfidence.toFixed(1)}%</p>
           </div>
         </div>
       </div>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <div className="market-panel rounded-[28px] p-5 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Portfolio Risk Budget</h2>
@@ -1857,19 +1857,19 @@ export default function TradingSignals({ preferences }) {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleApplyRiskPreset('CONSERVATIVE')}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            className="rounded-xl px-3 py-1.5 text-xs font-semibold border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
           >
             Conservative
           </button>
           <button
             onClick={() => handleApplyRiskPreset('BALANCED')}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            className="rounded-xl px-3 py-1.5 text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
           >
             Balanced
           </button>
           <button
             onClick={() => handleApplyRiskPreset('AGGRESSIVE')}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold border border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
+            className="rounded-xl px-3 py-1.5 text-xs font-semibold border border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
           >
             Aggressive
           </button>
@@ -1884,7 +1884,7 @@ export default function TradingSignals({ preferences }) {
               step="100"
               value={riskBudget.accountSize}
               onChange={(e) => setRiskBudget((prev) => ({ ...prev, accountSize: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1896,7 +1896,7 @@ export default function TradingSignals({ preferences }) {
               step="0.1"
               value={riskBudget.riskPerTradePct}
               onChange={(e) => setRiskBudget((prev) => ({ ...prev, riskPerTradePct: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
           <div>
@@ -1908,16 +1908,16 @@ export default function TradingSignals({ preferences }) {
               step="0.5"
               value={riskBudget.maxPortfolioHeatPct}
               onChange={(e) => setRiskBudget((prev) => ({ ...prev, maxPortfolioHeatPct: e.target.value }))}
-              className="market-input rounded-md px-3 py-2 text-sm"
+              className="market-input rounded-xl px-3 py-3 text-sm"
             />
           </div>
-          <div className="market-panel-soft rounded-md p-3">
+          <div className="market-panel-soft rounded-[20px] p-4">
             <p className="text-zinc-500 text-xs">Risk Budget per Trade</p>
             <p className="font-semibold text-zinc-900 mt-1">
               {formatCurrency((Number(riskBudget.accountSize) || 0) * ((Number(riskBudget.riskPerTradePct) || 0) / 100))}
             </p>
           </div>
-          <div className={`rounded-md p-3 border ${heatSummary.overLimit ? 'bg-red-50 border-red-200' : 'market-panel-soft border-market-line'}`}>
+          <div className={`rounded-[20px] p-4 border ${heatSummary.overLimit ? 'bg-red-50 border-red-200' : 'market-panel-soft border-market-line'}`}>
             <p className="text-zinc-500 text-xs">Portfolio Heat</p>
             <p className={`font-semibold mt-1 ${heatSummary.overLimit ? 'text-red-700' : 'text-zinc-900'}`}>
               {heatSummary.currentHeatPct.toFixed(2)}% / {heatSummary.maxHeatPct.toFixed(2)}%
@@ -1926,7 +1926,7 @@ export default function TradingSignals({ preferences }) {
         </div>
 
         {heatSummary.overLimit && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             Portfolio heat exceeds cap. Scale suggested quantities by {(heatSummary.scaleFactor * 100).toFixed(1)}% to stay within limit.
           </div>
         )}
@@ -1979,7 +1979,7 @@ export default function TradingSignals({ preferences }) {
         )}
       </div>
 
-      <div className="market-panel rounded-md p-4 space-y-4">
+      <div className="market-panel rounded-[28px] p-5 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Top Opportunities</h2>
@@ -1988,7 +1988,7 @@ export default function TradingSignals({ preferences }) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleAutoAllocateAllSafeQty}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              className="rounded-xl px-3 py-1.5 text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
             >
               Auto-Allocate Safe Qty
             </button>
@@ -2017,7 +2017,7 @@ export default function TradingSignals({ preferences }) {
               const wouldBreach = qtyInput > 0 && maxSafeQty > 0 && qtyInput - maxSafeQty > 0.0000001;
               const hasNoSafeCapacity = maxSafeQty <= 0;
               return (
-                <div key={`opportunity-${signal.id ?? signal.asset}`} className="market-panel-soft rounded-md p-3 border border-zinc-200">
+                <div key={`opportunity-${signal.id ?? signal.asset}`} className="market-panel-soft rounded-[22px] p-4 border border-zinc-200">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-display font-bold text-zinc-900 text-lg">{signal.asset}</p>
@@ -2051,13 +2051,13 @@ export default function TradingSignals({ preferences }) {
                   <div className="mt-3 grid grid-cols-3 gap-1">
                     <button
                       onClick={() => handleSetHftAsset(signal.asset)}
-                      className="px-2 py-1 text-[11px] rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
+                      className="px-2 py-1 text-[11px] rounded-xl border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
                     >
                       Set HFT
                     </button>
                     <button
                       onClick={() => handleOpenDetailedSignal(signal)}
-                      className="px-2 py-1 text-[11px] rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
+                      className="px-2 py-1 text-[11px] rounded-xl border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 font-semibold"
                     >
                       Open Card
                     </button>
@@ -2068,13 +2068,13 @@ export default function TradingSignals({ preferences }) {
                       value={quickQty[signal.asset] ?? ''}
                       onChange={(e) => setQuickQty((prev) => ({ ...prev, [signal.asset]: e.target.value }))}
                       placeholder="Qty"
-                      className="market-input rounded px-2 py-1 text-[11px]"
+                      className="market-input rounded-xl px-2 py-1.5 text-[11px]"
                     />
                   </div>
 
                   <button
                     onClick={() => setQuickQty((prev) => ({ ...prev, [signal.asset]: maxSafeQty.toFixed(4) }))}
-                    className="mt-2 w-full px-2 py-1 text-[11px] rounded border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold"
+                    className="mt-2 w-full px-2 py-1.5 text-[11px] rounded-xl border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold"
                   >
                     Use Max Safe Qty ({maxSafeQty.toFixed(4)})
                   </button>
@@ -2083,14 +2083,14 @@ export default function TradingSignals({ preferences }) {
                     <button
                       onClick={() => handleQuickTrade(signal, 'BUY')}
                       disabled={buyLoading || hasNoSafeCapacity || wouldBreach}
-                      className="market-btn-primary px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
+                      className="market-btn-primary px-2 py-1.5 text-[11px] rounded-xl font-semibold disabled:opacity-50"
                     >
                       {buyLoading ? 'Buying...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Review Buy'}
                     </button>
                     <button
                       onClick={() => handleQuickTrade(signal, 'SELL')}
                       disabled={sellLoading || hasNoSafeCapacity || wouldBreach}
-                      className="market-btn-dark px-2 py-1 text-[11px] rounded font-semibold disabled:opacity-50"
+                      className="market-btn-dark px-2 py-1.5 text-[11px] rounded-xl font-semibold disabled:opacity-50"
                     >
                       {sellLoading ? 'Selling...' : wouldBreach ? 'Qty Too High' : hasNoSafeCapacity ? 'Blocked' : 'Review Sell'}
                     </button>
@@ -2154,7 +2154,7 @@ export default function TradingSignals({ preferences }) {
             <div
               key={signal.id ?? i}
               id={`signal-card-${signalKey}`}
-              className={selected ? 'ring-2 ring-amber-400 rounded-md' : ''}
+              className={selected ? 'ring-2 ring-amber-400 rounded-[26px]' : ''}
             >
               <TradingSignalCard signal={signalWithAudit} />
             </div>

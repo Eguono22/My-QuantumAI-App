@@ -2,10 +2,10 @@ import React from 'react';
 
 export default function Alert({ type = 'info', message, onClose }) {
   const styles = {
-    info: 'bg-sky-50 border-sky-300 text-sky-800',
-    success: 'bg-emerald-50 border-emerald-300 text-emerald-800',
-    error: 'bg-red-50 border-red-300 text-red-800',
-    warning: 'bg-amber-50 border-amber-300 text-amber-800',
+    info: 'bg-sky-50/95 border-sky-300 text-sky-900',
+    success: 'bg-emerald-50/95 border-emerald-300 text-emerald-900',
+    error: 'bg-red-50/95 border-red-300 text-red-900',
+    warning: 'bg-amber-50/95 border-amber-300 text-amber-900',
   };
   const icons = {
     info: 'i',
@@ -14,13 +14,13 @@ export default function Alert({ type = 'info', message, onClose }) {
     warning: '!',
   };
   return (
-    <div className={`border rounded-md p-4 flex justify-between items-center ${styles[type]}`}>
-      <span className="flex items-center gap-2">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current/40 text-xs font-bold">{icons[type]}</span>
+    <div className={`flex items-center justify-between gap-4 rounded-[22px] border px-4 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur ${styles[type]}`}>
+      <span className="flex items-center gap-3 text-sm font-medium">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-current/30 bg-white/60 text-[11px] font-bold">{icons[type]}</span>
         {message}
       </span>
       {onClose && (
-        <button onClick={onClose} className="ml-4 text-zinc-500 hover:text-zinc-900">✕</button>
+        <button onClick={onClose} className="text-zinc-500 transition hover:text-zinc-900">✕</button>
       )}
     </div>
   );

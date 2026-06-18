@@ -49,13 +49,13 @@ export default function MarketTable({ items = [] }) {
   );
 
   return (
-    <div className="market-panel rounded-md overflow-hidden">
-      <div className="bg-market-black text-white px-4 py-3 text-sm font-semibold uppercase tracking-widest">
+    <div className="market-panel overflow-hidden rounded-[28px]">
+      <div className="bg-slate-950 text-white px-4 py-4 text-sm font-semibold uppercase tracking-[0.24em]">
         Market Overview
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-zinc-100 text-zinc-700 uppercase text-xs tracking-wide">
+          <thead className="bg-zinc-100 text-zinc-700 uppercase text-xs tracking-[0.16em]">
             <tr>
               <th className="text-left px-4 py-3">
                 <button type="button" onClick={() => handleSort('symbol')} className="font-semibold hover:text-black">
@@ -89,11 +89,11 @@ export default function MarketTable({ items = [] }) {
             {sorted.map((item) => {
               const positive = item.change_pct_24h >= 0;
               return (
-                <tr key={item.symbol} className="border-t border-zinc-200 hover:bg-zinc-50">
-                  <td className="px-4 py-3 font-display font-bold text-base tracking-wide text-zinc-900">{item.symbol}</td>
+                <tr key={item.symbol} className="border-t border-zinc-200 hover:bg-zinc-50/80">
+                  <td className="px-4 py-3 font-display font-bold text-base tracking-[0.12em] text-zinc-900">{item.symbol}</td>
                   <td className="px-4 py-3 text-zinc-600">
                     <div>{item.name}</div>
-                    <span className={`mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] font-semibold ${sourceBadgeClass(item.data_source)}`}>
+                    <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${sourceBadgeClass(item.data_source)}`}>
                       {item.data_source_label || 'Source unknown'}
                     </span>
                   </td>

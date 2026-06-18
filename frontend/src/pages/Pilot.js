@@ -1071,14 +1071,14 @@ function buildPilotReport({
 
 function Pill({ tone = 'zinc', children }) {
   const tones = {
-    emerald: 'bg-emerald-100 text-emerald-800',
-    amber: 'bg-amber-100 text-amber-800',
-    sky: 'bg-sky-100 text-sky-800',
-    zinc: 'bg-zinc-100 text-zinc-700',
-    red: 'bg-red-100 text-red-700',
+    emerald: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    amber: 'bg-amber-100 text-amber-800 border border-amber-200',
+    sky: 'bg-sky-100 text-sky-800 border border-sky-200',
+    zinc: 'bg-zinc-100 text-zinc-700 border border-zinc-200',
+    red: 'bg-red-100 text-red-700 border border-red-200',
   };
   return (
-    <span className={`inline-flex rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${tones[tone]}`}>
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -1093,8 +1093,8 @@ function MetricCard({ label, value, hint, tone = 'zinc' }) {
     red: 'text-red-700',
   };
   return (
-    <div className="market-panel rounded-md p-4">
-      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
+    <div className="market-panel rounded-[24px] p-4">
+      <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">{label}</p>
       <p className={`mt-2 text-2xl font-display font-bold ${valueTone[tone]}`}>{value}</p>
       <p className="mt-2 text-xs text-zinc-500">{hint}</p>
     </div>
@@ -1103,7 +1103,7 @@ function MetricCard({ label, value, hint, tone = 'zinc' }) {
 
 function PilotGate({ label, complete, detail, action, to }) {
   return (
-    <div className={`rounded-md border px-4 py-3 ${complete ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+    <div className={`rounded-[22px] border px-4 py-4 ${complete ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className={`font-semibold ${complete ? 'text-emerald-900' : 'text-amber-900'}`}>{label}</p>
@@ -1446,10 +1446,11 @@ export default function Pilot() {
 
   return (
     <div className="space-y-8 animate-fadeRise">
-      <div className="rounded-2xl overflow-hidden border border-zinc-700 relative" style={{ background: 'linear-gradient(135deg, #102016 0%, #17412f 48%, #24436f 100%)' }}>
+      <div className="relative overflow-hidden rounded-[30px] border border-emerald-400/15 shadow-panel" style={{ background: 'linear-gradient(135deg, #102016 0%, #17412f 48%, #24436f 100%)' }}>
+        <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle at 14% 18%, rgba(52,211,153,0.35) 0, transparent 28%), radial-gradient(circle at 78% 20%, rgba(244,201,93,0.18) 0, transparent 16%), radial-gradient(circle at 86% 78%, rgba(56,189,248,0.32) 0, transparent 24%)' }} />
         <div className="relative px-6 py-8 md:px-10 md:py-10">
-          <p className="text-emerald-100 text-xs tracking-[0.18em] uppercase">Private Beta Milestone</p>
-          <h1 className="mt-2 text-3xl md:text-4xl font-display font-bold text-white uppercase">
+          <p className="text-emerald-100 text-[11px] tracking-[0.32em] uppercase">Private Beta Milestone</p>
+          <h1 className="mt-2 text-4xl md:text-5xl font-display font-bold text-white uppercase">
             30-Day Trust Pilot
           </h1>
           <p className="mt-3 max-w-3xl text-sm md:text-base text-emerald-50">
@@ -1458,14 +1459,14 @@ export default function Pilot() {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={pilotStart ? resetPilot : startPilot}
-              className="px-4 py-2 rounded-md bg-emerald-300 text-zinc-950 text-sm font-semibold hover:bg-emerald-200 transition"
+              className="px-4 py-2 rounded-xl bg-emerald-300 text-zinc-950 text-sm font-semibold hover:bg-emerald-200 transition"
             >
               {pilotStart ? 'Reset Pilot Clock' : 'Start Pilot Clock'}
             </button>
-            <Link to="/app/connect" className="px-4 py-2 rounded-md border border-emerald-100 text-emerald-50 text-sm font-semibold hover:bg-white/10 transition">
+            <Link to="/app/connect" className="px-4 py-2 rounded-xl border border-emerald-100 text-emerald-50 text-sm font-semibold hover:bg-white/10 transition">
               Check Setup
             </Link>
-            <Link to="/app/signals" className="px-4 py-2 rounded-md border border-sky-100 text-sky-50 text-sm font-semibold hover:bg-white/10 transition">
+            <Link to="/app/signals" className="px-4 py-2 rounded-xl border border-sky-100 text-sky-50 text-sm font-semibold hover:bg-white/10 transition">
               Review Signals
             </Link>
           </div>
@@ -1473,11 +1474,11 @@ export default function Pilot() {
       </div>
 
       {!!error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
       {executionReliabilityBlocked && (
-        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-[22px] border border-red-300 bg-red-50 px-4 py-4 text-sm text-red-900">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs font-semibold uppercase tracking-wide">Execution Gate</p>
             <Pill tone={releaseGateDecision.tone}>{releaseGateDecision.status}</Pill>
@@ -1497,7 +1498,7 @@ export default function Pilot() {
         <MetricCard label="Beta Pipeline" value={candidates.length} hint={`${candidateStats.SCHEDULED} scheduled, ${candidateStats.COMPLETED} completed`} tone={candidates.length >= 10 ? 'emerald' : 'amber'} />
       </div>
 
-      <div className="market-panel rounded-md p-4">
+      <div className="market-panel rounded-[28px] p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Latest Paper Order Outcome</h2>
@@ -1510,52 +1511,52 @@ export default function Pilot() {
 
         {latestOrderOutcome ? (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[20px] p-4">
               <p className="text-zinc-500">Signal</p>
               <p className="font-semibold text-zinc-900">{latestOrderOutcome.asset} {latestOrderOutcome.action}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[20px] p-4">
               <p className="text-zinc-500">Status</p>
               <p className="font-semibold text-zinc-900">{latestOrderOutcome.status}</p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[20px] p-4">
               <p className="text-zinc-500">Fill / Qty</p>
               <p className="font-semibold text-zinc-900">
                 {latestOrderOutcome.filledQuantity > 0 ? `${latestOrderOutcome.filledQuantity}` : `${latestOrderOutcome.requestedQuantity}`}
                 {latestOrderOutcome.fillPrice > 0 ? ` @ $${latestOrderOutcome.fillPrice.toFixed(2)}` : ''}
               </p>
             </div>
-            <div className="market-panel-soft rounded-md p-3">
+            <div className="market-panel-soft rounded-[20px] p-4">
               <p className="text-zinc-500">Notional</p>
               <p className="font-semibold text-zinc-900">${latestOrderOutcome.notional.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
             </div>
           </div>
         ) : (
-          <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-600">
+          <div className="mt-4 rounded-[20px] border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
             No paper orders have been placed yet.
           </div>
         )}
 
         {latestOrderOutcome && (
-          <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+          <div className="mt-3 rounded-[20px] border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Outcome note</p>
             <p className="mt-1">{latestOrderOutcome.outcome}{latestOrderOutcome.updatedAt ? ` | Updated ${formatDate(latestOrderOutcome.updatedAt)}` : ''}</p>
           </div>
         )}
 
         {!!outcomeConsistency.sampleSize && (
-          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+          <div className="mt-3 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Outcome consistency (recent {outcomeConsistency.sampleSize})</p>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+              <div className="rounded-[18px] border border-emerald-100 bg-white px-3 py-2">
                 <p className="text-xs text-zinc-500">Fill rate</p>
                 <p className="font-semibold text-zinc-900">{outcomeConsistency.fillRate.toFixed(0)}%</p>
               </div>
-              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+              <div className="rounded-[18px] border border-emerald-100 bg-white px-3 py-2">
                 <p className="text-xs text-zinc-500">Reject rate</p>
                 <p className="font-semibold text-zinc-900">{outcomeConsistency.rejectRate.toFixed(0)}%</p>
               </div>
-              <div className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+              <div className="rounded-[18px] border border-emerald-100 bg-white px-3 py-2">
                 <p className="text-xs text-zinc-500">Pending</p>
                 <p className="font-semibold text-zinc-900">{outcomeConsistency.pending}</p>
               </div>
@@ -1565,7 +1566,7 @@ export default function Pilot() {
         )}
 
         {!!outcomeTrend.sampleSize && (
-          <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-800">
+          <div className="mt-3 rounded-[20px] border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-800">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Execution trend signal</p>
               <Pill tone={outcomeTrend.tone}>{outcomeTrend.label}</Pill>
@@ -1576,11 +1577,11 @@ export default function Pilot() {
         )}
 
         {!!recentOrderOutcomes.length && (
-          <div className="mt-3 rounded-md border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+          <div className="mt-3 rounded-[20px] border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Recent Outcomes</p>
             <div className="mt-2 space-y-2">
               {recentOrderOutcomes.map((item, index) => (
-                <div key={`${item.asset}-${item.status}-${index}`} className="rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2">
+                <div key={`${item.asset}-${item.status}-${index}`} className="rounded-[18px] border border-zinc-100 bg-zinc-50 px-3 py-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-zinc-900">{item.asset} {item.action}</p>
                     <Pill tone={item.status === 'REJECTED' ? 'red' : item.status === 'PENDING' ? 'amber' : 'sky'}>{item.status}</Pill>
@@ -1599,7 +1600,7 @@ export default function Pilot() {
         )}
       </div>
 
-      <div className="market-panel rounded-md p-4">
+      <div className="market-panel rounded-[28px] p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Pilot Progress</h2>
@@ -1616,7 +1617,7 @@ export default function Pilot() {
         <p className="mt-2 text-xs text-zinc-500">Green is readiness. Blue is elapsed pilot time.</p>
       </div>
 
-      <div className={`rounded-md border px-5 py-4 ${recommendationTone}`}>
+      <div className={`rounded-[28px] border px-5 py-5 ${recommendationTone}`}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl">
             <Pill tone={recommendation.tone || 'amber'}>{recommendation.label}</Pill>
@@ -1629,15 +1630,15 @@ export default function Pilot() {
             <p className="mt-2 text-xs opacity-80">{releaseGateDecision.reason}</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-sm">
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Trust</p>
               <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.avg_trust_score || 0).toFixed(1)}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Value</p>
               <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.avg_value_score || 0).toFixed(1)}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
               <p className="mt-1 font-display font-bold">{Number(feedbackSummary?.yes_rate_pct || 0).toFixed(0)}%</p>
             </div>
@@ -1645,7 +1646,7 @@ export default function Pilot() {
         </div>
       </div>
 
-      <div className={`rounded-md border px-5 py-4 ${dayFiveGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : dayFiveGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+      <div className={`rounded-[28px] border px-5 py-5 ${dayFiveGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : dayFiveGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl">
             <Pill tone={dayFiveGate.tone}>{`Day 5 ${dayFiveGate.status}`}</Pill>
@@ -1654,19 +1655,19 @@ export default function Pilot() {
             <p className="mt-3 text-sm font-semibold">{dayFiveGate.nextAction}</p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Feedback</p>
               <p className="mt-1 font-display font-bold">{dayFiveGate.totalFeedback}/5</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Trust</p>
               <p className="mt-1 font-display font-bold">{dayFiveGate.avgTrust.toFixed(1)}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Value</p>
               <p className="mt-1 font-display font-bold">{dayFiveGate.avgValue.toFixed(1)}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Yes Rate</p>
               <p className="mt-1 font-display font-bold">{dayFiveGate.yesRate.toFixed(0)}%</p>
             </div>
@@ -1674,7 +1675,7 @@ export default function Pilot() {
         </div>
       </div>
 
-      <div className={`rounded-md border px-5 py-4 ${daySixGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySixGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+      <div className={`rounded-[28px] border px-5 py-5 ${daySixGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySixGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl">
             <Pill tone={daySixGate.tone}>{`Day 6 ${daySixGate.status}`}</Pill>
@@ -1688,19 +1689,19 @@ export default function Pilot() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Orders</p>
               <p className="mt-1 font-display font-bold">{daySixGate.ordersTracked}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Fill Rate</p>
               <p className="mt-1 font-display font-bold">{daySixGate.fillRate.toFixed(0)}%</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Reject Rate</p>
               <p className="mt-1 font-display font-bold">{daySixGate.rejectRate.toFixed(0)}%</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Confidence</p>
               <p className="mt-1 font-display font-bold">{daySixGate.confidence}</p>
             </div>
@@ -1708,7 +1709,7 @@ export default function Pilot() {
         </div>
       </div>
 
-      <div className={`rounded-md border px-5 py-4 ${daySevenGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySevenGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+      <div className={`rounded-[28px] border px-5 py-5 ${daySevenGate.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : daySevenGate.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl">
             <Pill tone={daySevenGate.tone}>{`Day 7 ${daySevenGate.status}`}</Pill>
@@ -1720,19 +1721,19 @@ export default function Pilot() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Decisions</p>
               <p className="mt-1 font-display font-bold">{daySevenGate.decisionCount}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Filled</p>
               <p className="mt-1 font-display font-bold">{daySevenGate.hasFilledEvidence ? 'Yes' : 'No'}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Accountability</p>
               <p className="mt-1 font-display font-bold">{daySevenGate.hasAccountabilityEvidence ? 'Yes' : 'No'}</p>
             </div>
-            <div className="rounded-md bg-white/75 px-3 py-2">
+            <div className="rounded-[18px] bg-white/75 px-3 py-2">
               <p className="text-xs uppercase tracking-wide opacity-70">Recent</p>
               <p className="mt-1 font-display font-bold">{daySevenGate.recentStatuses.length}</p>
             </div>
@@ -1743,7 +1744,7 @@ export default function Pilot() {
       {dayEightToThirty.map((checkpoint) => (
         <div
           key={`day-${checkpoint.day}`}
-          className={`rounded-md border px-5 py-4 ${checkpoint.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : checkpoint.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}
+          className={`rounded-[28px] border px-5 py-5 ${checkpoint.tone === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : checkpoint.tone === 'red' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}
         >
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="max-w-3xl">
@@ -1758,7 +1759,7 @@ export default function Pilot() {
       ))}
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Session Kit</h2>
@@ -1769,14 +1770,14 @@ export default function Pilot() {
 
           <div className="mt-4 space-y-3">
             {sessionChecklist.map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+              <div key={item} className="flex gap-3 rounded-[18px] border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
                 <span className="font-display font-bold text-zinc-900">{index + 1}</span>
                 <span>{item}</span>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <div className="mt-4 rounded-[20px] border border-zinc-200 bg-zinc-50 p-4">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Expansion Criteria</p>
             <div className="mt-2 space-y-2">
               {exitCriteria.map((item) => (
@@ -1786,7 +1787,7 @@ export default function Pilot() {
           </div>
         </div>
 
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Pilot Report</h2>
@@ -1795,7 +1796,7 @@ export default function Pilot() {
             <button
               type="button"
               onClick={copyPilotReport}
-              className="rounded-md bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+              className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               {reportCopied ? 'Copied' : 'Copy Report'}
             </button>
@@ -1803,13 +1804,13 @@ export default function Pilot() {
           <textarea
             readOnly
             value={pilotReport}
-            className="mt-4 h-80 w-full rounded-md border border-zinc-300 bg-zinc-950 px-3 py-3 font-mono text-xs text-zinc-100"
+            className="mt-4 h-80 w-full rounded-[20px] border border-zinc-300 bg-zinc-950 px-3 py-3 font-mono text-xs text-zinc-100"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Candidate Pipeline</h2>
@@ -1827,7 +1828,7 @@ export default function Pilot() {
                 <input
                   value={candidateForm.name}
                   onChange={(event) => updateCandidateForm('name', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-input mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                   placeholder="Name, handle, or account"
                 />
               </label>
@@ -1836,7 +1837,7 @@ export default function Pilot() {
                 <select
                   value={candidateForm.segment}
                   onChange={(event) => updateCandidateForm('segment', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 >
                   <option>MT5 trader</option>
                   <option>Alpaca paper trader</option>
@@ -1850,7 +1851,7 @@ export default function Pilot() {
               <input
                 value={candidateForm.source}
                 onChange={(event) => updateCandidateForm('source', event.target.value)}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="market-input mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 placeholder="Discord, Telegram, X, referral..."
               />
             </label>
@@ -1859,20 +1860,20 @@ export default function Pilot() {
               <textarea
                 value={candidateForm.notes}
                 onChange={(event) => updateCandidateForm('notes', event.target.value)}
-                className="mt-1 min-h-20 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="market-input mt-1 min-h-20 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 placeholder="Why are they a useful pilot user?"
               />
             </label>
-            <button type="submit" className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+            <button type="submit" className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
               Add Candidate
             </button>
           </form>
         </div>
 
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="grid grid-cols-4 gap-2 text-center text-sm">
             {candidateStatuses.map((status) => (
-              <div key={status} className="rounded-md border border-zinc-200 bg-white p-2">
+              <div key={status} className="rounded-[18px] border border-zinc-200 bg-white p-3">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">{status.toLowerCase()}</p>
                 <p className="mt-1 font-display text-xl font-bold text-zinc-900">{candidateStats[status]}</p>
               </div>
@@ -1881,12 +1882,12 @@ export default function Pilot() {
 
           <div className="mt-4 space-y-3">
             {!candidates.length && (
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+              <div className="rounded-[20px] border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600">
                 No beta candidates yet. Add 10 likely users before widening the pilot.
               </div>
             )}
             {candidates.map((candidate) => (
-              <div key={candidate.id} className="rounded-md border border-zinc-200 bg-white p-4">
+              <div key={candidate.id} className="rounded-[22px] border border-zinc-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <p className="font-semibold text-zinc-900">{candidate.name}</p>
@@ -1905,7 +1906,7 @@ export default function Pilot() {
                       key={`${candidate.id}-${status}`}
                       type="button"
                       onClick={() => updateCandidateStatus(candidate, status)}
-                      className="rounded bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                      className="rounded-xl bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
                     >
                       {status}
                     </button>
@@ -1913,7 +1914,7 @@ export default function Pilot() {
                   <button
                     type="button"
                     onClick={() => deleteCandidate(candidate.id)}
-                    className="rounded bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"
+                    className="rounded-xl bg-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
                   >
                     Remove
                   </button>
@@ -1925,7 +1926,7 @@ export default function Pilot() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6">
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Beta Feedback</h2>
@@ -1943,7 +1944,7 @@ export default function Pilot() {
               <select
                 value={feedbackForm.candidateId}
                 onChange={(event) => selectFeedbackCandidate(event.target.value)}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
               >
                 <option value="">No linked candidate</option>
                 {feedbackCandidateOptions.map((candidate) => (
@@ -1959,7 +1960,7 @@ export default function Pilot() {
                 <input
                   value={feedbackForm.participant}
                   onChange={(event) => updateFeedbackForm('participant', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-input mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                   placeholder="Name or short label"
                 />
               </label>
@@ -1968,7 +1969,7 @@ export default function Pilot() {
                 <select
                   value={feedbackForm.segment}
                   onChange={(event) => updateFeedbackForm('segment', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 >
                   <option>MT5 trader</option>
                   <option>Alpaca paper trader</option>
@@ -1984,7 +1985,7 @@ export default function Pilot() {
                 <select
                   value={feedbackForm.trustScore}
                   onChange={(event) => updateFeedbackForm('trustScore', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 >
                   {[1, 2, 3, 4, 5].map((score) => <option key={`trust-${score}`} value={score}>{score}/5</option>)}
                 </select>
@@ -1994,7 +1995,7 @@ export default function Pilot() {
                 <select
                   value={feedbackForm.valueScore}
                   onChange={(event) => updateFeedbackForm('valueScore', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 >
                   {[1, 2, 3, 4, 5].map((score) => <option key={`value-${score}`} value={score}>{score}/5</option>)}
                 </select>
@@ -2004,7 +2005,7 @@ export default function Pilot() {
                 <select
                   value={feedbackForm.wouldPay}
                   onChange={(event) => updateFeedbackForm('wouldPay', event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="market-select mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 >
                   <option>Maybe</option>
                   <option>Yes</option>
@@ -2018,7 +2019,7 @@ export default function Pilot() {
               <input
                 value={feedbackForm.friction}
                 onChange={(event) => updateFeedbackForm('friction', event.target.value)}
-                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="market-input mt-1 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 placeholder="What made them hesitate?"
               />
             </label>
@@ -2028,18 +2029,18 @@ export default function Pilot() {
               <textarea
                 value={feedbackForm.notes}
                 onChange={(event) => updateFeedbackForm('notes', event.target.value)}
-                className="mt-1 min-h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="market-input mt-1 min-h-24 w-full rounded-xl px-3 py-3 text-sm text-zinc-900"
                 placeholder="What did they trust, misunderstand, or ask to see next?"
               />
             </label>
 
-            <button type="submit" className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+            <button type="submit" className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
               Save Feedback
             </button>
           </form>
         </div>
 
-        <div className="market-panel rounded-md p-4">
+        <div className="market-panel rounded-[28px] p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Feedback Evidence</h2>
@@ -2051,22 +2052,22 @@ export default function Pilot() {
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-md border border-zinc-200 bg-white p-3">
+            <div className="rounded-[18px] border border-zinc-200 bg-white p-3">
               <p className="text-xs uppercase tracking-wide text-zinc-500">Yes</p>
               <p className="mt-1 text-xl font-display font-bold text-emerald-700">{feedbackStats.payYes}</p>
             </div>
-            <div className="rounded-md border border-zinc-200 bg-white p-3">
+            <div className="rounded-[18px] border border-zinc-200 bg-white p-3">
               <p className="text-xs uppercase tracking-wide text-zinc-500">Maybe</p>
               <p className="mt-1 text-xl font-display font-bold text-amber-700">{feedbackStats.payMaybe}</p>
             </div>
-            <div className="rounded-md border border-zinc-200 bg-white p-3">
+            <div className="rounded-[18px] border border-zinc-200 bg-white p-3">
               <p className="text-xs uppercase tracking-wide text-zinc-500">No</p>
               <p className="mt-1 text-xl font-display font-bold text-red-700">{feedbackStats.payNo}</p>
             </div>
           </div>
 
           {!!feedbackSummary?.top_segments?.length && (
-            <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <div className="mt-4 rounded-[20px] border border-zinc-200 bg-zinc-50 p-4">
               <p className="text-xs uppercase tracking-wide text-zinc-500">Strongest Segments</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {feedbackSummary.top_segments.map((item) => (
@@ -2077,7 +2078,7 @@ export default function Pilot() {
           )}
 
           {!!feedbackSummary?.recent_frictions?.length && (
-            <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
+            <div className="mt-4 rounded-[20px] border border-zinc-200 bg-white p-4">
               <p className="text-xs uppercase tracking-wide text-zinc-500">Recent Frictions</p>
               <div className="mt-2 space-y-2">
                 {feedbackSummary.recent_frictions.map((friction, index) => (
@@ -2089,12 +2090,12 @@ export default function Pilot() {
 
           <div className="mt-4 space-y-3">
             {!feedbackEntries.length && (
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+              <div className="rounded-[20px] border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600">
                 No beta feedback logged yet.
               </div>
             )}
             {feedbackEntries.map((entry) => (
-              <div key={entry.id} className="rounded-md border border-zinc-200 bg-white p-4">
+              <div key={entry.id} className="rounded-[22px] border border-zinc-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-zinc-900">{entry.participant}</p>
@@ -2103,7 +2104,7 @@ export default function Pilot() {
                   <button
                     type="button"
                     onClick={() => deleteFeedback(entry.id)}
-                    className="rounded bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
+                    className="rounded-xl bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-200"
                   >
                     Remove
                   </button>
@@ -2123,7 +2124,7 @@ export default function Pilot() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
-        <div className="market-panel rounded-md p-4 space-y-3">
+        <div className="market-panel rounded-[28px] p-5 space-y-3">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Trust Gates</h2>
             <p className="text-sm text-zinc-600">These gates define whether the product is ready for the next batch of beta users.</p>
@@ -2134,11 +2135,11 @@ export default function Pilot() {
         </div>
 
         <div className="space-y-6">
-          <div className="market-panel rounded-md p-4">
+          <div className="market-panel rounded-[28px] p-5">
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Success Questions</h2>
             <div className="mt-4 space-y-3">
               {betaQuestions.map((question, index) => (
-                <div key={question} className="flex gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+                <div key={question} className="flex gap-3 rounded-[18px] border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
                   <span className="font-display font-bold text-zinc-900">{index + 1}</span>
                   <span>{question}</span>
                 </div>
@@ -2146,7 +2147,7 @@ export default function Pilot() {
             </div>
           </div>
 
-          <div className="market-panel rounded-md p-4">
+          <div className="market-panel rounded-[28px] p-5">
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">Current Evidence</h2>
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
@@ -2184,7 +2185,7 @@ export default function Pilot() {
         </div>
       </div>
 
-      <div className="market-panel rounded-md p-4">
+      <div className="market-panel rounded-[28px] p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-display font-bold text-zinc-900 uppercase">30-Day Operating Plan</h2>
@@ -2194,7 +2195,7 @@ export default function Pilot() {
         </div>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {weeklyPlan.map((item) => (
-            <div key={item.label} className="rounded-md border border-zinc-200 bg-white p-4">
+            <div key={item.label} className="rounded-[20px] border border-zinc-200 bg-white p-4">
               <p className="text-xs uppercase tracking-wide text-zinc-500">{item.label}</p>
               <h3 className="mt-2 font-display font-bold text-zinc-900 uppercase">{item.title}</h3>
               <p className="mt-2 text-sm text-zinc-600">{item.detail}</p>
