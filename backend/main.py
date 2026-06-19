@@ -7,7 +7,7 @@ import httpx
 from fastapi import FastAPI, WebSocket, HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
@@ -18,7 +18,7 @@ from services.notification_scheduler import notification_scheduler
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
-    ensure_sqlite_schema_compat()
+    ensure_schema_compat()
     notification_scheduler.start()
     try:
         yield
@@ -79,51 +79,51 @@ async def global_exception_handler(request, exc):
     )
 
 
-def ensure_sqlite_schema_compat():
-    if "sqlite" not in settings.DATABASE_URL:
-        return
+def ensure_schema_compat():
     try:
         with engine.begin() as conn:
-            pilot_feedback_columns = {
-                row[1] for row in conn.execute(text("PRAGMA table_info(pilot_feedback)")).fetchall()
-            }
-            if pilot_feedback_columns and "candidate_id" not in pilot_feedback_columns:
-                conn.execute(text("ALTER TABLE pilot_feedback ADD COLUMN candidate_id INTEGER"))
-                logger.info("Added missing pilot_feedback.candidate_id column")
+            inspector = inspect(conn)
+            existing_tables = set(inspector.get_table_names())
 
-            order_columns = {
-                row[1] for row in conn.execute(text("PRAGMA table_info(orders)")).fetchall()
-            }
-            if order_columns and "manual_confirmation" not in order_columns:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN manual_confirmation INTEGER NOT NULL DEFAULT 0"))
-                logger.info("Added missing orders.manual_confirmation column")
-            if order_columns and "confirmation_text" not in order_columns:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN confirmation_text TEXT"))
-                logger.info("Added missing orders.confirmation_text column")
-            if order_columns and "operator_note" not in order_columns:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN operator_note TEXT"))
-                logger.info("Added missing orders.operator_note column")
+            def ensure_columns(table_name: str, columns: list[tuple[str, str]]):
+                if table_name not in existing_tables:
+                    return
+                current_columns = {
+                    column["name"] for column in inspect(conn).get_columns(table_name)
+                }
+                for column_name, column_sql in columns:
+                    if column_name in current_columns:
+                        continue
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"))
+                    current_columns.add(column_name)
+                    logger.info("Added missing %s.%s column", table_name, column_name)
 
-            brief_alert_columns = {
-                row[1] for row in conn.execute(text("PRAGMA table_info(operator_brief_alert_states)")).fetchall()
-            }
-            if brief_alert_columns and "window_hours" not in brief_alert_columns:
-                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN window_hours INTEGER"))
-                logger.info("Added missing operator_brief_alert_states.window_hours column")
-            if brief_alert_columns and "severity" not in brief_alert_columns:
-                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN severity TEXT"))
-                logger.info("Added missing operator_brief_alert_states.severity column")
-            if brief_alert_columns and "title" not in brief_alert_columns:
-                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN title TEXT"))
-                logger.info("Added missing operator_brief_alert_states.title column")
-            if brief_alert_columns and "message" not in brief_alert_columns:
-                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN message TEXT"))
-                logger.info("Added missing operator_brief_alert_states.message column")
-            if brief_alert_columns and "recommended_action" not in brief_alert_columns:
-                conn.execute(text("ALTER TABLE operator_brief_alert_states ADD COLUMN recommended_action TEXT"))
-                logger.info("Added missing operator_brief_alert_states.recommended_action column")
+            ensure_columns(
+                "pilot_feedback",
+                [
+                    ("candidate_id", "candidate_id INTEGER"),
+                ],
+            )
+            ensure_columns(
+                "orders",
+                [
+                    ("manual_confirmation", "manual_confirmation INTEGER NOT NULL DEFAULT 0"),
+                    ("confirmation_text", "confirmation_text TEXT"),
+                    ("operator_note", "operator_note TEXT"),
+                ],
+            )
+            ensure_columns(
+                "operator_brief_alert_states",
+                [
+                    ("window_hours", "window_hours INTEGER"),
+                    ("severity", "severity TEXT"),
+                    ("title", "title TEXT"),
+                    ("message", "message TEXT"),
+                    ("recommended_action", "recommended_action TEXT"),
+                ],
+            )
     except Exception:
-        logger.exception("Failed to apply SQLite schema compatibility checks")
+        logger.exception("Failed to apply schema compatibility checks")
 
 
 def get_database_readiness(database_url: str | None = None, app_env: str | None = None):
