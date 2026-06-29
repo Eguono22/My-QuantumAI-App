@@ -27,6 +27,9 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
   const [billingLoading, setBillingLoading] = useState(true);
   const [billingAction, setBillingAction] = useState('');
   const [billingMessage, setBillingMessage] = useState(null);
+  const [startupHealth, setStartupHealth] = useState(null);
+  const [loadingStartupHealth, setLoadingStartupHealth] = useState(true);
+  const [startupMessage, setStartupMessage] = useState(null);
   const [telegramPrefs, setTelegramPrefs] = useState({
     telegram_enabled: false,
     telegram_chat_id: '',
@@ -56,6 +59,22 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
       }
     };
 
+    const loadStartupHealth = async () => {
+      try {
+        const status = await tradingService.getStartupHealth();
+        if (!isMounted) return;
+        setStartupHealth(status);
+      } catch (err) {
+        if (!isMounted) return;
+        setStartupMessage({
+          type: 'error',
+          message: err.response?.data?.detail || 'Could not load trading readiness.',
+        });
+      } finally {
+        if (isMounted) setLoadingStartupHealth(false);
+      }
+    };
+
     const loadTelegramPreferences = async () => {
       try {
         const prefs = await tradingService.getNotificationPreferences();
@@ -79,6 +98,7 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
     };
 
     loadBillingStatus();
+    loadStartupHealth();
     loadTelegramPreferences();
     return () => {
       isMounted = false;
@@ -170,6 +190,16 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
     }
   };
 
+  const liveTrading = startupHealth?.live_trading;
+  const liveRiskLimits = startupHealth?.risk_limits;
+  const liveConfigured = liveTrading?.trading_mode === 'live';
+  const liveStatusLabel = liveConfigured
+    ? liveTrading?.ready ? 'Live Mode Armed' : 'Live Mode Blocked'
+    : 'Paper Mode';
+  const liveStatusTone = liveConfigured
+    ? liveTrading?.ready ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+    : 'bg-cyan-100 text-cyan-800';
+
   return (
     <div className="space-y-8 animate-fadeRise">
       <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/15 bg-[linear-gradient(135deg,#07111f_0%,#0d2340_45%,#153d68_100%)] p-6 shadow-panel md:p-8">
@@ -202,6 +232,7 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
 
       {telegramStatus && <Alert type={telegramStatus.type} message={telegramStatus.message} onClose={() => setTelegramStatus(null)} />}
       {billingMessage && <Alert type={billingMessage.type} message={billingMessage.message} onClose={() => setBillingMessage(null)} />}
+      {startupMessage && <Alert type={startupMessage.type} message={startupMessage.message} onClose={() => setStartupMessage(null)} />}
 
       <section className="market-panel rounded-[28px] p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -275,9 +306,80 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
       <section className="market-panel rounded-[28px] p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Broker Capital</p>
+            <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Live Trading Setup</h2>
+            <p className="mt-1 text-sm text-zinc-600">Real trading money is funded at the broker, not through Stripe and not through the paper funding box.</p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${liveStatusTone}`}>
+            {loadingStartupHealth ? 'Checking...' : liveStatusLabel}
+          </span>
+        </div>
+
+        {loadingStartupHealth ? (
+          <div className="mt-5 text-sm text-zinc-500">Loading live trading readiness...</div>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Trading Mode</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveTrading?.trading_mode || 'paper'}</p>
+              </div>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Broker</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveTrading?.broker_provider || 'paper'}</p>
+              </div>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Live Credentials</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveTrading?.live_credentials_ready ? 'Configured' : 'Missing'}</p>
+              </div>
+              <div className="market-panel-soft rounded-[22px] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Kill Switch</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveTrading?.kill_switch_active ? 'Active' : 'Off'}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[22px] border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+              To use real capital, fund your Alpaca or MT5-connected broker account first. Then enable live trading on the backend with `TRADING_MODE=live`, `BROKER_PROVIDER=alpaca`, `LIVE_TRADING_ENABLED=true`, and your live broker credentials.
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+              <div className="rounded-[22px] border border-zinc-200 bg-white px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Allowed Symbols</p>
+                <p className="mt-2 font-semibold text-zinc-900">
+                  {liveTrading?.live_pilot_allowed_symbols?.length ? liveTrading.live_pilot_allowed_symbols.join(', ') : 'None'}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-zinc-200 bg-white px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Manual Confirmation</p>
+                <p className="mt-2 font-semibold text-zinc-900">
+                  {liveTrading?.manual_confirmation_required ? `Required: ${liveTrading.live_manual_confirmation_text}` : 'Not required'}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-zinc-200 bg-white px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Live Per Trade Cap</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveRiskLimits?.max_live_notional_per_trade ?? 'N/A'}</p>
+              </div>
+              <div className="rounded-[22px] border border-zinc-200 bg-white px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Live Daily Trade Cap</p>
+                <p className="mt-2 font-semibold text-zinc-900">{liveRiskLimits?.max_live_daily_trades ?? 'N/A'}</p>
+              </div>
+            </div>
+
+            {!liveTrading?.ready && (
+              <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Live trading is not ready yet: {liveTrading?.reason || 'Complete broker funding, credentials, and backend safety checks first.'}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="market-panel rounded-[28px] p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
             <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Commerce</p>
             <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Billing</h2>
-            <p className="mt-1 text-sm text-zinc-600">Stripe-hosted billing for payment methods and subscription access.</p>
+            <p className="mt-1 text-sm text-zinc-600">Stripe-hosted billing for app payments and subscriptions, not broker account funding.</p>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
             billingStatus?.configured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
@@ -314,6 +416,10 @@ export default function Settings({ preferences, onUpdatePreference, onToggleThem
                 Add Stripe environment variables on the backend before collecting payment methods: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and optionally `STRIPE_PRICE_ID_PRO`.
               </div>
             )}
+
+            <div className="mt-4 rounded-[22px] border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+              Use Stripe if users need to pay for QuantumAI access. Do not use it to represent or top up brokerage buying power.
+            </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
               <button

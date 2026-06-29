@@ -134,6 +134,10 @@ export default function Portfolio({ user, preferences }) {
   const totalExposure = portfolio.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
   const bestHolding = [...portfolio].sort((a, b) => Number(b.pnl_pct || 0) - Number(a.pnl_pct || 0))[0];
   const worstHolding = [...portfolio].sort((a, b) => Number(a.pnl_pct || 0) - Number(b.pnl_pct || 0))[0];
+  const paperFundingActions = {
+    deposit: 'Add paper cash',
+    withdraw: 'Remove paper cash',
+  };
 
   return (
     <div className="space-y-8 animate-fadeRise">
@@ -218,11 +222,15 @@ export default function Portfolio({ user, preferences }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Execution Ticket</p>
-                <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Execute Trade</h2>
+                <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Execute Paper Trade</h2>
               </div>
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                Paper Mode
+                Paper Only
               </span>
+            </div>
+
+            <div className="mt-4 rounded-[20px] border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+              This ticket and cash balance are simulated for paper trading. Real live capital must be funded in your connected broker account.
             </div>
 
             <form onSubmit={handleTrade} className="mt-5 space-y-4">
@@ -278,16 +286,19 @@ export default function Portfolio({ user, preferences }) {
                   tradeForm.action === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {tradeForm.action === 'buy' ? 'Buy' : 'Sell'} {tradeForm.asset}
+                {tradeForm.action === 'buy' ? 'Paper Buy' : 'Paper Sell'} {tradeForm.asset}
               </button>
             </form>
 
             <div className="mt-6 border-t border-zinc-200/80 pt-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Funding Desk</p>
-                  <p className="mt-1 text-sm text-zinc-600">Available cash: {formatCurrency(cashBalance)}</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Paper Funding</p>
+                  <p className="mt-1 text-sm text-zinc-600">Available paper cash: {formatCurrency(cashBalance)}</p>
                 </div>
+              </div>
+              <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Use this only to simulate deposits and withdrawals inside the app. It does not move real money to or from your broker or bank.
               </div>
               <div className="mt-4 space-y-3">
                 <input
@@ -297,7 +308,7 @@ export default function Portfolio({ user, preferences }) {
                   value={fundingAmount}
                   onChange={(e) => setFundingAmount(e.target.value)}
                   className="market-input rounded-xl px-3 py-3"
-                  placeholder="Funding amount"
+                  placeholder="Paper funding amount"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -305,14 +316,14 @@ export default function Portfolio({ user, preferences }) {
                     onClick={() => handleFunding('deposit')}
                     className="rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                   >
-                    Deposit
+                    {paperFundingActions.deposit}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleFunding('withdraw')}
                     className="rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white transition hover:bg-amber-700"
                   >
-                    Withdraw
+                    {paperFundingActions.withdraw}
                   </button>
                 </div>
               </div>

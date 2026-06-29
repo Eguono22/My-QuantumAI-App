@@ -3,6 +3,7 @@ import PriceChart from '../components/PriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import MarketTable from '../components/MarketTable';
+import TradingViewMarketOverview from '../components/TradingViewMarketOverview';
 import { marketService } from '../services/marketService';
 import { tradingService } from '../services/tradingService';
 import { formatCurrency, formatPercent, formatLargeNumber, formatNumber } from '../utils/formatters';
@@ -246,6 +247,8 @@ export default function Markets() {
       </section>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      <TradingViewMarketOverview />
 
       <section className="grid gap-4 xl:grid-cols-3">
         {[

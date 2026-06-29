@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { marketService } from '../services/marketService';
 import { tradingService } from '../services/tradingService';
 import TradingSignalCard from '../components/TradingSignalCard';
+import TradingViewMarketOverview from '../components/TradingViewMarketOverview';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 function getFlowTone(value) {
@@ -208,6 +209,8 @@ export default function Dashboard({ preferences }) {
           })}
         </section>
       )}
+
+      {!isCompact && <TradingViewMarketOverview compact />}
 
       <section className={`grid gap-5 ${isCompact ? 'xl:grid-cols-2' : 'xl:grid-cols-[minmax(0,1.5fr)_380px]'}`}>
         <div className="market-panel rounded-[28px] p-5 md:p-6">

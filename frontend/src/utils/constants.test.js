@@ -30,12 +30,12 @@ describe('SIGNAL_BG_COLORS', () => {
 
 describe('API_BASE_URL', () => {
   it('uses the configured API base URL', () => {
-    expect(API_BASE_URL).toBe('http://localhost:8002');
+    expect(API_BASE_URL).toBe('http://127.0.0.1:8011');
   });
 });
 
 describe('WS_BASE_URL', () => {
   it('uses the configured websocket base URL', () => {
-    expect(WS_BASE_URL).toBe('ws://localhost:8002/ws');
+    expect(WS_BASE_URL).toBe('ws://127.0.0.1:8011/ws');
   });
 });
