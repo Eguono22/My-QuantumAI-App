@@ -281,6 +281,27 @@ def get_trading_readiness(
 def root():
     return {"message": "Quantum AI Trading Platform API", "version": "1.0.0", "status": "running"}
 
+def get_alpaca_account_probe(status_code: int, payload: object) -> dict:
+    """Translate Alpaca account state into a safe pre-trade readiness result."""
+    probe = {"ok": status_code < 400, "status_code": status_code}
+    if not isinstance(payload, dict):
+        return probe
+
+    trading_blocked = payload.get("trading_blocked")
+    account_blocked = payload.get("account_blocked")
+    probe["trading_blocked"] = trading_blocked
+    probe["account_blocked"] = account_blocked
+
+    if trading_blocked is True:
+        probe["ok"] = False
+        probe["reason"] = "Alpaca account has trading_blocked=true (Trades Suspended is enabled)."
+    elif account_blocked is True:
+        probe["ok"] = False
+        probe["reason"] = "Alpaca account has account_blocked=true."
+
+    return probe
+
+
 @app.get("/health")
 def health():
     return {
@@ -319,10 +340,14 @@ def startup_health(include_probe: bool = False):
                 headers=headers,
             ) as client:
                 account_resp = client.get("/v2/account")
-                probes["alpaca_account"] = {
-                    "ok": account_resp.status_code < 400,
-                    "status_code": account_resp.status_code,
-                }
+                try:
+                    account_payload = account_resp.json()
+                except ValueError:
+                    account_payload = None
+                probes["alpaca_account"] = get_alpaca_account_probe(
+                    account_resp.status_code,
+                    account_payload,
+                )
         except Exception as e:
             probes["alpaca_account"] = {"ok": False, "error": str(e)[:180]}
         try:

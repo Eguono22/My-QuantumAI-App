@@ -76,6 +76,23 @@ string NormalizedApiBaseUrl()
    return baseUrl;
 }
 
+string AlternateLoopbackBaseUrl(string baseUrl)
+{
+   if(StringFind(baseUrl, "http://127.0.0.1") == 0)
+   {
+      string swapped = StringSubstr(baseUrl, StringLen("http://127.0.0.1"));
+      return "http://localhost" + swapped;
+   }
+
+   if(StringFind(baseUrl, "http://localhost") == 0)
+   {
+      string swapped = StringSubstr(baseUrl, StringLen("http://localhost"));
+      return "http://127.0.0.1" + swapped;
+   }
+
+   return "";
+}
+
 ENUM_TIMEFRAMES ResolveTimeframeEnum(string timeframeValue)
 {
    string tf = ToUpperValue(timeframeValue);
@@ -351,7 +368,8 @@ string HttpPost(string path, string payload)
       return "";
    }
 
-   string url = NormalizedApiBaseUrl() + path;
+   string baseUrl = NormalizedApiBaseUrl();
+   string url = baseUrl + path;
    string headers = "Content-Type: application/json\r\nX-MQL5-Secret: " + QuantumBridgeSecret + "\r\n";
    char data[];
    char result[];
@@ -360,16 +378,50 @@ string HttpPost(string path, string payload)
    int timeout = 12000;
    ResetLastError();
    int responseCode = WebRequest("POST", url, headers, timeout, data, result, resultHeaders);
+   int requestError = GetLastError();
    if(responseCode == -1)
    {
-      Print("QuantumAI WebRequest failed. Error: ", GetLastError(), ". Check MT5 WebRequest allowlist.");
+      Print("QuantumAI WebRequest failed. Error: ", requestError,
+            ". URL=", url,
+            ". Check MT5 WebRequest allowlist/proxy settings.");
       return "";
    }
 
    string response = CharArrayToString(result);
+   if(responseCode > 599)
+   {
+      string alternateBase = AlternateLoopbackBaseUrl(baseUrl);
+      if(alternateBase != "")
+      {
+         string retryUrl = alternateBase + path;
+         Print("QuantumAI unexpected HTTP status ", responseCode,
+               " for ", url,
+               ". Retrying via alternate loopback host: ", retryUrl);
+
+         ResetLastError();
+         ArrayResize(result, 0);
+         resultHeaders = "";
+         responseCode = WebRequest("POST", retryUrl, headers, timeout, data, result, resultHeaders);
+         requestError = GetLastError();
+         response = CharArrayToString(result);
+         url = retryUrl;
+
+         if(responseCode == -1)
+         {
+            Print("QuantumAI retry WebRequest failed. Error: ", requestError,
+                  ". URL=", retryUrl,
+                  ". Check MT5 WebRequest allowlist/proxy settings.");
+            return "";
+         }
+      }
+   }
+
    if(responseCode >= 400)
    {
-      Print("QuantumAI HTTP error ", responseCode, ": ", response);
+      Print("QuantumAI HTTP error ", responseCode,
+            " | URL=", url,
+            " | mt5_err=", requestError,
+            " | body=", response);
       if(responseCode == 401)
          Print("QuantumAI auth failed. The live EA input QuantumBridgeSecret does not match backend MQL5_SHARED_SECRET.");
       return "";

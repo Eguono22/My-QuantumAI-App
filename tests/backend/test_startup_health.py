@@ -3,7 +3,33 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../backend"))
 
-from main import get_database_readiness, get_password_reset_readiness, get_trading_readiness
+from main import (
+    get_alpaca_account_probe,
+    get_database_readiness,
+    get_password_reset_readiness,
+    get_trading_readiness,
+)
+
+
+def test_alpaca_account_probe_blocks_suspended_trading():
+    probe = get_alpaca_account_probe(
+        200,
+        {"trading_blocked": True, "account_blocked": False},
+    )
+
+    assert probe["ok"] is False
+    assert probe["trading_blocked"] is True
+    assert "Trades Suspended" in probe["reason"]
+
+
+def test_alpaca_account_probe_accepts_trade_ready_account():
+    probe = get_alpaca_account_probe(
+        200,
+        {"trading_blocked": False, "account_blocked": False},
+    )
+
+    assert probe["ok"] is True
+    assert probe["trading_blocked"] is False
 
 
 def test_sqlite_is_allowed_for_development_startup_health():

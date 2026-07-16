@@ -111,8 +111,8 @@ def validate_startup_payload(
                 fail(
                     "Alpaca account probe failed "
                     f"(status_code={account_probe.get('status_code')}, "
-                    f"error={account_probe.get('error')}). "
-                    "Regenerate the Alpaca PAPER key/secret pair and rerun configure_alpaca_paper_env.ps1."
+                    f"error={account_probe.get('error') or account_probe.get('reason')}). "
+                    "Confirm the Alpaca PAPER account is active and Trades Suspended is disabled."
                 )
             ok("Alpaca account probe passed")
             if data_probe.get("ok") is not True:
