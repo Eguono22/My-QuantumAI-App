@@ -1,0 +1,16 @@
+.git
+.github
+**/node_modules
+**/build
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/venv
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.db
+**/*.sqlite3
+**/*.log
+.DS_Store

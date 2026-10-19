@@ -108,6 +108,13 @@ Or use the repo helper script (auto-switches to Node 20.18.3 before npm):
 ```
 
 ### Environment Setup
+
+macOS / Linux:
+```bash
+cp .env.example .env
+# Set SECRET_KEY in .env to the output of: openssl rand -hex 32
+```
+
 ```powershell
 # from project root (Windows PowerShell)
 $secret = & openssl rand -hex 32
@@ -117,8 +124,8 @@ $secret = & openssl rand -hex 32
 ### Backend Setup
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+pip install -r requirements.txt -c ../requirements.lock.txt
+uvicorn main:app --reload --port 8011
 ```
 
 ### Python Dependency Lock Workflow
@@ -164,7 +171,7 @@ If the backend is not already running, use:
 ### Frontend Setup
 ```bash
 cd frontend
-npm install
+npm ci
 npm start
 ```
 
@@ -181,6 +188,8 @@ docker-compose up --build
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+
+Docker serves the frontend API and WebSocket connections through its same-origin Nginx proxy (`/api` and `/api/ws`). Custom `REACT_APP_API_URL` and `REACT_APP_WS_URL` values are build arguments; rebuild the frontend after changing them. Local `npm start` connects directly to port 8011 by default.
 
 For this local workspace, MT5 bridge examples use `http://127.0.0.1:8011`.
 
@@ -232,7 +241,7 @@ Quick regression + UI validation checklist: see `docs/first-paper-trading-runboo
 
 ## 🔒 Security Notes
 
-- Change `SECRET_KEY` in production (see `.env.example`)
+- Set `SECRET_KEY` in production (see `.env.example`); hosted startup rejects missing or blank keys. Local development generates a random key when none is configured, so sessions reset on restart.
 - JWT tokens expire in 30 minutes by default
 - Passwords are hashed with bcrypt
 - CORS origins are configurable via environment variables

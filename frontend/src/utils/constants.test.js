@@ -39,3 +39,40 @@ describe('WS_BASE_URL', () => {
     expect(WS_BASE_URL).toBe('ws://127.0.0.1:8011/ws');
   });
 });
+
+describe('deployment endpoints', () => {
+  const originalApi = process.env.REACT_APP_API_URL;
+  const originalWs = process.env.REACT_APP_WS_URL;
+
+  afterEach(() => {
+    if (originalApi === undefined) delete process.env.REACT_APP_API_URL;
+    else process.env.REACT_APP_API_URL = originalApi;
+    if (originalWs === undefined) delete process.env.REACT_APP_WS_URL;
+    else process.env.REACT_APP_WS_URL = originalWs;
+  });
+
+  const loadEndpoints = () => {
+    let endpoints;
+    jest.isolateModules(() => { endpoints = require('./constants'); });
+    return endpoints;
+  };
+
+  it('derives the secure websocket endpoint from a hosted API', () => {
+    process.env.REACT_APP_API_URL = 'https://example.com/api/';
+    delete process.env.REACT_APP_WS_URL;
+    expect(loadEndpoints().WS_BASE_URL).toBe('wss://example.com/api/ws');
+  });
+
+  it('uses the same origin for the Docker API proxy', () => {
+    process.env.REACT_APP_API_URL = '/api';
+    delete process.env.REACT_APP_WS_URL;
+    expect(loadEndpoints().WS_BASE_URL).toBe(`ws://${window.location.host}/api/ws`);
+  });
+
+  it('accepts explicit websocket origins and complete endpoints', () => {
+    process.env.REACT_APP_WS_URL = 'wss://stream.example.com';
+    expect(loadEndpoints().WS_BASE_URL).toBe('wss://stream.example.com/ws');
+    process.env.REACT_APP_WS_URL = 'wss://stream.example.com/api/ws/';
+    expect(loadEndpoints().WS_BASE_URL).toBe('wss://stream.example.com/api/ws');
+  });
+});

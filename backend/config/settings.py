@@ -1,7 +1,6 @@
 import secrets
 import warnings
 import os
-import hashlib
 import json
 from pathlib import Path
 from pydantic import ConfigDict
@@ -183,26 +182,18 @@ if settings.DATABASE_URL is None:
         stacklevel=2,
     )
 
-if settings.SECRET_KEY is None:
-    # Use a deterministic fallback key so tokens remain valid across process
-    # restarts while still warning that explicit SECRET_KEY is strongly preferred.
-    fallback_seed = (
-        f"{os.getenv('VERCEL_PROJECT_ID','')}|"
-        f"{os.getenv('COMPUTERNAME','')}|"
-        f"{settings.DATABASE_URL or ''}|quantumai"
+def _resolve_secret_key(secret_key: Optional[str], app_env: str) -> str:
+    if secret_key and secret_key.strip():
+        return secret_key
+    if (app_env or "development").lower() != "development":
+        raise ValueError("SECRET_KEY must be set in non-development environments. Generate one with: openssl rand -hex 32")
+    warnings.warn(
+        "SECRET_KEY not set — using a random development key. "
+        "Set SECRET_KEY to preserve sessions across restarts.",
+        UserWarning,
+        stacklevel=2,
     )
-    settings.SECRET_KEY = hashlib.sha256(fallback_seed.encode()).hexdigest()
-    if settings.APP_ENV != "development":
-        warnings.warn(
-            "SECRET_KEY not set in hosted environment — using deterministic fallback key. "
-            "Set SECRET_KEY in deployment settings for stronger security.",
-            UserWarning,
-            stacklevel=2,
-        )
-    else:
-        warnings.warn(
-            "SECRET_KEY not set — using deterministic development fallback key. "
-            "Set SECRET_KEY (e.g. `openssl rand -hex 32`) for production security.",
-            UserWarning,
-            stacklevel=2,
-        )
+    return _generate_dev_secret()
+
+
+settings.SECRET_KEY = _resolve_secret_key(settings.SECRET_KEY, settings.APP_ENV)
