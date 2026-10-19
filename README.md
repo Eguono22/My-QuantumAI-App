@@ -336,6 +336,8 @@ The verification helper creates a temporary user, resolves that user's real `id`
 
 ## 🚢 Production Setup (1-4)
 
+See [Production deployment](docs/production-deployment.md) for the current Vercel release process, provider configuration, monitoring, and remaining verification gates.
+
 ## 🎯 Current Success Milestone: 14-Day Trust Pilot
 
 The next product milestone is not more feature breadth. It is proving one complete, trustworthy paper-trading workflow with 5-10 beta users:
