@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { tradingService } from '../services/tradingService';
 import { marketService } from '../services/marketService';
 import PortfolioChart from '../components/PortfolioChart';
-import PriceChart from '../components/PriceChart';
+import LivePriceChart from '../components/LivePriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import { formatCurrency, formatPercent, getChangeColor } from '../utils/formatters';
@@ -10,7 +10,6 @@ import { formatCurrency, formatPercent, getChangeColor } from '../utils/formatte
 export default function Portfolio({ user, preferences }) {
   const [portfolio, setPortfolio] = useState([]);
   const [performance, setPerformance] = useState(null);
-  const [priceHistory, setPriceHistory] = useState([]);
   const [assetOptions, setAssetOptions] = useState(['BTC']);
   const [selectedAsset, setSelectedAsset] = useState('BTC');
   const [loading, setLoading] = useState(true);
@@ -25,10 +24,9 @@ export default function Portfolio({ user, preferences }) {
   }, [preferences?.portfolioView]);
 
   const fetchData = useCallback(async () => {
-    const [portRes, perfRes, histRes, overviewRes, cashRes] = await Promise.allSettled([
+    const [portRes, perfRes, overviewRes, cashRes] = await Promise.allSettled([
       tradingService.getPortfolio(),
       tradingService.getPerformance(),
-      marketService.getHistory(selectedAsset, 30),
       marketService.getOverview(),
       tradingService.getCashBalance(),
     ]);
@@ -43,12 +41,6 @@ export default function Portfolio({ user, preferences }) {
       setPerformance(perfRes.value);
     } else {
       setPerformance(null);
-    }
-
-    if (histRes.status === 'fulfilled') {
-      setPriceHistory(histRes.value);
-    } else {
-      setPriceHistory([]);
     }
 
     if (overviewRes.status === 'fulfilled') {
@@ -74,7 +66,7 @@ export default function Portfolio({ user, preferences }) {
     if (coreFailed) {
       const detail = portRes.reason?.response?.data?.detail || perfRes.reason?.response?.data?.detail;
       setAlert({ type: 'error', message: detail || 'Failed to load portfolio data' });
-    } else if (histRes.status === 'rejected' || overviewRes.status === 'rejected') {
+    } else if (overviewRes.status === 'rejected') {
       setAlert({ type: 'error', message: 'Some market widgets could not be loaded. Portfolio data is available.' });
     }
 
@@ -376,9 +368,10 @@ export default function Portfolio({ user, preferences }) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Market Context</p>
-              <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Price Chart</h2>
+              <h2 className="mt-2 font-display text-xl font-bold uppercase text-zinc-900">Live Price Chart</h2>
             </div>
             <select
+              aria-label="Chart asset"
               value={selectedAsset}
               onChange={(e) => setSelectedAsset(e.target.value)}
               className="market-select min-w-[150px] rounded-xl px-3 py-2 text-sm"
@@ -388,8 +381,8 @@ export default function Portfolio({ user, preferences }) {
               ))}
             </select>
           </div>
-          <div className="chart-glow mt-5 overflow-hidden rounded-[24px] border border-zinc-200/70 bg-zinc-950/95 p-3">
-            <PriceChart history={priceHistory} symbol={selectedAsset} />
+          <div className="mt-5">
+            <LivePriceChart symbol={selectedAsset} />
           </div>
         </section>
       )}

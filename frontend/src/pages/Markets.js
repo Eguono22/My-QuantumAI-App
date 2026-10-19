@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import PriceChart from '../components/PriceChart';
+import LivePriceChart from '../components/LivePriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import MarketTable from '../components/MarketTable';
@@ -359,14 +359,8 @@ export default function Markets() {
                   </div>
                 </div>
 
-                <div className="chart-glow mt-5 overflow-hidden rounded-[24px] border border-zinc-200/70 bg-zinc-950/95 p-3">
-                  <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.24em] text-slate-400">
-                    <span>30 Day Curve</span>
-                    <span>{Number(selectedMarket.change_pct_24h) >= 0 ? 'Momentum positive' : 'Pressure negative'}</span>
-                  </div>
-                  <div className="h-52">
-                    <PriceChart history={selectedMarket.history} symbol={selectedMarket.symbol} />
-                  </div>
+                <div className="mt-5">
+                  <LivePriceChart symbol={selectedMarket.symbol} />
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 text-xs">
