@@ -8,7 +8,7 @@ from fastapi import FastAPI, WebSocket, HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text, inspect
-from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot
+from api.routes import auth, market, trading, portfolio, monitoring, mql5, billing, pilot, okx_funding
 from api.websocket import websocket_endpoint
 from models.database import Base, engine
 from config.settings import settings
@@ -51,6 +51,7 @@ app.include_router(monitoring.router)
 app.include_router(mql5.router)
 app.include_router(billing.router)
 app.include_router(pilot.router)
+app.include_router(okx_funding.router)
 
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):

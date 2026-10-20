@@ -2,6 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FundingPanel from './FundingPanel';
 
+jest.mock('./OKXFundingPanel', () => () => <div role="status">OKX account connection</div>);
+
 function setup(overrides = {}) {
   const props = { cashBalance: 250, amount: '100', onAmountChange: jest.fn(), onPaperFunding: jest.fn(), ...overrides };
   render(<FundingPanel {...props} />);
@@ -39,11 +41,11 @@ it('does not expose a transfer submission when bank processing is not connected'
   const props = setup();
   fireEvent.click(screen.getByRole('switch'));
   fireEvent.change(screen.getByRole('combobox', { name: 'Funding method' }), { target: { value: 'bank' } });
-  expect(screen.getByRole('status')).toHaveTextContent('OKX in-app transfers are not connected yet');
+  expect(screen.getByRole('status')).toHaveTextContent('OKX account connection');
   expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Add real money ↗' })).not.toBeInTheDocument();
   expect(props.onPaperFunding).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Continue on OKX instead' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Funding method' }), { target: { value: 'broker' } });
   expect(screen.getByRole('link', { name: 'Add real money ↗' })).toBeInTheDocument();
 });
 

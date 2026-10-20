@@ -265,6 +265,38 @@ class OperatorBriefAlertState(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="operator_brief_alert_states")
 
+class OKXFundingAuth(Base):
+    __tablename__ = "okx_funding_auth"
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    failures = Column(Integer, nullable=False, default=0)
+    window_end = Column(Float, nullable=False)
+
+
+class OKXConnection(Base):
+    __tablename__ = "okx_connections"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    identity = Column(String, unique=True, nullable=False)
+    region = Column(String, nullable=False)
+    credentials = Column(String, nullable=False)
+    version = Column(String, nullable=False)
+    active_withdrawal_id = Column(String, nullable=True)
+
+
+class OKXWithdrawal(Base):
+    __tablename__ = "okx_withdrawals"
+    id = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    kind = Column(String, nullable=False)
+    currency = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    provider_id = Column(String, nullable=True)
+    request_data = Column(String, nullable=False)
+    connection_version = Column(String, nullable=False)
+    created_at = Column(Float, nullable=False)
+    expires_at = Column(Float, nullable=False)
+
+
 def get_db():
     db = SessionLocal()
     try:

@@ -81,12 +81,64 @@ OKX deposit and withdrawal actions open their respective official pages in a new
 own provider account there and submit a deposit or withdrawal. Opening the portal
 does not change the app balance or trading mode and does not submit a transfer.
 
-The in-app bank-transfer option is explicitly unavailable until the chosen payment
-or brokerage provider is integrated. OKX is the selected provider; the choice of cryptocurrency versus bank/cash transfers is pending. That work needs
-per-user account verification, authenticated deposit and payout processing, transfer
-status reconciliation, and duplicate-transfer prevention. Do not connect a shared
-platform trading account as though it were each user's personal funding account.
+The in-app OKX option supports cryptocurrency and bank/cash funding for individually
+connected accounts. Bank/currency availability is checked with OKX. Setup and
+live-verification requirements are documented below. Never use a shared platform
+account as though it were each user's personal funding account.
 
 `/portfolio/deposit` and `/portfolio/withdraw` remain paper-only. They accept
 `mode=paper`, reject real-money mode and bank details, and label responses with
 `mode=paper` and `real_money_moved=false`.
+
+## OKX crypto and bank/cash connector
+
+The in-app OKX connector supports per-user accounts and the following provider APIs:
+
+- Connection verification: `GET /api/v5/account/config`.
+- Crypto deposits: currencies/networks, actual account deposit addresses, required
+  tags/memos and minimum deposits; no address is invented by QuantumAI.
+- Cash deposits: available deposit methods and registered account details. Confirm
+  final beneficiary instructions and references on OKX, then initiate the deposit
+  through your bank. The app never claims to debit a bank via the deposit API.
+- Crypto withdrawals: reviewed on-chain requests through `/api/v5/asset/withdrawal`.
+- Cash withdrawals: active bank accounts returned by OKX, submitted through
+  `/api/v5/fiat/create-withdrawal`. Bank registration remains on OKX.
+- Provider deposit/withdrawal histories and in-app withdrawal status reconciliation.
+
+Set `OKX_CREDENTIAL_ENCRYPTION_KEY` to a permanent Fernet key in backend secrets.
+Do not use a public frontend variable. Back up this encryption key securely; a new
+key cannot decrypt previously saved connections. `OKX_WITHDRAWALS_ENABLED` is a
+separate server-side control and defaults to false. Disabling it still permits
+status refreshes for requests already submitted. Configure the appropriate account
+region (global, US/Australia, EEA) in the user's connection form; the server only
+sends credentials to the fixed official regional OKX API domains.
+
+Users connect their own API credentials through the protected funding panel with
+their current QuantumAI password. Credentials and withdrawal request payloads are
+encrypted with user identity binding. API secrets are never returned to the browser
+or saved in browser storage. A provider account cannot be linked to multiple app
+users. Read permission is enough for deposit/history access; withdrawals require
+provider Withdraw permission and any provider address-whitelist/recipient checks.
+Use OKX's recommended IP restrictions for API keys with withdrawal permissions.
+
+A withdrawal review expires after five minutes. The user reviews the amount,
+destination, estimated fees, and network or bank, then types WITHDRAW and confirms
+their QuantumAI password. Password confirmation has a persisted attempt limit.
+An account-level database lock and persistent client ID prevent concurrent or
+replayed submission. Unknown outcomes retain the lock and are never automatically
+resubmitted. Refresh reconciles the provider client ID / withdrawal ID. A request
+is complete only after OKX reports the final successful state; an accepted API
+response is displayed as submitted. If no matching record is found, check OKX or
+contact support; do not clear the lock and resend blindly.
+
+The cash endpoints may be unavailable to a given account, region, or currency.
+Empty methods and provider rejections are shown as unavailable, not simulated
+success. The connector is independent of Alpaca trading mode and paper cash.
+
+Before treating the connector as live-verified, connect an account you control,
+verify displayed funding balances, deposit addresses/memos, and eligible bank
+methods, then manually verify a small deposit and a deliberately confirmed
+withdrawal of each supported type. Automated tests use mocked OKX responses and do
+not establish account eligibility, bank delivery, or blockchain receipt.
+
+Official reference: https://www.okx.com/docs-v5/en/#funding-account-rest-api

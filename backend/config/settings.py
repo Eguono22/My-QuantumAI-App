@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     # No hardcoded default — a random key is generated when SECRET_KEY is absent.
     # In production set SECRET_KEY explicitly (e.g. `openssl rand -hex 32`).
     SECRET_KEY: Optional[str] = None
+    OKX_CREDENTIAL_ENCRYPTION_KEY: Optional[str] = None
+    OKX_WITHDRAWALS_ENABLED: bool = False
     REDIS_URL: str = "redis://redis:6379"
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

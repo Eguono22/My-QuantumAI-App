@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../utils/formatters';
+import OKXFundingPanel from './OKXFundingPanel';
 
 const FUNDING_PROVIDERS = {
   okx: {
@@ -77,6 +78,8 @@ export default function FundingPanel({ cashBalance, amount, onAmountChange, onPa
               </div>
               <p className="text-xs text-zinc-500">{provider.name} opens in a new tab and confirms transfer amounts, availability, fees, and completion.</p>
             </>
+          ) : providerId === 'okx' ? (
+            <OKXFundingPanel />
           ) : (
             <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
               <p className="font-semibold">{provider.name} in-app transfers are not connected yet</p>
