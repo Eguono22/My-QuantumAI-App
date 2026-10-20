@@ -1,11 +1,26 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../utils/formatters';
 
-const ALPACA_PORTAL = 'https://app.alpaca.markets/';
+const FUNDING_PROVIDERS = {
+  okx: {
+    name: 'OKX',
+    depositUrl: 'https://www.okx.com/balance/recharge',
+    withdrawalUrl: 'https://www.okx.com/balance/withdrawal',
+    description: 'Sign in to your own OKX account to select the asset, network, and transfer amount. Confirm the transfer on OKX.',
+  },
+  alpaca: {
+    name: 'Alpaca',
+    depositUrl: 'https://app.alpaca.markets/',
+    withdrawalUrl: 'https://app.alpaca.markets/',
+    description: 'Sign in to your own live brokerage account and complete the transfer there.',
+  },
+};
 
 export default function FundingPanel({ cashBalance, amount, onAmountChange, onPaperFunding, pending = false }) {
   const [realMoney, setRealMoney] = useState(false);
   const [method, setMethod] = useState('broker');
+  const [providerId, setProviderId] = useState('okx');
+  const provider = FUNDING_PROVIDERS[providerId];
 
   const toggleMode = () => {
     onAmountChange('');
@@ -38,28 +53,35 @@ export default function FundingPanel({ cashBalance, amount, onAmountChange, onPa
       {realMoney ? (
         <div className="mt-4 space-y-4">
           <label className="block text-sm text-zinc-700">
+            Funding provider
+            <select value={providerId} onChange={event => setProviderId(event.target.value)} className="market-select mt-2 w-full rounded-xl px-3 py-3">
+              <option value="okx">OKX</option>
+              <option value="alpaca">Alpaca</option>
+            </select>
+          </label>
+          <label className="block text-sm text-zinc-700">
             Funding method
             <select value={method} onChange={event => setMethod(event.target.value)} className="market-select mt-2 w-full rounded-xl px-3 py-3">
-              <option value="broker">Broker website · Alpaca</option>
-              <option value="bank">Bank transfer inside the app</option>
+              <option value="broker">Continue on {provider.name}</option>
+              <option value="bank">Transfer inside the app</option>
             </select>
           </label>
           {method === 'broker' ? (
             <>
               <p className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-950">
-                Continue to Alpaca to deposit or withdraw real money. Sign in to your own live brokerage account and complete the transfer there.
+                Continue to {provider.name} to deposit or withdraw real funds. {provider.description}
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <a href={ALPACA_PORTAL} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-emerald-600 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700">Add real money ↗</a>
-                <a href={ALPACA_PORTAL} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-amber-600 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-amber-700">Withdraw money ↗</a>
+                <a href={provider.depositUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-emerald-600 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700">Add real money ↗</a>
+                <a href={provider.withdrawalUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-amber-600 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-amber-700">Withdraw money ↗</a>
               </div>
-              <p className="text-xs text-zinc-500">Both actions open Alpaca in a new tab. Your broker confirms transfer amounts, availability, fees, and completion.</p>
+              <p className="text-xs text-zinc-500">{provider.name} opens in a new tab and confirms transfer amounts, availability, fees, and completion.</p>
             </>
           ) : (
             <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
-              <p className="font-semibold">Bank transfers are not connected yet</p>
-              <p className="mt-2">A funding provider, a verified account for each user, and deposit and payout processing must be connected before this option can accept or withdraw money.</p>
-              <button type="button" onClick={() => setMethod('broker')} className="mt-3 font-semibold underline">Use broker funding instead</button>
+              <p className="font-semibold">{provider.name} in-app transfers are not connected yet</p>
+              <p className="mt-2">Your {provider.name} account must be connected to QuantumAI before you can request transfers here. Deposits and withdrawals on the {provider.name} website are available through the other funding method.</p>
+              <button type="button" onClick={() => setMethod('broker')} className="mt-3 font-semibold underline">Continue on {provider.name} instead</button>
             </div>
           )}
           <p className="text-xs text-zinc-500">This switch changes funding options only. Paper trading stays in paper mode, and the balance shown in this app remains simulated.</p>

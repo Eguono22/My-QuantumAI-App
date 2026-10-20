@@ -76,12 +76,13 @@ backup restore drill have all passed.
 ## Funding switch
 
 The Portfolio funding switch separates simulated paper funds from real funding.
-Real funding currently opens the Alpaca portal in a new tab. Users sign into their
-own brokerage account there and submit a deposit or withdrawal. Opening the portal
+Real funding defaults to OKX, with Alpaca also available in the provider selector.
+OKX deposit and withdrawal actions open their respective official pages in a new tab. Users sign into their
+own provider account there and submit a deposit or withdrawal. Opening the portal
 does not change the app balance or trading mode and does not submit a transfer.
 
 The in-app bank-transfer option is explicitly unavailable until the chosen payment
-or brokerage provider is integrated. Provider selection is pending. That work needs
+or brokerage provider is integrated. OKX is the selected provider; the choice of cryptocurrency versus bank/cash transfers is pending. That work needs
 per-user account verification, authenticated deposit and payout processing, transfer
 status reconciliation, and duplicate-transfer prevention. Do not connect a shared
 platform trading account as though it were each user's personal funding account.
