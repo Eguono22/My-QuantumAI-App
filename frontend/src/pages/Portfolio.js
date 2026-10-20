@@ -5,6 +5,7 @@ import PortfolioChart from '../components/PortfolioChart';
 import LivePriceChart from '../components/LivePriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
+import FundingPanel from '../components/FundingPanel';
 import { formatCurrency, formatPercent, getChangeColor } from '../utils/formatters';
 
 export default function Portfolio({ user, preferences }) {
@@ -15,6 +16,7 @@ export default function Portfolio({ user, preferences }) {
   const [loading, setLoading] = useState(true);
   const [tradeForm, setTradeForm] = useState({ asset: 'BTC', action: 'buy', quantity: '' });
   const [fundingAmount, setFundingAmount] = useState('');
+  const [fundingPending, setFundingPending] = useState(false);
   const [cashBalance, setCashBalance] = useState(0);
   const [alert, setAlert] = useState(null);
   const [activeView, setActiveView] = useState(preferences?.portfolioView || 'overview');
@@ -95,12 +97,14 @@ export default function Portfolio({ user, preferences }) {
   };
 
   const handleFunding = async (type) => {
-    const amount = parseFloat(fundingAmount);
-    if (isNaN(amount) || amount <= 0) {
+    if (fundingPending) return;
+    const amount = Number(fundingAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       setAlert({ type: 'error', message: 'Please enter a valid amount greater than 0' });
       return;
     }
 
+    setFundingPending(true);
     try {
       const result = type === 'deposit'
         ? await tradingService.depositFunds(amount)
@@ -108,12 +112,14 @@ export default function Portfolio({ user, preferences }) {
 
       setAlert({
         type: 'success',
-        message: `${type === 'deposit' ? 'Deposit' : 'Withdrawal'} successful. Cash balance: ${formatCurrency(result.cash_balance)}`,
+        message: `${type === 'deposit' ? 'Paper cash added' : 'Paper cash removed'}. Paper balance: ${formatCurrency(result.cash_balance)}`,
       });
       setFundingAmount('');
       fetchData();
     } catch (err) {
       setAlert({ type: 'error', message: err.response?.data?.detail || `${type} failed` });
+    } finally {
+      setFundingPending(false);
     }
   };
 
@@ -126,10 +132,6 @@ export default function Portfolio({ user, preferences }) {
   const totalExposure = portfolio.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
   const bestHolding = [...portfolio].sort((a, b) => Number(b.pnl_pct || 0) - Number(a.pnl_pct || 0))[0];
   const worstHolding = [...portfolio].sort((a, b) => Number(a.pnl_pct || 0) - Number(b.pnl_pct || 0))[0];
-  const paperFundingActions = {
-    deposit: 'Add paper cash',
-    withdraw: 'Remove paper cash',
-  };
 
   return (
     <div className="space-y-8 animate-fadeRise">
@@ -282,44 +284,13 @@ export default function Portfolio({ user, preferences }) {
               </button>
             </form>
 
-            <div className="mt-6 border-t border-zinc-200/80 pt-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Paper Funding</p>
-                  <p className="mt-1 text-sm text-zinc-600">Available paper cash: {formatCurrency(cashBalance)}</p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Use this only to simulate deposits and withdrawals inside the app. It does not move real money to or from your broker or bank.
-              </div>
-              <div className="mt-4 space-y-3">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={fundingAmount}
-                  onChange={(e) => setFundingAmount(e.target.value)}
-                  className="market-input rounded-xl px-3 py-3"
-                  placeholder="Paper funding amount"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleFunding('deposit')}
-                    className="rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                  >
-                    {paperFundingActions.deposit}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFunding('withdraw')}
-                    className="rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white transition hover:bg-amber-700"
-                  >
-                    {paperFundingActions.withdraw}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <FundingPanel
+              cashBalance={cashBalance}
+              amount={fundingAmount}
+              onAmountChange={setFundingAmount}
+              onPaperFunding={handleFunding}
+              pending={fundingPending}
+            />
           </div>
         )}
 

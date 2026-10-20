@@ -31,11 +31,11 @@ export const tradingService = {
     return response.data;
   },
   depositFunds: async (amount) => {
-    const response = await api.post('/portfolio/deposit', { amount });
+    const response = await api.post('/portfolio/deposit', { amount, mode: 'paper' });
     return response.data;
   },
   withdrawFunds: async (amount) => {
-    const response = await api.post('/portfolio/withdraw', { amount });
+    const response = await api.post('/portfolio/withdraw', { amount, mode: 'paper' });
     return response.data;
   },
   getPerformance: async () => {

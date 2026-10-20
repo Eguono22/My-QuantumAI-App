@@ -71,3 +71,21 @@ database. Backups are pending until this provider-side check and restore drill p
 Do not report full production readiness until Alpaca probes/order verification,
 real password-reset inbox delivery, persistence after a deployment restart, and the
 backup restore drill have all passed.
+
+
+## Funding switch
+
+The Portfolio funding switch separates simulated paper funds from real funding.
+Real funding currently opens the Alpaca portal in a new tab. Users sign into their
+own brokerage account there and submit a deposit or withdrawal. Opening the portal
+does not change the app balance or trading mode and does not submit a transfer.
+
+The in-app bank-transfer option is explicitly unavailable until the chosen payment
+or brokerage provider is integrated. Provider selection is pending. That work needs
+per-user account verification, authenticated deposit and payout processing, transfer
+status reconciliation, and duplicate-transfer prevention. Do not connect a shared
+platform trading account as though it were each user's personal funding account.
+
+`/portfolio/deposit` and `/portfolio/withdraw` remain paper-only. They accept
+`mode=paper`, reject real-money mode and bank details, and label responses with
+`mode=paper` and `real_money_moved=false`.

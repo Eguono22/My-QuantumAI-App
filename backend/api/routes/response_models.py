@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -108,6 +108,8 @@ class PerformanceResponse(BaseModel):
 
 
 class FundingResponse(BaseModel):
+    mode: Literal["paper"] = "paper"
+    real_money_moved: Literal[False] = False
     success: bool
     action: str
     amount: float

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List, Literal
 from models.database import get_db, User
 from services.trading_service import trading_service
 from api.routes.auth import get_current_user
@@ -25,7 +25,9 @@ class TradeRequest(BaseModel):
 
 
 class FundingRequest(BaseModel):
-    amount: float
+    model_config = ConfigDict(extra="forbid")
+    amount: float = Field(gt=0, allow_inf_nan=False)
+    mode: Literal["paper"] = "paper"
 
 @router.get("", response_model=List[PortfolioHolding])
 def get_portfolio(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
