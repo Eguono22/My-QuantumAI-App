@@ -9,7 +9,7 @@ import { tradingService } from '../services/tradingService';
 import { formatCurrency, formatPercent, formatLargeNumber, formatNumber } from '../utils/formatters';
 
 function getSourceBadgeClass(source) {
-  return source === 'alpaca'
+  return ['alpaca', 'yahoo'].includes(source)
     ? 'bg-sky-100 text-sky-800 border-sky-200'
     : 'bg-amber-100 text-amber-800 border-amber-200';
 }
@@ -54,7 +54,6 @@ export default function Markets() {
   }, []);
 
   const loadMarkets = async () => {
-    setLoading(true);
     try {
       const overview = await marketService.getOverview();
       const withHistory = await Promise.all(
@@ -69,8 +68,10 @@ export default function Markets() {
         })
       );
       setMarkets(withHistory);
+      if (!withHistory.length) setAlert({ type: 'error', message: 'Market quotes are unavailable. Please retry shortly.' });
     } catch (err) {
       console.error('Failed to load market overview', err);
+      setMarkets([]);
       setAlert({ type: 'error', message: 'Unable to load market overview.' });
     } finally {
       setLoading(false);
@@ -228,7 +229,7 @@ export default function Markets() {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Bullish</p>
               <p className="mt-2 font-display text-3xl font-bold text-emerald-300">{summary.bullish}</p>
-              <p className="mt-1 text-xs text-slate-300">Positive 24h movers</p>
+              <p className="mt-1 text-xs text-slate-300">Positive Session movers</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Average Move</p>
@@ -238,9 +239,9 @@ export default function Markets() {
               <p className="mt-1 text-xs text-slate-300">Across visible instruments</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">24h Volume</p>
-              <p className="mt-2 font-display text-3xl font-bold text-cyan-200">{formatLargeNumber(summary.totalVolume)}</p>
-              <p className="mt-1 text-xs text-slate-300">Combined turnover</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Session Volume</p>
+              <p className="mt-2 font-display text-3xl font-bold text-cyan-200">{formatNumber(summary.totalVolume, 0)}</p>
+              <p className="mt-1 text-xs text-slate-300">Reported volume across instruments</p>
             </div>
           </div>
         </div>
@@ -273,9 +274,9 @@ export default function Markets() {
                     <p className="mt-1 text-xs text-zinc-500">{item.name}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-zinc-900">{formatCurrency(item.price)}</p>
+                    <p className="text-sm font-semibold text-zinc-900">{formatCurrency(item.price, item.currency || 'USD', item.price < 10 ? 4 : 2)}</p>
                     <p className={`mt-1 text-xs font-semibold ${Number(item.change_pct_24h) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {panel.label === 'Most Active' ? formatLargeNumber(item.volume_24h) : formatPercent(item.change_pct_24h)}
+                      {panel.label === 'Most Active' ? formatNumber(item.volume_24h, 0) : formatPercent(item.change_pct_24h)}
                     </p>
                   </div>
                 </button>
@@ -309,7 +310,7 @@ export default function Markets() {
                   <option value="all">All sources</option>
                   {sourceOptions.map((source) => (
                     <option key={source} value={source}>
-                      {source === 'alpaca' ? 'Alpaca live feed' : source}
+                      {source}
                     </option>
                   ))}
                 </select>
@@ -342,6 +343,7 @@ export default function Markets() {
                     </span>
                     <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getSourceBadgeClass(selectedMarket.data_source)}`}>
                       {selectedMarket.data_source_label || 'Source unknown'}
+                      {selectedMarket.quote_timestamp && ` · As of ${new Date(selectedMarket.quote_timestamp).toLocaleString()}`}
                     </span>
                   </div>
                 </div>
@@ -349,7 +351,7 @@ export default function Markets() {
                 <div className="mt-5 flex items-end justify-between gap-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Last Price</p>
-                    <p className="mt-2 text-4xl font-semibold text-zinc-900">{formatCurrency(selectedMarket.price)}</p>
+                    <p className="mt-2 text-4xl font-semibold text-zinc-900">{formatCurrency(selectedMarket.price, selectedMarket.currency || 'USD', selectedMarket.price < 10 ? 4 : 2)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">30D Range</p>
@@ -366,7 +368,7 @@ export default function Markets() {
                 <div className="mt-5 grid grid-cols-2 gap-3 text-xs">
                   <div className="market-panel-soft rounded-2xl p-3">
                     <p className="uppercase tracking-[0.2em] text-zinc-500">Volume</p>
-                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatLargeNumber(selectedMarket.volume_24h)}</p>
+                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatNumber(selectedMarket.volume_24h, 0)}</p>
                   </div>
                   <div className="market-panel-soft rounded-2xl p-3">
                     <p className="uppercase tracking-[0.2em] text-zinc-500">Market Cap</p>
@@ -374,11 +376,11 @@ export default function Markets() {
                   </div>
                   <div className="market-panel-soft rounded-2xl p-3">
                     <p className="uppercase tracking-[0.2em] text-zinc-500">30D Low</p>
-                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatCurrency(selectedMarket.rangeLow)}</p>
+                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatCurrency(selectedMarket.rangeLow || null, selectedMarket.currency || 'USD')}</p>
                   </div>
                   <div className="market-panel-soft rounded-2xl p-3">
                     <p className="uppercase tracking-[0.2em] text-zinc-500">30D High</p>
-                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatCurrency(selectedMarket.rangeHigh)}</p>
+                    <p className="mt-2 text-sm font-semibold text-zinc-900">{formatCurrency(selectedMarket.rangeHigh || null, selectedMarket.currency || 'USD')}</p>
                   </div>
                 </div>
               </div>
@@ -396,7 +398,7 @@ export default function Markets() {
 
                 <div className="mt-4 rounded-2xl border border-zinc-200/80 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
                   <p className="font-semibold text-zinc-900">{selectedMarket.symbol}</p>
-                  <p className="mt-1">Current quote {formatCurrency(selectedMarket.price)} • 24h move {formatPercent(selectedMarket.change_pct_24h)} • Volume {formatLargeNumber(selectedMarket.volume_24h)}</p>
+                  <p className="mt-1">Current quote {formatCurrency(selectedMarket.price, selectedMarket.currency || 'USD', selectedMarket.price < 10 ? 4 : 2)} • Session move {formatPercent(selectedMarket.change_pct_24h)} • Volume {formatNumber(selectedMarket.volume_24h, 0)}</p>
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -443,13 +445,13 @@ export default function Markets() {
                   <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-4 py-3">
                     <p className="font-semibold text-zinc-900">Liquidity view</p>
                     <p className="mt-1">
-                      {selectedMarket.symbol} is printing {formatLargeNumber(selectedMarket.volume_24h)} in 24h turnover with a market cap of {formatLargeNumber(selectedMarket.market_cap)}.
+                      {selectedMarket.symbol} is printing {formatNumber(selectedMarket.volume_24h, 0)} in 24h turnover with a market cap of {formatLargeNumber(selectedMarket.market_cap)}.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-4 py-3">
                     <p className="font-semibold text-zinc-900">Range profile</p>
                     <p className="mt-1">
-                      The last 30 days span {formatCurrency(selectedMarket.rangeLow)} to {formatCurrency(selectedMarket.rangeHigh)}, a {formatNumber(selectedMarket.rangePct, 2)}% swing.
+                      The last 30 days span {formatCurrency(selectedMarket.rangeLow || null, selectedMarket.currency || 'USD')} to {formatCurrency(selectedMarket.rangeHigh || null, selectedMarket.currency || 'USD')}, a {formatNumber(selectedMarket.rangePct, 2)}% swing.
                     </p>
                   </div>
                 </div>

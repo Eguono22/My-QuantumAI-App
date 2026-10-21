@@ -16,12 +16,12 @@ describe('formatCurrency', () => {
     expect(formatCurrency(0)).toBe('$0.00');
   });
 
-  it('formats null as $0.00', () => {
-    expect(formatCurrency(null)).toBe('$0.00');
+  it('formats null as unavailable', () => {
+    expect(formatCurrency(null)).toBe('—');
   });
 
-  it('formats undefined as $0.00', () => {
-    expect(formatCurrency(undefined)).toBe('$0.00');
+  it('formats undefined as unavailable', () => {
+    expect(formatCurrency(undefined)).toBe('—');
   });
 
   it('formats large values with comma separators', () => {
@@ -38,12 +38,12 @@ describe('formatNumber', () => {
     expect(formatNumber(1234.5678)).toBe('1,234.57');
   });
 
-  it('formats null as 0', () => {
-    expect(formatNumber(null)).toBe('0');
+  it('formats null as unavailable', () => {
+    expect(formatNumber(null)).toBe('—');
   });
 
-  it('formats undefined as 0', () => {
-    expect(formatNumber(undefined)).toBe('0');
+  it('formats undefined as unavailable', () => {
+    expect(formatNumber(undefined)).toBe('—');
   });
 
   it('respects custom decimal places', () => {
@@ -72,12 +72,12 @@ describe('formatLargeNumber', () => {
     expect(formatLargeNumber(99.5)).toBe('$99.50');
   });
 
-  it('formats null as $0.00', () => {
-    expect(formatLargeNumber(null)).toBe('$0.00');
+  it('formats null as unavailable', () => {
+    expect(formatLargeNumber(null)).toBe('—');
   });
 
-  it('formats undefined as $0.00', () => {
-    expect(formatLargeNumber(undefined)).toBe('$0.00');
+  it('formats undefined as unavailable', () => {
+    expect(formatLargeNumber(undefined)).toBe('—');
   });
 });
 
@@ -94,12 +94,12 @@ describe('formatPercent', () => {
     expect(formatPercent(-3.5)).toBe('-3.50%');
   });
 
-  it('formats null as 0.00%', () => {
-    expect(formatPercent(null)).toBe('0.00%');
+  it('formats null as unavailable', () => {
+    expect(formatPercent(null)).toBe('—');
   });
 
-  it('formats undefined as 0.00%', () => {
-    expect(formatPercent(undefined)).toBe('0.00%');
+  it('formats undefined as unavailable', () => {
+    expect(formatPercent(undefined)).toBe('—');
   });
 });
 

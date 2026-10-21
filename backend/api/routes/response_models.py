@@ -22,14 +22,18 @@ class MarketOverviewItem(BaseModel):
     symbol: str
     name: str
     price: float
-    change_24h: float
-    change_pct_24h: float
-    volume_24h: float
-    market_cap: float
-    high_24h: float
-    low_24h: float
+    change_24h: Optional[float] = None
+    change_pct_24h: Optional[float] = None
+    volume_24h: Optional[float] = None
+    market_cap: Optional[float] = None
+    high_24h: Optional[float] = None
+    low_24h: Optional[float] = None
     data_source: Optional[str] = None
     data_source_label: Optional[str] = None
+
+
+    currency: str = "USD"
+    quote_timestamp: Optional[str] = None
 
 
 class PriceHistoryItem(BaseModel):

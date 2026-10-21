@@ -1,5 +1,5 @@
 export const formatCurrency = (value, currency = 'USD', decimals = 2) => {
-  if (value === null || value === undefined) return '$0.00';
+  if (value === null || value === undefined) return '—';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -9,7 +9,7 @@ export const formatCurrency = (value, currency = 'USD', decimals = 2) => {
 };
 
 export const formatNumber = (value, decimals = 2) => {
-  if (value === null || value === undefined) return '0';
+  if (value === null || value === undefined) return '—';
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -17,7 +17,7 @@ export const formatNumber = (value, decimals = 2) => {
 };
 
 export const formatLargeNumber = (value) => {
-  if (value === null || value === undefined) return '$0.00';
+  if (value === null || value === undefined) return '—';
   if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
@@ -26,7 +26,7 @@ export const formatLargeNumber = (value) => {
 };
 
 export const formatPercent = (value) => {
-  if (value === null || value === undefined) return '0.00%';
+  if (value === null || value === undefined) return '—';
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;
 };

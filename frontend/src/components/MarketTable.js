@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { formatCurrency, formatLargeNumber, formatPercent } from '../utils/formatters';
+import { formatCurrency, formatLargeNumber, formatPercent, formatNumber } from '../utils/formatters';
 
 const SORTABLE_COLUMNS = {
   symbol: (row) => row.symbol || '',
@@ -11,7 +11,7 @@ const SORTABLE_COLUMNS = {
 };
 
 function getSourceBadgeClass(source) {
-  return source === 'alpaca'
+  return ['alpaca', 'yahoo'].includes(source)
     ? 'border-sky-200 bg-sky-100 text-sky-800'
     : 'border-amber-200 bg-amber-100 text-amber-800';
 }
@@ -113,31 +113,31 @@ export default function MarketTable({ items = [], selectedSymbol = '', onSelectS
                 >
                   <td className="px-4 py-3">
                     <div className="font-display text-base font-bold tracking-[0.12em] text-zinc-900">{item.symbol}</div>
-                    <div className="mt-1 text-xs text-zinc-500">{item.data_source_label || 'Source unknown'}</div>
+                    <div className="mt-1 text-xs text-zinc-500">{item.data_source_label || 'Source unknown'}{item.quote_timestamp && ` · ${new Date(item.quote_timestamp).toLocaleString()}`}</div>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">
                     <div className="font-medium text-zinc-900">{item.name}</div>
                     <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getSourceBadgeClass(item.data_source)}`}>
-                      {item.data_source === 'alpaca' ? 'Live feed' : 'Model feed'}
+                      {item.data_source === 'yahoo' ? 'May be delayed' : item.data_source === 'alpaca' ? 'Live feed' : 'Model feed'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-zinc-900 font-semibold">{formatCurrency(item.price)}</td>
+                  <td className="px-4 py-3 text-right text-zinc-900 font-semibold">{formatCurrency(item.price, item.currency || 'USD', item.price < 10 ? 4 : 2)}</td>
                   <td className={`px-4 py-3 text-right font-semibold ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatPercent(item.change_pct_24h)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="w-16 text-xs text-zinc-500">{formatCurrency(item.rangeLow || 0, 'USD', 0)}</span>
+                      <span className="w-16 text-xs text-zinc-500">{formatCurrency(item.rangeLow || null, item.currency || 'USD', 2)}</span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-200">
                         <div
                           className={`h-full rounded-full ${positive ? 'bg-emerald-500' : 'bg-rose-500'}`}
                           style={{ width: `${rangeFill}%` }}
                         />
                       </div>
-                      <span className="w-16 text-right text-xs text-zinc-500">{formatCurrency(item.rangeHigh || 0, 'USD', 0)}</span>
+                      <span className="w-16 text-right text-xs text-zinc-500">{formatCurrency(item.rangeHigh || null, item.currency || 'USD', 2)}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right text-zinc-700">{formatLargeNumber(item.volume_24h)}</td>
+                  <td className="px-4 py-3 text-right text-zinc-700">{formatNumber(item.volume_24h, 0)}</td>
                   <td className="px-4 py-3 text-right text-zinc-700">{formatLargeNumber(item.market_cap)}</td>
                 </tr>
               );

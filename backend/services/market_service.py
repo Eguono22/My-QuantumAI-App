@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 from quantum_ai.algorithms import MarketPredictionModel
 from config.settings import settings
+from services.public_market_data import PublicMarketData
 
 MOCK_ASSETS = {
     # US equities
@@ -201,10 +202,13 @@ def generate_price_history(symbol: str, base_price: float, volatility: float, da
 class MarketService:
     def __init__(self):
         self.prediction_model = MarketPredictionModel()
+        self.public_data = PublicMarketData(settings.MARKET_DATA_TIMEOUT_S)
         self._alpaca_symbols = [s for s in MOCK_ASSETS.keys() if s.isalpha() and len(s) <= 5]
 
     def _source_meta(self, source: str) -> Dict[str, str]:
         normalized = (source or "synthetic").strip().lower()
+        if normalized == "yahoo":
+            return {"data_source": "yahoo", "data_source_label": "Yahoo Finance · may be delayed"}
         if normalized == "alpaca":
             return {
                 "data_source": "alpaca",
@@ -275,6 +279,8 @@ class MarketService:
 
     def get_market_overview(self) -> List[Dict]:
         """Get overview of all tracked assets."""
+        if settings.MARKET_DATA_PROVIDER.lower() == "yahoo":
+            return self.public_data.overview(MOCK_ASSETS)
         alpaca_prices = {}
         if self._using_alpaca_data():
             alpaca_prices = self._get_alpaca_latest_prices(self._alpaca_symbols[:50])
@@ -294,6 +300,8 @@ class MarketService:
         if symbol not in MOCK_ASSETS:
             return None
         info = MOCK_ASSETS[symbol]
+        if settings.MARKET_DATA_PROVIDER.lower() == "yahoo":
+            return self.public_data.asset(symbol, info["name"])
 
         if self._using_alpaca_data() and symbol in self._alpaca_symbols:
             prices = self._get_alpaca_latest_prices([symbol])
@@ -308,6 +316,8 @@ class MarketService:
         symbol = resolve_symbol(symbol)
         if symbol not in MOCK_ASSETS:
             return {"history": [], **self._source_meta("synthetic")}
+        if settings.MARKET_DATA_PROVIDER.lower() == "yahoo":
+            return {"history": self.public_data.history(symbol, days), **self._source_meta("yahoo")}
         if self._using_alpaca_data() and symbol in self._alpaca_symbols:
             bars = self._get_alpaca_bars(symbol, days)
             if bars:

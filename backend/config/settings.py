@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     LIVE_TRADING_ENABLED: bool = False
     TRADING_KILL_SWITCH: bool = False
     BROKER_REQUEST_TIMEOUT_S: float = 8.0
-    MARKET_DATA_PROVIDER: str = "mock"
+    MARKET_DATA_PROVIDER: str = "yahoo"
     MARKET_DATA_TIMEOUT_S: float = 6.0
     ALPACA_DATA_BASE_URL: str = "https://data.alpaca.markets"
     ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"
