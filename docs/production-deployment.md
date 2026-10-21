@@ -11,16 +11,29 @@ The root `vercel.json` builds the React frontend and packages `backend/**` with 
 Python API. `.python-version` selects Python 3.12. The project uses Node 22 and Fluid
 compute. The frontend uses `/api` and derives `wss://quantxai.app/api/ws` automatically.
 
-1. Run the repository's backend tests and frontend tests/build.
-2. Run `vercel deploy --prod --skip-domain --yes` to build without moving live aliases.
-3. Run `vercel curl /api/health --deployment <deployment-url>` and
-   `vercel curl /api/health/startup --deployment <deployment-url>`.
-4. Promote only a healthy deployment with `vercel promote <deployment-url> --yes`.
-5. Run `python scripts/production_check.py --base-url https://quantxai.app`.
-6. Run the explicit paper-trading smoke test:
-   `PRELAUNCH_API_BASE=https://quantxai.app/api python scripts/prelaunch_check.py`.
-   This creates a test account and submits a paper order. Do not schedule it as a
-   health probe. The separate hourly production-health workflow is read-only.
+The `Production deploy` GitHub Actions workflow runs on pushes to `main` and can also
+be started manually. It runs backend and frontend tests/build, creates a production
+deployment without moving live aliases, runs the read-only production checks against
+that deployment, promotes it only if healthy, then checks `https://quantxai.app`.
+Deployments are serialized so concurrent runs cannot race to promote different builds.
+
+Configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions
+secrets in the `production` environment. Configure required reviewers on that GitHub
+environment if production promotion should require approval. Keep application
+credentials and environment variables in Vercel; do not copy `.env.local` to GitHub.
+
+For a manual CLI release instead, run the repository's backend tests and frontend
+tests/build, then follow the Vercel CLI flow: deploy with
+`vercel deploy --prod --skip-domain --yes`, verify `/api/health` and
+`/api/health/startup` at the deployment URL, promote only a healthy deployment with
+`vercel promote <deployment-url> --yes`, and run
+`python scripts/production_check.py --base-url https://quantxai.app`.
+
+The explicit paper-trading smoke test,
+`PRELAUNCH_API_BASE=https://quantxai.app/api python scripts/prelaunch_check.py`,
+creates a test account and submits a paper order. Do not run it as part of an
+automatic deployment or health probe. The separate hourly production-health
+workflow is read-only.
 
 ## Required production environment
 
