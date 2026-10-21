@@ -35,3 +35,14 @@ def test_history_skips_missing_prices(monkeypatch):
     provider = PublicMarketData()
     monkeypatch.setattr(provider, 'chart', lambda *args: data)
     assert len(provider.history('EURUSD')) == 1
+
+
+def test_null_currency_does_not_break_market_response(monkeypatch):
+    from api.routes.response_models import MarketOverviewItem
+
+    data = chart()
+    data['meta']['currency'] = None
+    provider = PublicMarketData()
+    monkeypatch.setattr(provider, 'chart', lambda *args: data)
+    row = provider.asset('EURUSD', 'Euro / US Dollar')
+    assert MarketOverviewItem(**row).currency == 'USD'

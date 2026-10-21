@@ -67,7 +67,7 @@ class PublicMarketData:
         return dict(symbol=symbol, name=name, price=price, change_24h=change,
                     change_pct_24h=change, volume_24h=meta.get('regularMarketVolume'),
                     market_cap=meta.get('marketCap'), high_24h=meta.get('regularMarketDayHigh'),
-                    low_24h=meta.get('regularMarketDayLow'), currency=meta.get('currency', 'USD'),
+                    low_24h=meta.get('regularMarketDayLow'), currency=meta.get('currency') or 'USD',
                     quote_timestamp=datetime.fromtimestamp(timestamp, timezone.utc).isoformat(),
                     data_source='yahoo', data_source_label='Yahoo Finance · may be delayed')
 
