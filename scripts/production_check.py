@@ -1,6 +1,8 @@
 """Read-only production checks. Never registers users or places orders."""
 import argparse
 import json
+import os
+import subprocess
 import sys
 from urllib.request import Request, urlopen
 from urllib.parse import urlparse
@@ -12,11 +14,33 @@ def require(condition, message):
     print(f"[OK] {message}")
 
 
-def get_json(url):
+def get_response(url, use_vercel=False):
+    if use_vercel:
+        parsed = urlparse(url)
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+        command = ["vercel", "curl", path, "--deployment", f"{parsed.scheme}://{parsed.netloc}"]
+        if os.environ.get("VERCEL_TOKEN"):
+            command += ["--token", os.environ["VERCEL_TOKEN"]]
+        command += ["--", "--silent", "--show-error", "--max-time", "30", "--write-out", "\n%{http_code}\n%{content_type}"]
+        try:
+            result = subprocess.run(command, capture_output=True, timeout=60)
+        except (subprocess.TimeoutExpired, OSError):
+            raise RuntimeError("Authenticated Vercel request could not complete") from None
+        if result.returncode:
+            raise RuntimeError("Authenticated Vercel request failed")
+        body, status, content_type = result.stdout.rsplit(b"\n", 2)
+        return int(status), content_type.decode(), body
     with urlopen(Request(url, headers={"Accept": "application/json"}), timeout=30) as response:
-        require(response.status == 200, f"{urlparse(url).path} responds successfully")
-        require("application/json" in response.headers.get("Content-Type", ""), "API returns JSON")
-        return json.load(response)
+        return response.status, response.headers.get("Content-Type", ""), response.read()
+
+
+def get_json(url, use_vercel=False):
+    status, content_type, body = get_response(url, use_vercel)
+    require(status == 200, f"{urlparse(url).path} responds successfully")
+    require("application/json" in content_type, "API returns JSON")
+    return json.loads(body)
 
 
 def check_startup(data, require_alpaca=False):
@@ -41,16 +65,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="https://quantxai.app")
     parser.add_argument("--require-alpaca", action="store_true")
+    parser.add_argument("--use-vercel-cli", action="store_true", help="Authenticate checks against a protected deployment through Vercel CLI")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
     require(urlparse(base).scheme == "https", "production uses HTTPS")
-    with urlopen(base, timeout=30) as response:
-        require(response.status == 200, "frontend is accessible")
-        require("html" in response.headers.get("Content-Type", ""), "frontend returns HTML")
-        require(b'QuantumAI' in response.read(), "frontend serves QuantumAI")
-    require(get_json(base + "/api/health").get("status") == "healthy", "API is healthy")
+    status, content_type, body = get_response(base, args.use_vercel_cli)
+    require(status == 200, "frontend is accessible")
+    require("html" in content_type, "frontend returns HTML")
+    require(b'QuantumAI' in body, "frontend serves QuantumAI")
+    require(get_json(base + "/api/health", args.use_vercel_cli).get("status") == "healthy", "API is healthy")
     suffix = "?include_probe=true" if args.require_alpaca else ""
-    check_startup(get_json(base + "/api/health/startup" + suffix), args.require_alpaca)
+    check_startup(get_json(base + "/api/health/startup" + suffix, args.use_vercel_cli), args.require_alpaca)
     print("[DONE] Read-only production checks passed. Email inbox delivery, restore drills, and order execution require separate verification.")
 
 

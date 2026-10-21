@@ -18,6 +18,8 @@ that deployment, promotes it only if healthy, then checks `https://quantxai.app`
 Deployments are serialized so concurrent runs cannot race to promote different builds.
 The release is built on Vercel, where the Python build tools and production secrets
 are available; GitHub does not pull production secrets or upload a prebuilt bundle.
+Before promotion, checks use authenticated `vercel curl` requests against the exact
+deployment URL. The final domain check uses public HTTPS to confirm visitor access.
 
 Configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions
 secrets in the `production` environment. Configure required reviewers on that GitHub

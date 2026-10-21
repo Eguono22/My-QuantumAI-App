@@ -1,5 +1,7 @@
 import copy
 import importlib.util
+import subprocess
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -46,3 +48,36 @@ def test_production_regressions_fail_the_check(ready, section, key, value):
     data[section][key] = value
     with pytest.raises(RuntimeError):
         production_check.check_startup(data)
+
+
+def test_protected_deployment_checks_use_authenticated_cli(monkeypatch):
+    monkeypatch.setenv("VERCEL_TOKEN", "test-private-token")
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stdout=b'{"status":"healthy"}\n200\napplication/json')
+
+    monkeypatch.setattr(production_check.subprocess, "run", run)
+    assert production_check.get_json("https://release.vercel.app/api/health?probe=true", True) == {"status": "healthy"}
+    assert commands[0][:5] == ["vercel", "curl", "/api/health?probe=true", "--deployment", "https://release.vercel.app"]
+    assert "test-private-token" in commands[0]
+
+
+def test_protected_deployment_rejects_login_html(monkeypatch):
+    monkeypatch.setattr(production_check.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(
+        returncode=0, stdout=b'<html>Login</html>\n200\ntext/html'))
+    with pytest.raises(RuntimeError, match="API returns JSON"):
+        production_check.get_json("https://release.vercel.app/api/health", True)
+
+
+def test_cli_timeout_never_exposes_token(monkeypatch):
+    monkeypatch.setenv("VERCEL_TOKEN", "test-private-token")
+
+    def run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, 60)
+
+    monkeypatch.setattr(production_check.subprocess, "run", run)
+    with pytest.raises(RuntimeError) as error:
+        production_check.get_response("https://release.vercel.app", True)
+    assert "test-private-token" not in str(error.value)
