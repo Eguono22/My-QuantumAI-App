@@ -95,7 +95,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Promote healthy deployment
-        run: vercel promote "${{ steps.deployment.outputs.url }}" --scope="$VERCEL_ORG_ID" --yes
+        run: python scripts/promote_production.py "${{ steps.deployment.outputs.url }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
