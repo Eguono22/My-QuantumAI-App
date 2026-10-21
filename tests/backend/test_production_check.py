@@ -61,7 +61,7 @@ def test_protected_deployment_checks_use_authenticated_cli(monkeypatch):
     monkeypatch.setattr(production_check.subprocess, "run", run)
     assert production_check.get_json("https://release.vercel.app/api/health?probe=true", True) == {"status": "healthy"}
     assert commands[0][:5] == ["vercel", "curl", "/api/health?probe=true", "--deployment", "https://release.vercel.app"]
-    assert "test-private-token" in commands[0]
+    assert "test-private-token" not in commands[0]
 
 
 def test_protected_deployment_rejects_login_html(monkeypatch):
@@ -80,4 +80,14 @@ def test_cli_timeout_never_exposes_token(monkeypatch):
     monkeypatch.setattr(production_check.subprocess, "run", run)
     with pytest.raises(RuntimeError) as error:
         production_check.get_response("https://release.vercel.app", True)
+    assert "test-private-token" not in str(error.value)
+
+
+def test_cli_error_redacts_token_from_diagnostics(monkeypatch):
+    monkeypatch.setenv("VERCEL_TOKEN", "test-private-token")
+    monkeypatch.setattr(production_check.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(
+        returncode=1, stderr=b'Authentication failed for test-private-token'))
+    with pytest.raises(RuntimeError) as error:
+        production_check.get_response("https://release.vercel.app", True)
+    assert "Authentication failed" in str(error.value)
     assert "test-private-token" not in str(error.value)

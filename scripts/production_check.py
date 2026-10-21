@@ -21,15 +21,17 @@ def get_response(url, use_vercel=False):
         if parsed.query:
             path += "?" + parsed.query
         command = ["vercel", "curl", path, "--deployment", f"{parsed.scheme}://{parsed.netloc}"]
-        if os.environ.get("VERCEL_TOKEN"):
-            command += ["--token", os.environ["VERCEL_TOKEN"]]
         command += ["--", "--silent", "--show-error", "--max-time", "30", "--write-out", "\n%{http_code}\n%{content_type}"]
         try:
             result = subprocess.run(command, capture_output=True, timeout=60)
         except (subprocess.TimeoutExpired, OSError):
             raise RuntimeError("Authenticated Vercel request could not complete") from None
         if result.returncode:
-            raise RuntimeError("Authenticated Vercel request failed")
+            detail = result.stderr.decode(errors="replace")
+            token = os.environ.get("VERCEL_TOKEN")
+            if token:
+                detail = detail.replace(token, "[REDACTED]")
+            raise RuntimeError("Authenticated Vercel request failed: " + detail[-1500:])
         body, status, content_type = result.stdout.rsplit(b"\n", 2)
         return int(status), content_type.decode(), body
     with urlopen(Request(url, headers={"Accept": "application/json"}), timeout=30) as response:
