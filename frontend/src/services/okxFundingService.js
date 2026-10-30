@@ -6,6 +6,7 @@ export const okxFundingService = {
   connect: async (payload) => (await api.post(`${base}/connection`, payload)).data,
   disconnect: async (password) => (await api.post(`${base}/disconnect`, { password })).data,
   balances: async () => (await api.get(`${base}/balances`)).data,
+  tradingBalances: async () => (await api.get(`${base}/trading-balances`)).data,
   methods: async (kind, currency, action) => (await api.get(`${base}/methods`, { params: { kind, currency, action } })).data,
   deposit: async (kind, currency) => (await api.get(`${base}/deposit`, { params: { kind, currency } })).data,
   history: async (kind, currency) => (await api.get(`${base}/history`, { params: { kind, currency } })).data,

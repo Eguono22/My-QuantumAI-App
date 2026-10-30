@@ -115,6 +115,13 @@ def balances(db: Session = Depends(get_db), user: User = Depends(get_current_use
     return call(fetch)
 
 
+@router.get('/trading-balances')
+def trading_balances(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    def fetch():
+        return service.client(db, user.id).request('GET', '/api/v5/account/balance')
+    return call(fetch)
+
+
 @router.get('/methods')
 def methods(kind: Literal['crypto', 'cash'], currency: str = Query(pattern=r'^[A-Z0-9]{2,12}$'), action: Literal['deposit', 'withdrawal'] = 'deposit', db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return call(service.methods, db, user.id, kind, currency, action)

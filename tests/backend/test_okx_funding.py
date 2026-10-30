@@ -250,6 +250,17 @@ def api(context):
     with TestClient(app) as client: yield client
 
 
+def test_trading_balance_is_read_only_and_not_cached(context, api):
+    _, _, _, calls, responses = context
+    payload = [{'totalEq': '125.50', 'details': [{'ccy': 'EUR', 'eq': '100.25'}]}]
+    responses['/api/v5/account/balance'] = payload
+    response = api.get('/funding/okx/trading-balances')
+    assert response.status_code == 200
+    assert response.json() == payload
+    assert response.headers['cache-control'] == 'no-store'
+    assert calls == [('GET', '/api/v5/account/balance', None, None)]
+
+
 def test_confirmation_requires_current_password_and_typed_confirmation(context, api):
     db, user, _, calls, _ = context
     review = service.prepare(db, user.id, CRYPTO_REQUEST)
@@ -279,6 +290,7 @@ def test_routes_require_authentication(context):
     app = FastAPI(); app.include_router(routes.router)
     with TestClient(app) as client:
         assert client.get('/funding/okx/connection').status_code == 401
+        assert client.get('/funding/okx/trading-balances').status_code == 401
 
 
 def test_crypto_and_cash_history_fail_independently(context):

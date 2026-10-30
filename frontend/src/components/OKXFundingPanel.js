@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { okxFundingService as service } from '../services/okxFundingService';
+import OKXBalancePanel from './OKXBalancePanel';
 
 const fieldClass = 'market-input mt-1 w-full rounded-xl px-3 py-2';
 const buttonClass = 'rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-900 disabled:opacity-50';
@@ -208,6 +209,7 @@ export default function OKXFundingPanel() {
     </form>}
     {connection?.connected && <>
       <p className="text-sm text-emerald-700">Your OKX account is connected · {connection.region}</p>
+      <OKXBalancePanel />
       <label className="block text-sm text-zinc-700">Transfer type<select className={fieldClass} value={kind} onChange={event => { setKind(event.target.value); setCurrency(event.target.value === 'crypto' ? 'USDT' : 'EUR'); }}>
         <option value="crypto">Cryptocurrency</option><option value="cash">Bank / Cash</option>
       </select></label>

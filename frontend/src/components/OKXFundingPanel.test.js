@@ -4,7 +4,7 @@ import OKXFundingPanel from './OKXFundingPanel';
 import { okxFundingService as service } from '../services/okxFundingService';
 
 jest.mock('../services/okxFundingService', () => ({ okxFundingService: {
-  status: jest.fn(), connect: jest.fn(), disconnect: jest.fn(), methods: jest.fn(), deposit: jest.fn(), balances: jest.fn(), withdrawals: jest.fn(), review: jest.fn(), confirm: jest.fn(), refresh: jest.fn(), history: jest.fn(),
+  status: jest.fn(), connect: jest.fn(), disconnect: jest.fn(), methods: jest.fn(), deposit: jest.fn(), balances: jest.fn(), tradingBalances: jest.fn(), withdrawals: jest.fn(), review: jest.fn(), confirm: jest.fn(), refresh: jest.fn(), history: jest.fn(),
 } }));
 
 const network = { ccy: 'USDT', chain: 'USDT-TRC20', canWd: true, fee: '1', needTag: false };
@@ -16,6 +16,7 @@ beforeEach(() => {
   service.methods.mockImplementation(kind => Promise.resolve(kind === 'crypto' ? [network] : [bank]));
   service.deposit.mockImplementation(kind => Promise.resolve({ instructions: kind === 'crypto' ? [{ ccy: 'USDT', chain: 'USDT-TRC20', addr: 'real-provider-address', memo: '123', minDep: '1' }] : [bank] }));
   service.balances.mockResolvedValue([{ ccy: 'USDT', availBal: '123' }, { ccy: 'EUR', availBal: '500' }]);
+  service.tradingBalances.mockResolvedValue([]);
   service.withdrawals.mockResolvedValue([]);
   service.review.mockResolvedValue({ id: 'review-id', status: 'review', summary: { currency: 'USDT', amount: '10', fee: '1', destination: 'trusted-wallet' } });
   service.confirm.mockResolvedValue({ id: 'review-id', status: 'submitted' });

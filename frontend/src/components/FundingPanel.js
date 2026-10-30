@@ -33,7 +33,7 @@ export default function FundingPanel({ cashBalance, amount, onAmountChange, onPa
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-900">{realMoney ? 'Real Money Funding' : 'Paper Funding'}</h3>
-          <p className="mt-1 text-sm text-zinc-600">{realMoney ? 'Manage deposits and withdrawals' : `Available paper cash: ${formatCurrency(cashBalance)}`}</p>
+          <p className="mt-1 text-sm text-zinc-600">{realMoney ? 'View balances and manage deposits and withdrawals' : `Available paper cash: ${formatCurrency(cashBalance)}`}</p>
         </div>
         <button
           type="button"
@@ -64,7 +64,7 @@ export default function FundingPanel({ cashBalance, amount, onAmountChange, onPa
             Funding method
             <select value={method} onChange={event => setMethod(event.target.value)} className="market-select mt-2 w-full rounded-xl px-3 py-3">
               <option value="broker">Continue on {provider.name}</option>
-              <option value="bank">Transfer inside the app</option>
+              <option value="bank">Balances & transfers inside the app</option>
             </select>
           </label>
           {method === 'broker' ? (
