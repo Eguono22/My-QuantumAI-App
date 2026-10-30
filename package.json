@@ -1,6 +1,7 @@
 {
   "name": "my-quantumai-app",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "start": "npm --prefix frontend start",
     "build": "npm --prefix frontend run build",

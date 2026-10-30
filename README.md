@@ -1,5 +1,7 @@
 # ⚛️ QuantumAI Trading Platform
 
+All rights reserved. See [LICENSE](LICENSE).
+
 A full-stack trading workspace built around quantum-inspired signals, paper-trading controls, and a narrow live-trading pilot.
 
 ```
