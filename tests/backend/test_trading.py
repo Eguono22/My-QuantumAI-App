@@ -13,6 +13,20 @@ from services.market_service import MarketService
 from services.notification_service import notification_service
 from config.settings import settings
 
+@pytest.fixture
+def utc_midday(monkeypatch):
+    """Keep same-day fixtures within today even when CI runs near UTC midnight."""
+    fixed = datetime.datetime.now(datetime.timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+
+    class FrozenDateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz else fixed.replace(tzinfo=None)
+
+    monkeypatch.setattr(trading_service_module, "datetime", FrozenDateTime)
+    return fixed
+
+
 class TestTradingService:
     def setup_method(self):
         self.service = TradingService()
@@ -356,7 +370,7 @@ class TestTradingService:
 
         db.close()
 
-    def test_execution_metrics_rollup_windows(self):
+    def test_execution_metrics_rollup_windows(self, utc_midday):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from models.database import Base, User, Order
@@ -376,7 +390,7 @@ class TestTradingService:
         db.add(user)
         db.commit()
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = utc_midday
         db.add_all(
             [
                 Order(
@@ -637,7 +651,7 @@ class TestTradingService:
 
         db.close()
 
-    def test_operator_daily_brief_summarizes_controls_and_regime_drift(self):
+    def test_operator_daily_brief_summarizes_controls_and_regime_drift(self, utc_midday):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from models.database import Base, User, TradeAuditEvent, Order
@@ -657,7 +671,7 @@ class TestTradingService:
         db.add(user)
         db.commit()
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = utc_midday
         db.add_all(
             [
                 TradeAuditEvent(
