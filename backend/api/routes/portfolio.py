@@ -10,6 +10,7 @@ from api.routes.response_models import PortfolioHolding, TradeResponse, Performa
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 class TradeRequest(BaseModel):
+    expected_mode: Optional[Literal['paper', 'live']] = None
     asset: str
     action: str
     quantity: float
@@ -40,6 +41,8 @@ def get_cash_balance(db: Session = Depends(get_db), current_user: User = Depends
 
 @router.post("/trade", response_model=TradeResponse)
 def execute_trade(request: TradeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if request.expected_mode and request.expected_mode != trading_service._trading_mode():
+        raise HTTPException(409, 'Selected trading mode does not match the server. Refresh trading readiness before submitting.')
     try:
         return trading_service.execute_trade(
             db,

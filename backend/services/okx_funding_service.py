@@ -14,7 +14,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.exc import IntegrityError
 
 from config.settings import settings
-from models.database import OKXConnection, OKXWithdrawal
+from models.database import OKXConnection, OKXWithdrawal, OKXSpotOrder, User
 
 DOMAINS = {'global': 'https://openapi.okx.com', 'us': 'https://us.okx.com', 'eea': 'https://eea.okx.com'}
 
@@ -124,6 +124,8 @@ class OKXFundingService:
         if not account or not account[0].get('uid'):
             raise FundingError('OKX did not return an account identity.')
         identity = region + ':' + str(account[0]['uid'])
+        db.query(User).filter_by(id=user_id).update({User.username: User.username})
+        self.check_pending_trades(db, user_id)
         existing = db.query(OKXConnection).filter_by(user_id=user_id).first()
         if db.query(OKXWithdrawal).filter(OKXWithdrawal.user_id == user_id, OKXWithdrawal.status.in_(['submitting', 'unknown', 'submitted'])).first():
             raise FundingError('Resolve pending withdrawals before replacing this connection.', 409)
@@ -144,6 +146,8 @@ class OKXFundingService:
         return self.status(db, user_id)
 
     def disconnect(self, db, user_id):
+        db.query(User).filter_by(id=user_id).update({User.username: User.username})
+        self.check_pending_trades(db, user_id)
         if db.query(OKXWithdrawal).filter(OKXWithdrawal.user_id == user_id, OKXWithdrawal.status.in_(['submitting', 'unknown', 'submitted'])).first():
             raise FundingError('Resolve pending withdrawals before disconnecting.', 409)
         row = db.query(OKXConnection).filter_by(user_id=user_id).first()
@@ -154,6 +158,10 @@ class OKXFundingService:
                 raise FundingError('A withdrawal is in progress.', 409)
             db.commit()
         return {'connected': False}
+
+    def check_pending_trades(self, db, user_id):
+        if db.query(OKXSpotOrder).filter(OKXSpotOrder.user_id == user_id, OKXSpotOrder.status.in_(['submitting', 'unknown', 'live', 'partially_filled', 'accepted'])).first():
+            raise FundingError('Resolve pending real orders before changing the OKX connection.', 409)
 
     def methods(self, db, user_id, kind, currency, action):
         client = self.client(db, user_id)

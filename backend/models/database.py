@@ -283,6 +283,21 @@ class OKXConnection(Base):
     active_withdrawal_id = Column(String, nullable=True)
 
 
+class OKXSpotOrder(Base):
+    __tablename__ = 'okx_spot_orders'
+    id = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    connection_version = Column(String, nullable=False)
+    instrument = Column(String, nullable=False)
+    side = Column(String, nullable=False)
+    quantity = Column(String, nullable=False)
+    price = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    provider_id = Column(String, nullable=True)
+    filled_quantity = Column(String, nullable=True)
+    created_at = Column(Float, nullable=False)
+
+
 class OKXWithdrawal(Base):
     __tablename__ = "okx_withdrawals"
     id = Column(String, primary_key=True)

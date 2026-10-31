@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from api.routes.auth import get_current_user, pwd_context
 from models.database import get_db, User, OKXWithdrawal, OKXFundingAuth
 from services.okx_funding_service import FundingError, okx_funding_service as service
+from services.okx_trading_service import okx_trading_service
+from models.database import OKXSpotOrder
+from config.settings import settings
 
 router = APIRouter(prefix='/funding/okx', tags=['okx-funding'])
 
@@ -53,6 +56,16 @@ class ConfirmRequest(PrivateRequest):
     confirmation: Literal['WITHDRAW']
 
 
+class SpotOrderRequest(PrivateRequest):
+    confirmation: Literal['LIVE']
+    client_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    instrument: str = Field(pattern=r'^[A-Z0-9]{2,12}-(USDT|USDC)$')
+    side: Literal['buy', 'sell']
+    quantity: str = Field(max_length=40, pattern=r'^\d+(\.\d+)?$')
+    price: str = Field(max_length=40, pattern=r'^\d+(\.\d+)?$')
+
+
+
 def no_cache(response: Response):
     response.headers['Cache-Control'] = 'no-store'
     response.headers['Pragma'] = 'no-cache'
@@ -86,6 +99,33 @@ def call(function, *args):
         return function(*args)
     except FundingError as exc:
         raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.get('/trading-readiness')
+def trading_readiness(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    connection = service.status(db, user.id)
+    enabled = bool(settings.LIVE_TRADING_ENABLED and not settings.TRADING_KILL_SWITCH)
+    return {'ready': enabled and connection['configured'] and connection['connected'],
+            'enabled': enabled, 'connected': connection['connected'],
+            'max_notional': settings.MAX_LIVE_NOTIONAL_PER_TRADE}
+
+
+@router.get('/spot-orders')
+def spot_orders(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rows = db.query(OKXSpotOrder).filter_by(user_id=user.id).order_by(OKXSpotOrder.created_at.desc()).limit(20).all()
+    return [okx_trading_service.public(row) for row in rows]
+
+
+@router.post('/spot-orders')
+def submit_spot_order(request: SpotOrderRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    reauthenticate(db, user, request.password)
+    return call(okx_trading_service.submit, db, user.id, request)
+
+
+@router.post('/spot-orders/{order_id}/refresh')
+def refresh_spot_order(order_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return call(okx_trading_service.refresh, db, user.id, order_id)
+
 
 
 @router.get('/connection')

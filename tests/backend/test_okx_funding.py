@@ -21,6 +21,7 @@ from api.routes.auth import get_current_user, pwd_context
 from config.settings import settings
 from models.database import Base, User, OKXConnection, OKXWithdrawal, get_db
 from services.okx_funding_service import OKXClient, FundingError, OKXRejected, money, okx_funding_service as service
+from services.okx_trading_service import okx_trading_service
 
 CREDS = {'api_key': 'test-key', 'secret': 'test-secret', 'passphrase': 'test-passphrase'}
 NETWORK = {'ccy': 'USDT', 'chain': 'USDT-TRC20', 'canDep': True, 'canWd': True, 'fee': '1', 'burningFeeRate': '', 'minWd': '2', 'maxWd': '10000', 'minDep': '1', 'wdTickSz': '6', 'needTag': False}
@@ -261,6 +262,69 @@ def test_trading_balance_is_read_only_and_not_cached(context, api):
     assert calls == [('GET', '/api/v5/account/balance', None, None)]
 
 
+def spot_payload():
+    return dict(client_id='a' * 32, instrument='BTC-USDC', side='buy', quantity='0.001', price='100', confirmation='LIVE', password='TestPassword123!')
+
+
+def test_spot_order_requires_enablement_password_and_confirmation(context, api, monkeypatch):
+    _, _, _, calls, _ = context
+    monkeypatch.setattr(settings, 'LIVE_TRADING_ENABLED', False)
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).status_code == 403
+    monkeypatch.setattr(settings, 'LIVE_TRADING_ENABLED', True)
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), password='wrong')).status_code == 400
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), confirmation='PAPER')).status_code == 422
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), instrument='BTC-USDT-SWAP')).status_code == 422
+    monkeypatch.setattr(settings, 'TRADING_KILL_SWITCH', True)
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).status_code == 403
+    assert not posts(calls)
+
+
+def test_spot_order_is_idempotent_isolated_and_refreshable(context, api, monkeypatch):
+    db, user, other, calls, responses = context
+    monkeypatch.setattr(settings, 'LIVE_TRADING_ENABLED', True)
+    responses['/api/v5/trade/order'] = [{'sCode': '0', 'ordId': 'order-1'}]
+    response = api.post('/funding/okx/spot-orders', json=spot_payload())
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert response.json()['status'] == 'accepted'
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).json()['status'] == 'accepted'
+    assert len(posts(calls)) == 1
+    assert posts(calls)[0][3] == dict(instId='BTC-USDC', tdMode='cash', side='buy', ordType='limit', sz='0.001', px='100', clOrdId='a' * 32)
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), price='101')).status_code == 409
+    assert api.post('/funding/okx/disconnect', json={'password': 'TestPassword123!'}).status_code == 409
+    with pytest.raises(FundingError, match='not found'):
+        okx_trading_service.refresh(db, other.id, 'a' * 32)
+    responses['/api/v5/trade/order'] = [{'state': 'filled', 'ordId': 'order-1', 'accFillSz': '0.001'}]
+    refreshed = api.post('/funding/okx/spot-orders/' + 'a' * 32 + '/refresh')
+    assert refreshed.json()['status'] == 'filled'
+    assert refreshed.json()['filled_quantity'] == '0.001'
+    from models.database import Portfolio, Order
+    assert db.query(Portfolio).filter_by(user_id=user.id).count() == 0
+    assert db.query(Order).filter_by(user_id=user.id).count() == 0
+
+
+def test_unknown_spot_order_blocks_resubmission_and_checks_limits(context, api, monkeypatch):
+    _, _, _, calls, responses = context
+    monkeypatch.setattr(settings, 'LIVE_TRADING_ENABLED', True)
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), price='1000000')).status_code == 400
+    assert not posts(calls)
+    responses['/api/v5/trade/order'] = FundingError('timeout')
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).json()['status'] == 'unknown'
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).json()['status'] == 'unknown'
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), client_id='b' * 32)).status_code == 409
+    assert len(posts(calls)) == 1
+
+
+def test_spot_order_per_item_rejection_and_daily_limit(context, api, monkeypatch):
+    _, _, _, calls, responses = context
+    monkeypatch.setattr(settings, 'LIVE_TRADING_ENABLED', True)
+    monkeypatch.setattr(settings, 'MAX_LIVE_DAILY_TRADES', 1)
+    responses['/api/v5/trade/order'] = [{'sCode': '51008', 'sMsg': 'Not enough funds'}]
+    assert api.post('/funding/okx/spot-orders', json=spot_payload()).json()['status'] == 'rejected'
+    assert api.post('/funding/okx/spot-orders', json=dict(spot_payload(), client_id='b' * 32)).status_code == 400
+    assert len(posts(calls)) == 1
+
+
 def test_confirmation_requires_current_password_and_typed_confirmation(context, api):
     db, user, _, calls, _ = context
     review = service.prepare(db, user.id, CRYPTO_REQUEST)
@@ -291,6 +355,8 @@ def test_routes_require_authentication(context):
     with TestClient(app) as client:
         assert client.get('/funding/okx/connection').status_code == 401
         assert client.get('/funding/okx/trading-balances').status_code == 401
+        assert client.get('/funding/okx/spot-orders').status_code == 401
+        assert client.post('/funding/okx/spot-orders', json=spot_payload()).status_code == 401
 
 
 def test_crypto_and_cash_history_fail_independently(context):

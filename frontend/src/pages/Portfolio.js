@@ -6,10 +6,12 @@ import LivePriceChart from '../components/LivePriceChart';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Alert from '../components/Alert';
 import FundingPanel from '../components/FundingPanel';
+import RealTradingPanel from '../components/RealTradingPanel';
 import { formatCurrency, formatPercent, getChangeColor } from '../utils/formatters';
 
 export default function Portfolio({ user, preferences }) {
   const [portfolio, setPortfolio] = useState([]);
+  const [realTrading, setRealTrading] = useState(false);
   const [performance, setPerformance] = useState(null);
   const [assetOptions, setAssetOptions] = useState(['BTC']);
   const [selectedAsset, setSelectedAsset] = useState('BTC');
@@ -87,7 +89,7 @@ export default function Portfolio({ user, preferences }) {
       return;
     }
     try {
-      await tradingService.executeTrade(tradeForm.asset, tradeForm.action, qty);
+      await tradingService.executeTrade(tradeForm.asset, tradeForm.action, qty, undefined, { expected_mode: 'paper' });
       setAlert({ type: 'success', message: `${tradeForm.action.toUpperCase()} order executed: ${tradeForm.quantity} ${tradeForm.asset}` });
       setTradeForm({ ...tradeForm, quantity: '' });
       fetchData();
@@ -154,7 +156,7 @@ export default function Portfolio({ user, preferences }) {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
+          {!realTrading && <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Total Exposure</p>
               <p className="mt-2 text-2xl font-semibold text-white">{formatCurrency(totalExposure)}</p>
@@ -167,11 +169,16 @@ export default function Portfolio({ user, preferences }) {
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Risk Watch</p>
               <p className="mt-2 text-2xl font-semibold text-amber-100">{worstHolding ? worstHolding.asset : '--'}</p>
             </div>
-          </div>
+          </div>}
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="market-panel flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4">
+        <div><p className="font-semibold text-zinc-900">Trading mode: {realTrading ? 'Real' : 'Paper'}</p><p className="text-sm text-zinc-600">{realTrading ? 'Use real funds at OKX or Alpaca.' : 'Practice with simulated funds.'}</p></div>
+        <button type="button" role="switch" aria-label="Real trading" aria-checked={realTrading} onClick={() => { setRealTrading(current => !current); setAlert(null); setTradeForm(current => ({ ...current, quantity: '' })); }} className={`rounded-xl px-5 py-3 font-semibold ${realTrading ? 'bg-red-700 text-white' : 'border border-zinc-300 text-zinc-900'}`}>{realTrading ? 'Real trading · Switch to paper' : 'Paper trading · Switch to real'}</button>
+      </div>
+
+      {!realTrading && <div className="flex flex-wrap gap-2">
         {[
           { key: 'overview', label: 'Overview' },
           { key: 'risk', label: 'Risk First' },
@@ -189,10 +196,11 @@ export default function Portfolio({ user, preferences }) {
             {view.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
+      {realTrading ? <RealTradingPanel /> : <>
       {performance && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
@@ -334,7 +342,9 @@ export default function Portfolio({ user, preferences }) {
         )}
       </section>
 
-      {showPriceChart && (
+      </>}
+
+      {!realTrading && showPriceChart && (
         <section className="market-panel rounded-[28px] p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
